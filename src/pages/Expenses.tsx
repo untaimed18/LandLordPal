@@ -9,6 +9,25 @@ import type { ExpenseCategory } from '../types'
 import { nowISO } from '../lib/id'
 import { toCSV, downloadCSV } from '../lib/csv'
 
+function formatAmountDisplay(value: number): string {
+  if (!value) return ''
+  const parts = value.toFixed(2).split('.')
+  const intPart = Number(parts[0]).toLocaleString('en-US')
+  const decPart = parts[1]
+  return decPart === '00' ? intPart : `${intPart}.${decPart}`
+}
+
+function parseAmountInput(raw: string): number {
+  const cleaned = raw.replace(/[^0-9.]/g, '')
+  // Allow only one decimal point
+  const dotIdx = cleaned.indexOf('.')
+  const sanitized = dotIdx === -1 ? cleaned : cleaned.slice(0, dotIdx + 1) + cleaned.slice(dotIdx + 1).replace(/\./g, '')
+  // Limit to 2 decimal places
+  const [intPart, decPart] = sanitized.split('.')
+  const final = decPart !== undefined ? `${intPart}.${decPart.slice(0, 2)}` : intPart
+  return final ? Number(final) : 0
+}
+
 const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
   { value: 'mortgage', label: 'Mortgage' },
   { value: 'insurance', label: 'Insurance' },
@@ -248,7 +267,7 @@ export default function Expenses() {
                 ))}
               </select>
             </label>
-            <label>Amount * <input type="number" min={0} step={0.01} required value={form.amount || ''} onChange={(e) => setForm((f) => ({ ...f, amount: +e.target.value }))} /></label>
+            <label>Amount * <input type="text" inputMode="decimal" required value={form.amount ? formatAmountDisplay(form.amount) : ''} onChange={(e) => setForm((f) => ({ ...f, amount: parseAmountInput(e.target.value) }))} placeholder="1,200.00" /></label>
             <label>Date * <input type="date" required value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} /></label>
           </div>
           <label>
