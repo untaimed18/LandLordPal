@@ -80,7 +80,7 @@ export default function Vendors() {
       </div>
 
       {showForm && (
-        <form className="card form-card" onSubmit={handleSubmit} style={{ maxWidth: 540 }}>
+        <form className="card form-card" onSubmit={handleSubmit}>
           <h3>{editingId ? 'Edit vendor' : 'New vendor'}</h3>
           <div className="form-grid">
             <label>Name * <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Mike's Plumbing" /></label>

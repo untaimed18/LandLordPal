@@ -291,9 +291,9 @@ input:focus, select:focus, textarea:focus {
 .page-header h1 { margin: 0; }
 
 /* Forms */
-.form-card { margin-bottom: 1.5rem; max-width: 600px; }
+.form-card { margin-bottom: 1.5rem; max-width: 780px; }
 .form-card h3 { margin: 0 0 1rem 0; }
-.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .form-card label { display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 0.35rem; }
 .form-card input, .form-card select, .form-card textarea {
   width: 100%;
@@ -385,7 +385,7 @@ input:focus, select:focus, textarea:focus {
 
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: var(--overlay); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
-.modal { max-width: 480px; width: 100%; max-height: 90vh; overflow-y: auto; }
+.modal { max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .modal-header h3 { margin: 0; }
 .btn-icon { background: none; border: none; font-size: 1.5rem; line-height: 1; color: var(--text-muted); padding: 0.25rem; }
@@ -565,7 +565,7 @@ input:focus, select:focus, textarea:focus {
 .expense-bar-pct { min-width: 50px; text-align: right; font-size: 0.85rem; }
 
 /* Tax summary */
-.tax-summary-report { max-width: 480px; }
+.tax-summary-report { max-width: 600px; }
 .tax-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
 .tax-row.header-row { font-weight: 600; font-size: 1.05rem; border-bottom: 2px solid var(--border); }
 .tax-row.indent { padding-left: 1.5rem; }
@@ -640,10 +640,10 @@ input:focus, select:focus, textarea:focus {
 
 /* Welcome card (Dashboard empty state) */
 .welcome-card {
-  max-width: 560px;
+  max-width: 620px;
   margin: 2rem auto;
   text-align: center;
-  padding: 2.5rem 2rem;
+  padding: 2.5rem 2.5rem;
 }
 .welcome-icon { font-size: 3rem; margin-bottom: 0.75rem; }
 .welcome-card h2 { margin: 0 0 0.75rem 0; font-size: 1.5rem; }

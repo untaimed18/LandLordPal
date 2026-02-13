@@ -167,7 +167,7 @@ export default function Maintenance() {
       )}
 
       {showForm && properties.length > 0 && (
-        <form className="card form-card" onSubmit={handleSubmit} style={{ maxWidth: 640 }}>
+        <form className="card form-card" onSubmit={handleSubmit}>
           <h3>{editingId ? 'Edit request' : 'New maintenance request'}</h3>
           <div className="form-grid">
             <label>Property * <select required value={form.propertyId} onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.value, unitId: '', tenantId: '' }))}>
