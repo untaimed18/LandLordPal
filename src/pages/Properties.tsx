@@ -5,6 +5,13 @@ import { getPropertySummary } from '../lib/calculations'
 import { addProperty, updateProperty, deleteProperty } from '../store'
 import { useToast } from '../context/ToastContext'
 import { formatMoney, formatDate } from '../lib/format'
+import { US_STATES } from '../lib/us-states'
+
+function formatNumberWithCommas(value: string): string {
+  const digits = value.replace(/[^\d]/g, '')
+  if (!digits) return ''
+  return Number(digits).toLocaleString('en-US')
+}
 
 export default function Properties() {
   const toast = useToast()
@@ -103,9 +110,12 @@ export default function Properties() {
             <label>Name * <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Oak Street Duplex" /></label>
             <label>Address * <input required value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="123 Oak St" /></label>
             <label>City * <input required value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} placeholder="Austin" /></label>
-            <label>State * <input required value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} placeholder="TX" /></label>
+            <label>State * <select required value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}>
+              <option value="">Select state</option>
+              {US_STATES.map((s) => <option key={s.value} value={s.value}>{s.value} — {s.label}</option>)}
+            </select></label>
             <label>ZIP * <input required value={form.zip} onChange={(e) => setForm((f) => ({ ...f, zip: e.target.value }))} placeholder="78701" /></label>
-            <label>Purchase price <input type="number" min={0} step={0.01} value={form.purchasePrice || ''} onChange={(e) => setForm((f) => ({ ...f, purchasePrice: +e.target.value }))} placeholder="250000" /></label>
+            <label>Purchase price <input type="text" inputMode="numeric" value={form.purchasePrice ? formatNumberWithCommas(String(form.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} placeholder="350,000" /></label>
             <label>Purchase date <input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
           </div>
           <label>Notes <textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Optional notes" rows={2} /></label>

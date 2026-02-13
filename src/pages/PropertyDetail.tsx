@@ -21,7 +21,14 @@ import { useNavigate } from 'react-router-dom'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
 import { formatMoney, formatDate } from '../lib/format'
+import { US_STATES } from '../lib/us-states'
 import Breadcrumbs from '../components/Breadcrumbs'
+
+function formatNumberWithCommas(value: string): string {
+  const digits = value.replace(/[^\d]/g, '')
+  if (!digits) return ''
+  return Number(digits).toLocaleString('en-US')
+}
 
 function startOfMonth(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
@@ -283,9 +290,12 @@ export default function PropertyDetail() {
                 <label>Name * <input required value={propertyForm.name} onChange={(e) => setPropertyForm((f) => ({ ...f, name: e.target.value }))} /></label>
                 <label>Address * <input required value={propertyForm.address} onChange={(e) => setPropertyForm((f) => ({ ...f, address: e.target.value }))} /></label>
                 <label>City * <input required value={propertyForm.city} onChange={(e) => setPropertyForm((f) => ({ ...f, city: e.target.value }))} /></label>
-                <label>State * <input required value={propertyForm.state} onChange={(e) => setPropertyForm((f) => ({ ...f, state: e.target.value }))} /></label>
+                <label>State * <select required value={propertyForm.state} onChange={(e) => setPropertyForm((f) => ({ ...f, state: e.target.value }))}>
+                  <option value="">Select state</option>
+                  {US_STATES.map((s) => <option key={s.value} value={s.value}>{s.value} — {s.label}</option>)}
+                </select></label>
                 <label>ZIP * <input required value={propertyForm.zip} onChange={(e) => setPropertyForm((f) => ({ ...f, zip: e.target.value }))} /></label>
-                <label>Purchase price <input type="number" min={0} step={0.01} value={propertyForm.purchasePrice || ''} onChange={(e) => setPropertyForm((f) => ({ ...f, purchasePrice: +e.target.value }))} /></label>
+                <label>Purchase price <input type="text" inputMode="numeric" value={propertyForm.purchasePrice ? formatNumberWithCommas(String(propertyForm.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setPropertyForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} /></label>
                 <label>Purchase date <input type="date" value={propertyForm.purchaseDate} onChange={(e) => setPropertyForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
               </div>
               <label>Notes <textarea value={propertyForm.notes} onChange={(e) => setPropertyForm((f) => ({ ...f, notes: e.target.value }))} rows={2} /></label>

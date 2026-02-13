@@ -27,7 +27,23 @@ export default function Reports() {
   const [year, setYear] = useState(now.getFullYear())
   const [propertyFilter, setPropertyFilter] = useState('')
   const [activeReport, setActiveReport] = useState<ReportType>('pnl')
-  const yearOptions = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
+  // Build year options dynamically from actual data range (at least ±1 from current year)
+  const yearOptions = useMemo(() => {
+    const allDates = [
+      ...payments.map((p) => p.date),
+      ...expenses.map((e) => e.date),
+    ].filter(Boolean)
+    let minYear = now.getFullYear() - 1
+    let maxYear = now.getFullYear() + 1
+    for (const d of allDates) {
+      const y = Number(d.slice(0, 4))
+      if (Number.isFinite(y)) {
+        if (y < minYear) minYear = y
+        if (y > maxYear) maxYear = y
+      }
+    }
+    return Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i)
+  }, [payments, expenses])
 
   const filteredPayments = propertyFilter ? payments.filter((p) => p.propertyId === propertyFilter) : payments
   const filteredExpenses = propertyFilter ? expenses.filter((e) => e.propertyId === propertyFilter) : expenses
@@ -96,18 +112,18 @@ export default function Reports() {
 
   function exportTax() {
     const rows: (string | number)[][] = [
-      ['Gross Rental Income', taxSummary.totalIncome, '', ''],
-      ['', '', '', ''],
-      ['Expenses:', '', '', ''],
+      ['Gross Rental Income', taxSummary.totalIncome],
+      ['', ''],
+      ['Expenses:', ''],
     ]
     CATEGORIES.forEach((c) => {
       const amt = taxSummary.byCategory[c.value] ?? 0
-      if (amt > 0) rows.push([`  ${c.label}`, amt, '', ''])
+      if (amt > 0) rows.push([`  ${c.label}`, amt])
     })
-    rows.push(['', '', '', ''])
-    rows.push(['Total Expenses', taxSummary.totalExpenses, '', ''])
-    rows.push(['Net Rental Income', taxSummary.netIncome, '', ''])
-    const csv = toCSV(['Item', 'Amount', '', ''], rows)
+    rows.push(['', ''])
+    rows.push(['Total Expenses', taxSummary.totalExpenses])
+    rows.push(['Net Rental Income', taxSummary.netIncome])
+    const csv = toCSV(['Item', 'Amount'], rows)
     downloadCSV(`tax-summary-${year}.csv`, csv)
   }
 

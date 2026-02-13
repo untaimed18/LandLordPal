@@ -50,40 +50,53 @@ export default function Expenses() {
   })
   const sortedExpenses = [...filteredExpenses].sort((a, b) => b.date.localeCompare(a.date))
 
-  // Auto-generate recurring expenses (guard against StrictMode double-fire)
+  // Auto-generate recurring expenses for all missed months up to the current month
+  // (guard against StrictMode double-fire)
   const recurringRan = useRef(false)
   useEffect(() => {
     if (recurringRan.current) return
     recurringRan.current = true
     const recurring = expenses.filter((e) => e.recurring)
     if (recurring.length === 0) return
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    const generated: string[] = []
+    const currentYear = now.getFullYear()
+    const currentMonthIdx = now.getMonth()
+    const currentMonth = `${currentYear}-${String(currentMonthIdx + 1).padStart(2, '0')}`
+    let generatedCount = 0
+    // Build a set of existing expense signatures to avoid duplicates quickly
+    const existingKeys = new Set(
+      expenses.map((e) => `${e.propertyId}|${e.category}|${e.description}|${e.date.slice(0, 7)}`)
+    )
     for (const re of recurring) {
-      const reMonth = re.date.slice(0, 7)
-      if (reMonth >= currentMonth) continue
-      const existingSameMonth = expenses.find(
-        (e) =>
-          e.propertyId === re.propertyId &&
-          e.category === re.category &&
-          e.description === re.description &&
-          e.date.startsWith(currentMonth)
-      )
-      if (!existingSameMonth) {
-        addExpense({
-          propertyId: re.propertyId,
-          unitId: re.unitId,
-          category: re.category,
-          amount: re.amount,
-          date: `${currentMonth}-01`,
-          description: re.description,
-          recurring: true,
-        })
-        generated.push(re.description)
+      const reYear = Number(re.date.slice(0, 4))
+      const reMonthIdx = Number(re.date.slice(5, 7)) - 1
+      // Walk forward from the month AFTER the source, up to and including the current month
+      let y = reYear
+      let m = reMonthIdx + 1
+      if (m > 11) { m = 0; y++ }
+      while (y < currentYear || (y === currentYear && m <= currentMonthIdx)) {
+        const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`
+        if (monthKey > currentMonth) break
+        const sigKey = `${re.propertyId}|${re.category}|${re.description}|${monthKey}`
+        if (!existingKeys.has(sigKey)) {
+          addExpense({
+            propertyId: re.propertyId,
+            unitId: re.unitId,
+            category: re.category,
+            amount: re.amount,
+            date: `${monthKey}-01`,
+            description: re.description,
+            recurring: true,
+            vendorId: re.vendorId,
+          })
+          existingKeys.add(sigKey)
+          generatedCount++
+        }
+        m++
+        if (m > 11) { m = 0; y++ }
       }
     }
-    if (generated.length > 0) {
-      toast(`Auto-generated ${generated.length} recurring expense${generated.length > 1 ? 's' : ''} for this month`, 'info')
+    if (generatedCount > 0) {
+      toast(`Auto-generated ${generatedCount} recurring expense${generatedCount > 1 ? 's' : ''} for missed months`, 'info')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
