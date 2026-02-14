@@ -1,5 +1,14 @@
 export type Id = string;
 
+export type PropertyType =
+  | 'single_family'
+  | 'multi_family'
+  | 'condo'
+  | 'townhouse'
+  | 'apartment'
+  | 'commercial'
+  | 'other';
+
 export interface Property {
   id: Id;
   name: string;
@@ -7,8 +16,14 @@ export interface Property {
   city: string;
   state: string;
   zip: string;
+  propertyType?: PropertyType;
+  sqft?: number;
+  amenities?: string[];
   purchasePrice?: number;
   purchaseDate?: string;
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+  insuranceExpiry?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -106,6 +121,8 @@ export type MaintenancePriority = 'low' | 'medium' | 'high' | 'emergency';
 export type MaintenanceStatus = 'open' | 'in_progress' | 'completed';
 export type MaintenanceCategory = 'plumbing' | 'electrical' | 'hvac' | 'appliance' | 'structural' | 'pest' | 'other';
 
+export type MaintenanceRecurrence = 'none' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
+
 export interface MaintenanceRequest {
   id: Id;
   propertyId: Id;
@@ -118,6 +135,8 @@ export interface MaintenanceRequest {
   category: MaintenanceCategory;
   vendorId?: Id;
   cost?: number;
+  scheduledDate?: string;
+  recurrence?: MaintenanceRecurrence;
   resolvedAt?: string;
   notes?: string;
   createdAt: string;
@@ -133,6 +152,20 @@ export interface ActivityLog {
   entityId: Id;
   note: string;
   date: string;
+  createdAt: string;
+}
+
+// Communication log
+export type CommunicationType = 'call' | 'email' | 'text' | 'in_person' | 'letter' | 'other';
+
+export interface CommunicationLog {
+  id: Id;
+  tenantId: Id;
+  propertyId: Id;
+  type: CommunicationType;
+  date: string;
+  subject: string;
+  notes?: string;
   createdAt: string;
 }
 

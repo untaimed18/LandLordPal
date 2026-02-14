@@ -7,6 +7,7 @@ import type {
   MaintenanceRequest,
   ActivityLog,
   Vendor,
+  CommunicationLog,
 } from './types';
 import { generateId, nowISO } from './lib/id';
 import { STORAGE_KEY } from './lib/calculations';
@@ -20,6 +21,7 @@ export interface AppState {
   maintenanceRequests: MaintenanceRequest[];
   activityLogs: ActivityLog[];
   vendors: Vendor[];
+  communicationLogs: CommunicationLog[];
 }
 
 const defaultState: AppState = {
@@ -31,6 +33,7 @@ const defaultState: AppState = {
   maintenanceRequests: [],
   activityLogs: [],
   vendors: [],
+  communicationLogs: [],
 };
 
 function isArray(x: unknown): x is unknown[] {
@@ -76,6 +79,7 @@ function parseStateData(data: Record<string, unknown>): AppState {
     maintenanceRequests: isArray(data.maintenanceRequests) ? data.maintenanceRequests : [],
     activityLogs: isArray(data.activityLogs) ? data.activityLogs : [],
     vendors: isArray(data.vendors) ? data.vendors : [],
+    communicationLogs: isArray(data.communicationLogs) ? data.communicationLogs : [],
   } as AppState;
 }
 
@@ -189,7 +193,8 @@ export function deleteProperty(id: string): void {
     if (a.entityType === 'tenant' && tenants.every((t) => t.id !== a.entityId)) return false;
     return true;
   });
-  setState({ ...state, properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs });
+  const communicationLogs = state.communicationLogs.filter((c) => c.propertyId !== id);
+  setState({ ...state, properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, communicationLogs });
 }
 
 // Units
@@ -261,7 +266,8 @@ export function deleteTenant(id: string): void {
   const activityLogs = state.activityLogs.filter((a) =>
     !(a.entityType === 'tenant' && a.entityId === id)
   );
-  setState({ ...state, tenants, payments, units, activityLogs });
+  const communicationLogs = state.communicationLogs.filter((c) => c.tenantId !== id);
+  setState({ ...state, tenants, payments, units, activityLogs, communicationLogs });
 }
 
 // Expenses
@@ -353,4 +359,15 @@ export function deleteVendor(id: string): void {
     e.vendorId === id ? { ...e, vendorId: undefined, updatedAt: nowISO() } : e
   );
   setState({ ...state, vendors, maintenanceRequests, expenses });
+}
+
+// Communication Logs
+export function addCommunicationLog(input: Omit<CommunicationLog, 'id' | 'createdAt'>): CommunicationLog {
+  const log: CommunicationLog = { ...input, id: generateId(), createdAt: nowISO() };
+  setState({ ...state, communicationLogs: [...state.communicationLogs, log] });
+  return log;
+}
+
+export function deleteCommunicationLog(id: string): void {
+  setState({ ...state, communicationLogs: state.communicationLogs.filter((c) => c.id !== id) });
 }

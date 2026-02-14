@@ -21,6 +21,7 @@ interface AppStateData {
   maintenanceRequests: import('./types').MaintenanceRequest[];
   activityLogs: import('./types').ActivityLog[];
   vendors: import('./types').Vendor[];
+  communicationLogs: import('./types').CommunicationLog[];
 }
 
 interface ElectronAPI {

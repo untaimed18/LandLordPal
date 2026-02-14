@@ -13,8 +13,10 @@ import {
   Users,
   Settings,
   Search,
+  Bell,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { getLeasesEndingSoon } from '../lib/calculations'
 
 const nav: { to: string; label: string; Icon: LucideIcon }[] = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard },
@@ -39,6 +41,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { properties, units, tenants, vendors, maintenanceRequests } = useStore()
+
+  // Calculate notification count for badge
+  const notificationCount = (() => {
+    const now = new Date()
+    let count = 0
+    // Leases ending within 90 days
+    count += getLeasesEndingSoon(tenants, 90).length
+    // Insurance expiring within 60 days
+    count += properties.filter((p) => {
+      if (!p.insuranceExpiry) return false
+      const daysLeft = Math.ceil((new Date(p.insuranceExpiry + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      return daysLeft >= 0 && daysLeft <= 60
+    }).length
+    // Scheduled maintenance within 30 days
+    count += maintenanceRequests.filter((r) => {
+      if (!r.scheduledDate || r.status === 'completed') return false
+      const daysUntil = Math.ceil((new Date(r.scheduledDate + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      return daysUntil >= 0 && daysUntil <= 30
+    }).length
+    return count
+  })()
+
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -118,10 +142,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        <button type="button" className="search-trigger" onClick={() => { setSearchOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }} title="Search (Ctrl+K)">
-          <Search size={16} />
-          <span className="search-hint">Ctrl+K</span>
-        </button>
+        <div className="header-actions-right">
+          {notificationCount > 0 && (
+            <Link to="/" className="notification-bell" title={`${notificationCount} reminder${notificationCount !== 1 ? 's' : ''}`}>
+              <Bell size={18} />
+              <span className="notification-badge">{notificationCount > 9 ? '9+' : notificationCount}</span>
+            </Link>
+          )}
+          <button type="button" className="search-trigger" onClick={() => { setSearchOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }} title="Search (Ctrl+K)">
+            <Search size={16} />
+            <span className="search-hint">Ctrl+K</span>
+          </button>
+        </div>
       </header>
       <main className="main">
         {children}

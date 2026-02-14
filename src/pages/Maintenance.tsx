@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import { nowISO } from '../lib/id'
-import type { MaintenancePriority, MaintenanceStatus, MaintenanceCategory } from '../types'
+import type { MaintenancePriority, MaintenanceStatus, MaintenanceCategory, MaintenanceRecurrence } from '../types'
 import { usePagination } from '../hooks/usePagination'
 import Pagination from '../components/Pagination'
 import { Wrench } from 'lucide-react'
@@ -34,6 +34,14 @@ const CATEGORIES: { value: MaintenanceCategory; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
+const RECURRENCES: { value: MaintenanceRecurrence; label: string }[] = [
+  { value: 'none', label: 'One-time' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'semi_annual', label: 'Every 6 months' },
+  { value: 'annual', label: 'Annually' },
+]
+
 const emptyForm = {
   propertyId: '',
   unitId: '',
@@ -43,6 +51,8 @@ const emptyForm = {
   priority: 'medium' as MaintenancePriority,
   category: 'other' as MaintenanceCategory,
   cost: 0,
+  scheduledDate: '',
+  recurrence: 'none' as MaintenanceRecurrence,
   notes: '',
 }
 
@@ -87,6 +97,8 @@ export default function Maintenance() {
       priority: req.priority,
       category: req.category,
       cost: req.cost ?? 0,
+      scheduledDate: req.scheduledDate ?? '',
+      recurrence: req.recurrence ?? 'none',
       notes: req.notes ?? '',
     })
     setShowForm(true)
@@ -105,6 +117,8 @@ export default function Maintenance() {
         priority: form.priority,
         category: form.category,
         cost: form.cost || undefined,
+        scheduledDate: form.scheduledDate || undefined,
+        recurrence: form.recurrence !== 'none' ? form.recurrence : undefined,
         notes: form.notes || undefined,
       })
       setEditingId(null)
@@ -120,6 +134,8 @@ export default function Maintenance() {
         status: 'open',
         category: form.category,
         cost: form.cost || undefined,
+        scheduledDate: form.scheduledDate || undefined,
+        recurrence: form.recurrence !== 'none' ? form.recurrence : undefined,
         notes: form.notes || undefined,
       })
       toast('Request created')
@@ -195,6 +211,10 @@ export default function Maintenance() {
               {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select></label>
             <label>Est. cost <input type="number" min={0} step={0.01} value={form.cost || ''} onChange={(e) => setForm((f) => ({ ...f, cost: +e.target.value }))} /></label>
+            <label>Scheduled date <input type="date" value={form.scheduledDate} onChange={(e) => setForm((f) => ({ ...f, scheduledDate: e.target.value }))} /></label>
+            <label>Recurrence <select value={form.recurrence} onChange={(e) => setForm((f) => ({ ...f, recurrence: e.target.value as MaintenanceRecurrence }))}>
+              {RECURRENCES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select></label>
           </div>
           <label>Title * <input required value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="e.g. Leaky faucet in kitchen" /></label>
           <label style={{ marginTop: '0.75rem' }}>Description <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Details about the issue..." /></label>
@@ -235,7 +255,7 @@ export default function Maintenance() {
         <div className="table-wrap">
           <table className="data-table">
             <thead>
-              <tr><th>Title</th><th>Property / Unit</th><th>Priority</th><th>Category</th><th>Status</th><th>Cost</th><th>Date</th><th></th></tr>
+              <tr><th>Title</th><th>Property / Unit</th><th>Priority</th><th>Category</th><th>Status</th><th>Cost</th><th>Scheduled</th><th>Created</th><th></th></tr>
             </thead>
             <tbody>
               {pagination.paged.map((r) => {
@@ -253,6 +273,7 @@ export default function Maintenance() {
                       </select>
                     </td>
                     <td>{r.cost ? formatMoney(r.cost) : '—'}</td>
+                    <td>{r.scheduledDate ? formatDate(r.scheduledDate) : '—'}{r.recurrence && r.recurrence !== 'none' && <span className="muted block">{RECURRENCES.find((x) => x.value === r.recurrence)?.label}</span>}</td>
                     <td>{formatDate(r.createdAt)}</td>
                     <td className="actions-cell">
                       <button type="button" className="btn small" onClick={() => openEdit(r)}>Edit</button>

@@ -4,7 +4,7 @@ import { getState, importState } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
-import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon } from 'lucide-react'
+import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare } from 'lucide-react'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
 
@@ -20,7 +20,7 @@ function setThemeClass(theme: 'light' | 'dark') {
 export default function Settings() {
   const toast = useToast()
   const confirm = useConfirm()
-  const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, vendors } = useStore()
+  const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, vendors, communicationLogs } = useStore()
   const fileInput = useRef<HTMLInputElement>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(getTheme)
 
@@ -83,11 +83,11 @@ export default function Settings() {
       danger: true,
     })
     if (!ok2) return
-    importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [] })
+    importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [] })
     toast('All data cleared')
   }
 
-  const totalRecords = properties.length + units.length + tenants.length + expenses.length + payments.length + maintenanceRequests.length + activityLogs.length + vendors.length
+  const totalRecords = properties.length + units.length + tenants.length + expenses.length + payments.length + maintenanceRequests.length + activityLogs.length + vendors.length + communicationLogs.length
 
   return (
     <div className="page settings-page">
@@ -130,6 +130,7 @@ export default function Settings() {
           <div className="data-summary-item"><Wrench size={16} className="data-summary-icon" /><span className="data-summary-count">{maintenanceRequests.length}</span><span className="data-summary-label">Maintenance</span></div>
           <div className="data-summary-item"><Users size={16} className="data-summary-icon" /><span className="data-summary-count">{vendors.length}</span><span className="data-summary-label">Vendors</span></div>
           <div className="data-summary-item"><FileText size={16} className="data-summary-icon" /><span className="data-summary-count">{activityLogs.length}</span><span className="data-summary-label">Notes</span></div>
+          <div className="data-summary-item"><MessageSquare size={16} className="data-summary-icon" /><span className="data-summary-count">{communicationLogs.length}</span><span className="data-summary-label">Communications</span></div>
         </div>
         <p className="muted" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>{totalRecords} total records</p>
       </section>
@@ -137,7 +138,7 @@ export default function Settings() {
       <section className="card section-card">
         <h2>Backup & restore</h2>
         <p className="section-desc">
-          Your data is stored in this browser's local storage. Export a backup to keep your data safe, or restore from a previous backup.
+          Your data is stored locally on this device. Export a backup to keep your data safe, or restore from a previous backup.
         </p>
         <div className="settings-actions">
           <button type="button" className="btn primary" onClick={handleExport}>

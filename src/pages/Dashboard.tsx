@@ -16,9 +16,13 @@ import {
   BarChart3,
   CalendarDays,
   DollarSign,
+  Shield,
+  Clock,
+  Bell,
 } from 'lucide-react'
 
 const LEASES_SOON_DAYS = 90
+const INSURANCE_ALERT_DAYS = 60
 
 export default function Dashboard() {
   const { properties, units, tenants, expenses, payments, maintenanceRequests } = useStore()
@@ -31,6 +35,29 @@ export default function Dashboard() {
   const notPaidThisMonth = rentRoll.filter((r) => !r.paid)
   const leasesEndingSoon = getLeasesEndingSoon(tenants, LEASES_SOON_DAYS)
   const openMaintenance = maintenanceRequests.filter((r) => r.status !== 'completed')
+
+  // Insurance expiring soon
+  const insuranceAlerts = properties.filter((p) => {
+    if (!p.insuranceExpiry) return false
+    const expiry = new Date(p.insuranceExpiry + 'T12:00:00')
+    const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    return daysLeft >= 0 && daysLeft <= INSURANCE_ALERT_DAYS
+  }).map((p) => {
+    const expiry = new Date(p.insuranceExpiry! + 'T12:00:00')
+    const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    return { property: p, daysLeft }
+  }).sort((a, b) => a.daysLeft - b.daysLeft)
+
+  // Scheduled maintenance coming up (next 30 days)
+  const scheduledMaintenance = maintenanceRequests.filter((r) => {
+    if (!r.scheduledDate || r.status === 'completed') return false
+    const scheduled = new Date(r.scheduledDate + 'T12:00:00')
+    const daysUntil = Math.ceil((scheduled.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    return daysUntil >= 0 && daysUntil <= 30
+  }).sort((a, b) => (a.scheduledDate ?? '').localeCompare(b.scheduledDate ?? ''))
+
+  // Total notification count
+  const notificationCount = leasesEndingSoon.length + insuranceAlerts.length + scheduledMaintenance.length
 
   // Late fee detection
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -171,6 +198,41 @@ export default function Dashboard() {
             )}
           </section>
         </>
+      )}
+
+      {hasData && notificationCount > 0 && (
+        <section className="card section-card notification-center" style={{ marginTop: '1.5rem' }}>
+          <div className="section-card-header">
+            <h2><Bell size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Reminders ({notificationCount})</h2>
+          </div>
+          <div className="notification-list">
+            {insuranceAlerts.map(({ property: p, daysLeft }) => (
+              <div key={`ins-${p.id}`} className="notification-item notification-warning">
+                <Shield size={16} />
+                <span><strong>{p.name}</strong> — insurance expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''} ({p.insuranceProvider ?? 'Policy'})</span>
+                <Link to={`/properties/${p.id}`} className="btn small">View</Link>
+              </div>
+            ))}
+            {scheduledMaintenance.map((m) => {
+              const prop = properties.find((p) => p.id === m.propertyId)
+              const daysUntil = Math.ceil((new Date(m.scheduledDate! + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+              return (
+                <div key={`sched-${m.id}`} className="notification-item notification-info">
+                  <Clock size={16} />
+                  <span><strong>{m.title}</strong>{prop && ` — ${prop.name}`} · Scheduled in {daysUntil} day{daysUntil !== 1 ? 's' : ''}</span>
+                  <Link to="/maintenance" className="btn small">View</Link>
+                </div>
+              )
+            })}
+            {leasesEndingSoon.slice(0, 5).map(({ tenant, daysLeft }) => (
+              <div key={`lease-${tenant.id}`} className="notification-item notification-alert">
+                <CalendarDays size={16} />
+                <span><strong>{tenant.name}</strong> — lease ends in {daysLeft} day{daysLeft !== 1 ? 's' : ''}</span>
+                <Link to={`/properties/${tenant.propertyId}`} className="btn small">View</Link>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {lateRentItems.length > 0 && (

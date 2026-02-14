@@ -1,23 +1,134 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
 let db = null;
+let dbFilePath = null;
+
+// ─── Schema version ──────────────────────────────────────────────────────────
+// Increment this whenever you add migrations below.
+const CURRENT_SCHEMA_VERSION = 2;
 
 /**
  * Initialize the SQLite database.
  * @param {string} userDataPath - app.getPath('userData')
  */
 function initDatabase(userDataPath) {
-  const dbPath = path.join(userDataPath, 'landlordpal.db');
-  console.log('Opening database at:', dbPath);
+  dbFilePath = path.join(userDataPath, 'landlordpal.db');
+  console.log('Opening database at:', dbFilePath);
 
-  db = new Database(dbPath);
+  db = new Database(dbFilePath);
 
   // Enable WAL mode for better concurrent read/write performance
   db.pragma('journal_mode = WAL');
 
   createTables();
+  migrateIfNeeded(userDataPath);
   return db;
+}
+
+// ─── Schema version helpers ──────────────────────────────────────────────────
+
+function getSchemaVersion() {
+  // The meta table may not exist yet (fresh DB or pre-versioning DB)
+  try {
+    const row = db.prepare('SELECT value FROM _meta WHERE key = ?').get('schema_version');
+    return row ? parseInt(row.value, 10) : 0;
+  } catch {
+    return 0; // table doesn't exist yet
+  }
+}
+
+function setSchemaVersion(version) {
+  db.exec(`CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+  db.prepare(`INSERT OR REPLACE INTO _meta (key, value) VALUES (?, ?)`).run('schema_version', String(version));
+}
+
+// ─── Safe migration runner ───────────────────────────────────────────────────
+
+/**
+ * Back up the database file and run any pending migrations.
+ * If a migration fails, the backup is preserved so the user can recover.
+ */
+function migrateIfNeeded(userDataPath) {
+  const currentVersion = getSchemaVersion();
+
+  if (currentVersion >= CURRENT_SCHEMA_VERSION) {
+    console.log(`Database schema is up to date (v${currentVersion}).`);
+    return;
+  }
+
+  console.log(`Database schema v${currentVersion} → v${CURRENT_SCHEMA_VERSION}. Running migrations...`);
+
+  // Create an automatic backup before migrating
+  try {
+    const backupName = `landlordpal-backup-v${currentVersion}-${Date.now()}.db`;
+    const backupPath = path.join(userDataPath, backupName);
+    // Use better-sqlite3's built-in backup (fast, consistent snapshot)
+    db.backup(backupPath)
+      .then(() => console.log('Pre-migration backup saved:', backupPath))
+      .catch((err) => console.warn('Backup warning (non-fatal):', err.message));
+  } catch (err) {
+    // Fallback: copy the file manually (synchronous)
+    try {
+      if (fs.existsSync(dbFilePath)) {
+        const backupName = `landlordpal-backup-v${currentVersion}-${Date.now()}.db`;
+        const backupPath = path.join(userDataPath, backupName);
+        fs.copyFileSync(dbFilePath, backupPath);
+        console.log('Pre-migration backup saved (copy):', backupPath);
+      }
+    } catch (copyErr) {
+      console.warn('Could not create pre-migration backup:', copyErr.message);
+    }
+  }
+
+  // Run migrations inside a transaction so partial failures roll back
+  try {
+    const migrate = db.transaction(() => {
+      if (currentVersion < 1) {
+        runMigrationV1();
+      }
+      if (currentVersion < 2) {
+        runMigrationV2();
+      }
+      // Future migrations go here:
+      // if (currentVersion < 3) { runMigrationV3(); }
+
+      setSchemaVersion(CURRENT_SCHEMA_VERSION);
+    });
+    migrate();
+    console.log(`Migration complete. Schema is now v${CURRENT_SCHEMA_VERSION}.`);
+  } catch (err) {
+    console.error('Migration FAILED — database left at previous version.', err.message);
+    console.error('A backup of your data was saved before the migration attempt.');
+    // Don't rethrow — let the app start with whatever schema is available.
+    // The user's data is still intact (transaction rolled back).
+  }
+}
+
+/** V1: baseline schema — create all original tables. (no-op for existing DBs since tables use IF NOT EXISTS) */
+function runMigrationV1() {
+  console.log('  Running migration v1: baseline tables');
+  // Tables already created in createTables() via IF NOT EXISTS — this is just the version marker.
+}
+
+/** V2: property enhancements, insurance fields, maintenance scheduling, communication logs */
+function runMigrationV2() {
+  console.log('  Running migration v2: property details, insurance, scheduling, comms');
+  const addCol = (table, col, type) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch { /* column already exists */ }
+  };
+  // Property enhancements
+  addCol('properties', 'propertyType', 'TEXT');
+  addCol('properties', 'sqft', 'INTEGER');
+  addCol('properties', 'amenities', 'TEXT');
+  addCol('properties', 'insuranceProvider', 'TEXT');
+  addCol('properties', 'insurancePolicyNumber', 'TEXT');
+  addCol('properties', 'insuranceExpiry', 'TEXT');
+  // Maintenance scheduling
+  addCol('maintenance_requests', 'scheduledDate', 'TEXT');
+  addCol('maintenance_requests', 'recurrence', 'TEXT');
+  // communication_logs table is already handled by createTables() IF NOT EXISTS
 }
 
 function createTables() {
@@ -29,8 +140,14 @@ function createTables() {
       city TEXT NOT NULL,
       state TEXT NOT NULL,
       zip TEXT NOT NULL,
+      propertyType TEXT,
+      sqft INTEGER,
+      amenities TEXT,
       purchasePrice REAL,
       purchaseDate TEXT,
+      insuranceProvider TEXT,
+      insurancePolicyNumber TEXT,
+      insuranceExpiry TEXT,
       notes TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
@@ -118,6 +235,8 @@ function createTables() {
       category TEXT NOT NULL DEFAULT 'other',
       vendorId TEXT,
       cost REAL,
+      scheduledDate TEXT,
+      recurrence TEXT,
       resolvedAt TEXT,
       notes TEXT,
       createdAt TEXT NOT NULL,
@@ -130,6 +249,17 @@ function createTables() {
       entityId TEXT NOT NULL,
       note TEXT NOT NULL,
       date TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS communication_logs (
+      id TEXT PRIMARY KEY,
+      tenantId TEXT NOT NULL,
+      propertyId TEXT NOT NULL,
+      type TEXT NOT NULL,
+      date TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      notes TEXT,
       createdAt TEXT NOT NULL
     );
 
@@ -150,7 +280,15 @@ function createTables() {
 
 /** Convert a SQLite row to a JS object, handling boolean and JSON fields */
 function rowToProperty(row) {
-  return row; // all TEXT/REAL columns map directly
+  return {
+    ...row,
+    amenities: row.amenities ? JSON.parse(row.amenities) : undefined,
+    propertyType: row.propertyType || undefined,
+    sqft: row.sqft != null ? row.sqft : undefined,
+    insuranceProvider: row.insuranceProvider || undefined,
+    insurancePolicyNumber: row.insurancePolicyNumber || undefined,
+    insuranceExpiry: row.insuranceExpiry || undefined,
+  };
 }
 
 function rowToUnit(row) {
@@ -189,7 +327,16 @@ function rowToMaintenanceRequest(row) {
     tenantId: row.tenantId || undefined,
     vendorId: row.vendorId || undefined,
     cost: row.cost != null ? row.cost : undefined,
+    scheduledDate: row.scheduledDate || undefined,
+    recurrence: row.recurrence || undefined,
     resolvedAt: row.resolvedAt || undefined,
+    notes: row.notes || undefined,
+  };
+}
+
+function rowToCommunicationLog(row) {
+  return {
+    ...row,
     notes: row.notes || undefined,
   };
 }
@@ -220,6 +367,7 @@ function loadAll() {
     maintenanceRequests: db.prepare('SELECT * FROM maintenance_requests').all().map(rowToMaintenanceRequest),
     activityLogs: db.prepare('SELECT * FROM activity_logs').all().map(rowToActivityLog),
     vendors: db.prepare('SELECT * FROM vendors').all().map(rowToVendor),
+    communicationLogs: db.prepare('SELECT * FROM communication_logs').all().map(rowToCommunicationLog),
   };
 }
 
@@ -230,15 +378,21 @@ function saveAll(state) {
     // Properties
     db.prepare('DELETE FROM properties').run();
     const insertProperty = db.prepare(`
-      INSERT INTO properties (id, name, address, city, state, zip, purchasePrice, purchaseDate, notes, createdAt, updatedAt)
-      VALUES (@id, @name, @address, @city, @state, @zip, @purchasePrice, @purchaseDate, @notes, @createdAt, @updatedAt)
+      INSERT INTO properties (id, name, address, city, state, zip, propertyType, sqft, amenities, purchasePrice, purchaseDate, insuranceProvider, insurancePolicyNumber, insuranceExpiry, notes, createdAt, updatedAt)
+      VALUES (@id, @name, @address, @city, @state, @zip, @propertyType, @sqft, @amenities, @purchasePrice, @purchaseDate, @insuranceProvider, @insurancePolicyNumber, @insuranceExpiry, @notes, @createdAt, @updatedAt)
     `);
     for (const p of state.properties || []) {
       insertProperty.run({
         id: p.id, name: p.name, address: p.address, city: p.city,
         state: p.state, zip: p.zip,
+        propertyType: p.propertyType ?? null,
+        sqft: p.sqft ?? null,
+        amenities: p.amenities ? JSON.stringify(p.amenities) : null,
         purchasePrice: p.purchasePrice ?? null,
         purchaseDate: p.purchaseDate ?? null,
+        insuranceProvider: p.insuranceProvider ?? null,
+        insurancePolicyNumber: p.insurancePolicyNumber ?? null,
+        insuranceExpiry: p.insuranceExpiry ?? null,
         notes: p.notes ?? null,
         createdAt: p.createdAt, updatedAt: p.updatedAt,
       });
@@ -328,8 +482,8 @@ function saveAll(state) {
     // Maintenance requests
     db.prepare('DELETE FROM maintenance_requests').run();
     const insertMaintenance = db.prepare(`
-      INSERT INTO maintenance_requests (id, propertyId, unitId, tenantId, title, description, priority, status, category, vendorId, cost, resolvedAt, notes, createdAt, updatedAt)
-      VALUES (@id, @propertyId, @unitId, @tenantId, @title, @description, @priority, @status, @category, @vendorId, @cost, @resolvedAt, @notes, @createdAt, @updatedAt)
+      INSERT INTO maintenance_requests (id, propertyId, unitId, tenantId, title, description, priority, status, category, vendorId, cost, scheduledDate, recurrence, resolvedAt, notes, createdAt, updatedAt)
+      VALUES (@id, @propertyId, @unitId, @tenantId, @title, @description, @priority, @status, @category, @vendorId, @cost, @scheduledDate, @recurrence, @resolvedAt, @notes, @createdAt, @updatedAt)
     `);
     for (const m of state.maintenanceRequests || []) {
       insertMaintenance.run({
@@ -340,6 +494,8 @@ function saveAll(state) {
         priority: m.priority, status: m.status, category: m.category,
         vendorId: m.vendorId ?? null,
         cost: m.cost ?? null,
+        scheduledDate: m.scheduledDate ?? null,
+        recurrence: m.recurrence ?? null,
         resolvedAt: m.resolvedAt ?? null,
         notes: m.notes ?? null,
         createdAt: m.createdAt, updatedAt: m.updatedAt,
@@ -373,6 +529,21 @@ function saveAll(state) {
         specialty: v.specialty ?? null,
         notes: v.notes ?? null,
         createdAt: v.createdAt, updatedAt: v.updatedAt,
+      });
+    }
+
+    // Communication logs
+    db.prepare('DELETE FROM communication_logs').run();
+    const insertComm = db.prepare(`
+      INSERT INTO communication_logs (id, tenantId, propertyId, type, date, subject, notes, createdAt)
+      VALUES (@id, @tenantId, @propertyId, @type, @date, @subject, @notes, @createdAt)
+    `);
+    for (const c of state.communicationLogs || []) {
+      insertComm.run({
+        id: c.id, tenantId: c.tenantId, propertyId: c.propertyId,
+        type: c.type, date: c.date, subject: c.subject,
+        notes: c.notes ?? null,
+        createdAt: c.createdAt,
       });
     }
   });

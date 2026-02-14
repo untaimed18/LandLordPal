@@ -2,12 +2,12 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { formatMoney, formatDate } from '../lib/format'
-import { DollarSign, FileText, KeyRound, Wrench, Receipt, CalendarDays } from 'lucide-react'
+import { DollarSign, FileText, KeyRound, Wrench, Receipt, CalendarDays, Shield, Clock } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 interface CalendarEvent {
   date: string
-  type: 'rent_due' | 'lease_end' | 'lease_start' | 'maintenance' | 'expense_recurring'
+  type: 'rent_due' | 'lease_end' | 'lease_start' | 'maintenance' | 'expense_recurring' | 'insurance_expiry' | 'scheduled_maintenance'
   label: string
   sub: string
   link?: string
@@ -20,6 +20,8 @@ const TYPE_LABELS: Record<string, { label: string; Icon: LucideIcon; className: 
   lease_start: { label: 'Lease starts', Icon: KeyRound, className: 'cal-lease-start' },
   maintenance: { label: 'Maintenance', Icon: Wrench, className: 'cal-maintenance' },
   expense_recurring: { label: 'Recurring expense', Icon: Receipt, className: 'cal-expense' },
+  insurance_expiry: { label: 'Insurance expires', Icon: Shield, className: 'cal-insurance' },
+  scheduled_maintenance: { label: 'Scheduled maintenance', Icon: Clock, className: 'cal-scheduled' },
 }
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -111,6 +113,34 @@ export default function Calendar() {
       }
     }
 
+    // Insurance expirations this month
+    for (const p of properties) {
+      if (p.insuranceExpiry && p.insuranceExpiry.startsWith(monthStr)) {
+        result.push({
+          date: p.insuranceExpiry,
+          type: 'insurance_expiry',
+          label: `Insurance expires — ${p.insuranceProvider ?? 'Policy'}`,
+          sub: p.name,
+          link: `/properties/${p.id}`,
+        })
+      }
+    }
+
+    // Scheduled maintenance this month
+    for (const m of maintenanceRequests) {
+      if (m.scheduledDate && m.scheduledDate.startsWith(monthStr) && m.status !== 'completed') {
+        const prop = properties.find((p) => p.id === m.propertyId)
+        result.push({
+          date: m.scheduledDate,
+          type: 'scheduled_maintenance',
+          label: m.title,
+          sub: prop?.name ?? '',
+          link: '/maintenance',
+          priority: m.priority,
+        })
+      }
+    }
+
     return result.sort((a, b) => a.date.localeCompare(b.date))
   }, [year, month, tenants, properties, units, expenses, maintenanceRequests])
 
@@ -172,8 +202,37 @@ export default function Calendar() {
         })
       }
     }
+
+    // Insurance expirations in next 30 days
+    for (const p of properties) {
+      if (p.insuranceExpiry && p.insuranceExpiry >= todayISO && p.insuranceExpiry <= cutoffISO) {
+        result.push({
+          date: p.insuranceExpiry,
+          type: 'insurance_expiry',
+          label: `Insurance expires — ${p.insuranceProvider ?? 'Policy'}`,
+          sub: p.name,
+          link: `/properties/${p.id}`,
+        })
+      }
+    }
+
+    // Scheduled maintenance in next 30 days
+    for (const m of maintenanceRequests) {
+      if (m.scheduledDate && m.scheduledDate >= todayISO && m.scheduledDate <= cutoffISO && m.status !== 'completed') {
+        const prop = properties.find((p) => p.id === m.propertyId)
+        result.push({
+          date: m.scheduledDate,
+          type: 'scheduled_maintenance',
+          label: m.title,
+          sub: prop?.name ?? '',
+          link: '/maintenance',
+          priority: m.priority,
+        })
+      }
+    }
+
     return result.sort((a, b) => a.date.localeCompare(b.date))
-  }, [tenants, properties])
+  }, [tenants, properties, maintenanceRequests])
 
   return (
     <div className="page calendar-page">

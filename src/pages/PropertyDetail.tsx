@@ -26,6 +26,32 @@ import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate, formatPhoneNumber } from '../lib/format'
 import { US_STATES } from '../lib/us-states'
 import Breadcrumbs from '../components/Breadcrumbs'
+import type { PropertyType, CommunicationType } from '../types'
+import { addCommunicationLog, deleteCommunicationLog } from '../store'
+
+const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
+  { value: 'single_family', label: 'Single Family' },
+  { value: 'multi_family', label: 'Multi Family' },
+  { value: 'condo', label: 'Condo' },
+  { value: 'townhouse', label: 'Townhouse' },
+  { value: 'apartment', label: 'Apartment' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'other', label: 'Other' },
+]
+
+const COMMON_AMENITIES = [
+  'Parking', 'Garage', 'Pool', 'Laundry', 'Dishwasher', 'AC', 'Heating',
+  'Balcony', 'Patio', 'Yard', 'Storage', 'Gym', 'Pet Friendly', 'Elevator',
+]
+
+const COMM_TYPES: { value: CommunicationType; label: string }[] = [
+  { value: 'call', label: 'Phone Call' },
+  { value: 'email', label: 'Email' },
+  { value: 'text', label: 'Text Message' },
+  { value: 'in_person', label: 'In Person' },
+  { value: 'letter', label: 'Letter' },
+  { value: 'other', label: 'Other' },
+]
 
 function formatNumberWithCommas(value: string): string {
   const digits = value.replace(/[^\d]/g, '')
@@ -58,8 +84,10 @@ export default function PropertyDetail() {
   const navigate = useNavigate()
   const toast = useToast()
   const confirm = useConfirm()
-  const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs } = useStore()
+  const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, communicationLogs } = useStore()
   const [paymentHistoryTenant, setPaymentHistoryTenant] = useState<string | null>(null)
+  const [commForm, setCommForm] = useState<string | null>(null)
+  const [newComm, setNewComm] = useState({ type: 'call' as CommunicationType, date: nowISO(), subject: '', notes: '' })
   const [unitForm, setUnitForm] = useState(false)
   const [tenantForm, setTenantForm] = useState<string | null>(null)
   const [paymentForm, setPaymentForm] = useState<string | null>(null)
@@ -76,7 +104,7 @@ export default function PropertyDetail() {
 
   const property = properties.find((p) => p.id === id)
 
-  const [propertyForm, setPropertyForm] = useState({ name: '', address: '', city: '', state: '', zip: '', notes: '', purchasePrice: 0, purchaseDate: '' })
+  const [propertyForm, setPropertyForm] = useState({ name: '', address: '', city: '', state: '', zip: '', propertyType: '' as string, sqft: 0, amenities: [] as string[], notes: '', purchasePrice: 0, purchaseDate: '', insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '' })
   const [newUnit, setNewUnit] = useState({ name: '', bedrooms: 1, bathrooms: 1, monthlyRent: 0, sqft: 0, deposit: 0, notes: '', available: true })
   const [newTenant, setNewTenant] = useState({ unitId: '', name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: 0, deposit: 0, gracePeriodDays: 5, lateFeeAmount: 0, notes: '' })
   const [newPayment, setNewPayment] = useState({ tenantId: '', amount: 0, date: nowISO(), method: 'transfer' as const, notes: '' })
@@ -125,9 +153,15 @@ export default function PropertyDetail() {
       city: prop.city,
       state: prop.state,
       zip: prop.zip,
+      propertyType: prop.propertyType ?? '',
+      sqft: prop.sqft ?? 0,
+      amenities: prop.amenities ?? [],
       notes: prop.notes ?? '',
       purchasePrice: prop.purchasePrice ?? 0,
       purchaseDate: prop.purchaseDate ?? '',
+      insuranceProvider: prop.insuranceProvider ?? '',
+      insurancePolicyNumber: prop.insurancePolicyNumber ?? '',
+      insuranceExpiry: prop.insuranceExpiry ?? '',
     })
     setEditingProperty(true)
   }
@@ -135,9 +169,19 @@ export default function PropertyDetail() {
   function saveProperty(e: React.FormEvent) {
     e.preventDefault()
     updateProperty(prop.id, {
-      ...propertyForm,
+      name: propertyForm.name,
+      address: propertyForm.address,
+      city: propertyForm.city,
+      state: propertyForm.state,
+      zip: propertyForm.zip,
+      propertyType: (propertyForm.propertyType as PropertyType) || undefined,
+      sqft: propertyForm.sqft || undefined,
+      amenities: propertyForm.amenities.length > 0 ? propertyForm.amenities : undefined,
       purchasePrice: propertyForm.purchasePrice || undefined,
       purchaseDate: propertyForm.purchaseDate || undefined,
+      insuranceProvider: propertyForm.insuranceProvider || undefined,
+      insurancePolicyNumber: propertyForm.insurancePolicyNumber || undefined,
+      insuranceExpiry: propertyForm.insuranceExpiry || undefined,
       notes: propertyForm.notes || undefined,
     })
     setEditingProperty(false)
@@ -333,9 +377,25 @@ export default function PropertyDetail() {
           {!editingProperty ? (
             <>
               <h1>{prop.name}</h1>
-              <p className="muted">{prop.address}, {prop.city}, {prop.state} {prop.zip}</p>
+              <p className="muted">
+                {prop.address}, {prop.city}, {prop.state} {prop.zip}
+                {prop.propertyType && <> · {PROPERTY_TYPES.find((t) => t.value === prop.propertyType)?.label}</>}
+                {prop.sqft != null && prop.sqft > 0 && <> · {prop.sqft.toLocaleString()} sqft</>}
+              </p>
               {prop.purchasePrice != null && prop.purchasePrice > 0 && (
                 <p className="muted">Purchased for {formatMoney(prop.purchasePrice)}{prop.purchaseDate ? ` on ${formatDate(prop.purchaseDate)}` : ''}</p>
+              )}
+              {prop.amenities && prop.amenities.length > 0 && (
+                <div className="amenity-chips" style={{ marginTop: '0.25rem' }}>
+                  {prop.amenities.map((a) => <span key={a} className="amenity-chip active">{a}</span>)}
+                </div>
+              )}
+              {prop.insuranceProvider && (
+                <p className="muted" style={{ marginTop: '0.25rem' }}>
+                  Insurance: {prop.insuranceProvider}
+                  {prop.insurancePolicyNumber && <> (#{prop.insurancePolicyNumber})</>}
+                  {prop.insuranceExpiry && <> · Expires {formatDate(prop.insuranceExpiry)}</>}
+                </p>
               )}
               {prop.notes && <p className="property-notes">{prop.notes}</p>}
               <div className="header-actions">
@@ -355,10 +415,32 @@ export default function PropertyDetail() {
                   {US_STATES.map((s) => <option key={s.value} value={s.value}>{s.value} — {s.label}</option>)}
                 </select></label>
                 <label>ZIP * <input required pattern="\d{5}(-\d{4})?" title="5-digit ZIP or ZIP+4 (e.g. 78701 or 78701-1234)" value={propertyForm.zip} onChange={(e) => setPropertyForm((f) => ({ ...f, zip: e.target.value }))} /></label>
+                <label>Property type <select value={propertyForm.propertyType} onChange={(e) => setPropertyForm((f) => ({ ...f, propertyType: e.target.value }))}>
+                  <option value="">Select type</option>
+                  {PROPERTY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select></label>
+                <label>Total sq ft <input type="number" min={0} value={propertyForm.sqft || ''} onChange={(e) => setPropertyForm((f) => ({ ...f, sqft: +e.target.value || 0 }))} /></label>
                 <label>Purchase price <input type="text" inputMode="numeric" value={propertyForm.purchasePrice ? formatNumberWithCommas(String(propertyForm.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setPropertyForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} /></label>
                 <label>Purchase date <input type="date" value={propertyForm.purchaseDate} onChange={(e) => setPropertyForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
               </div>
-              <label>Notes <textarea value={propertyForm.notes} onChange={(e) => setPropertyForm((f) => ({ ...f, notes: e.target.value }))} rows={2} /></label>
+              <div style={{ marginTop: '0.75rem' }}>
+                <label>Amenities</label>
+                <div className="amenity-chips">
+                  {COMMON_AMENITIES.map((a) => (
+                    <button key={a} type="button" className={`amenity-chip ${propertyForm.amenities.includes(a) ? 'active' : ''}`}
+                      onClick={() => setPropertyForm((f) => ({ ...f, amenities: f.amenities.includes(a) ? f.amenities.filter((x) => x !== a) : [...f.amenities, a] }))}>{a}</button>
+                  ))}
+                </div>
+              </div>
+              <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
+                <legend>Insurance</legend>
+                <div className="form-grid">
+                  <label>Provider <input value={propertyForm.insuranceProvider} onChange={(e) => setPropertyForm((f) => ({ ...f, insuranceProvider: e.target.value }))} placeholder="e.g. State Farm" /></label>
+                  <label>Policy # <input value={propertyForm.insurancePolicyNumber} onChange={(e) => setPropertyForm((f) => ({ ...f, insurancePolicyNumber: e.target.value }))} /></label>
+                  <label>Expiry date <input type="date" value={propertyForm.insuranceExpiry} onChange={(e) => setPropertyForm((f) => ({ ...f, insuranceExpiry: e.target.value }))} /></label>
+                </div>
+              </fieldset>
+              <label style={{ marginTop: '0.75rem' }}>Notes <textarea value={propertyForm.notes} onChange={(e) => setPropertyForm((f) => ({ ...f, notes: e.target.value }))} rows={2} /></label>
               <div className="form-actions">
                 <button type="submit" className="btn primary">Save</button>
                 <button type="button" className="btn" onClick={() => setEditingProperty(false)}>Cancel</button>
@@ -736,6 +818,72 @@ export default function PropertyDetail() {
             </tbody>
           </table>
         )}
+      </section>
+
+      {/* Communication Log */}
+      <section className="card section-card">
+        <div className="section-card-header">
+          <h2>Communication log</h2>
+          {propTenants.length > 0 && (
+            <button type="button" className="btn small primary" onClick={() => { setCommForm(commForm ? null : 'new'); setNewComm({ type: 'call', date: nowISO(), subject: '', notes: '' }) }}>
+              {commForm ? 'Cancel' : '+ Log communication'}
+            </button>
+          )}
+        </div>
+        {commForm && (
+          <form className="form-card" style={{ marginBottom: '1rem' }} onSubmit={(e) => {
+            e.preventDefault()
+            const tenantId = (e.currentTarget.querySelector('[name="comm-tenant"]') as HTMLSelectElement)?.value
+            if (!tenantId || !newComm.subject.trim()) return
+            const t = tenants.find((x) => x.id === tenantId)
+            addCommunicationLog({
+              tenantId,
+              propertyId: prop.id,
+              type: newComm.type,
+              date: newComm.date,
+              subject: newComm.subject,
+              notes: newComm.notes || undefined,
+            })
+            setCommForm(null)
+            toast(`Communication with ${t?.name ?? 'tenant'} logged`)
+          }}>
+            <div className="form-grid">
+              <label>Tenant * <select name="comm-tenant" required>
+                <option value="">Select tenant</option>
+                {propTenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select></label>
+              <label>Type <select value={newComm.type} onChange={(e) => setNewComm((c) => ({ ...c, type: e.target.value as CommunicationType }))}>
+                {COMM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select></label>
+              <label>Date * <input type="date" required value={newComm.date} onChange={(e) => setNewComm((c) => ({ ...c, date: e.target.value }))} /></label>
+            </div>
+            <label>Subject * <input required value={newComm.subject} onChange={(e) => setNewComm((c) => ({ ...c, subject: e.target.value }))} placeholder="e.g. Discussed lease renewal" /></label>
+            <label style={{ marginTop: '0.5rem' }}>Notes <textarea rows={2} value={newComm.notes} onChange={(e) => setNewComm((c) => ({ ...c, notes: e.target.value }))} placeholder="Details of the conversation..." /></label>
+            <div className="form-actions"><button type="submit" className="btn primary">Save</button></div>
+          </form>
+        )}
+        {(() => {
+          const propComms = communicationLogs
+            .filter((c) => c.propertyId === prop.id)
+            .sort((a, b) => b.date.localeCompare(a.date))
+          if (propComms.length === 0) return <p className="empty-state">No communications logged yet.{propTenants.length === 0 ? ' Add a tenant first.' : ''}</p>
+          return (
+            <div className="activity-timeline">
+              {propComms.slice(0, 20).map((c) => {
+                const t = tenants.find((x) => x.id === c.tenantId)
+                return (
+                  <div key={c.id} className="activity-item">
+                    <span className="activity-date">{formatDate(c.date)}</span>
+                    <span className="badge small">{COMM_TYPES.find((ct) => ct.value === c.type)?.label ?? c.type}</span>
+                    <strong>{t?.name ?? 'Unknown'}</strong>
+                    <span className="activity-note">{c.subject}{c.notes ? ` — ${c.notes}` : ''}</span>
+                    <button type="button" className="btn-icon small" onClick={async () => { if (await confirm({ title: 'Delete communication', message: 'Delete this entry?', confirmText: 'Delete', danger: true })) { deleteCommunicationLog(c.id); toast('Entry deleted') } }} title="Delete">×</button>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
       </section>
 
       {propLogs.length > 0 && (

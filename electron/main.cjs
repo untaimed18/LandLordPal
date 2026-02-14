@@ -102,6 +102,8 @@ function setupAutoUpdater() {
   });
 
   ipcMain.handle('quit-and-install', () => {
+    // Ensure the database is cleanly closed before the app quits for the update
+    closeDatabase();
     autoUpdater.quitAndInstall(false, true);
   });
 
@@ -127,7 +129,10 @@ function setupDatabase() {
 
   ipcMain.handle('db:load', () => {
     try {
-      return loadAll();
+      const data = loadAll();
+      const counts = Object.entries(data).map(([k, v]) => `${k}: ${v.length}`).join(', ');
+      console.log('Database loaded —', counts);
+      return data;
     } catch (err) {
       console.error('db:load failed:', err.message);
       return null;
