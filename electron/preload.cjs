@@ -1,8 +1,16 @@
-// Minimal preload script with context isolation enabled.
-// No custom APIs are exposed — the app uses only localStorage
-// which is available in the renderer by default.
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+
+  // Auto-update API
+  onUpdateStatus: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('update-status', handler);
+    // Return cleanup function
+    return () => ipcRenderer.removeListener('update-status', handler);
+  },
+  startDownload: () => ipcRenderer.invoke('start-download'),
+  installUpdate: () => ipcRenderer.invoke('quit-and-install'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
 });

@@ -840,6 +840,25 @@ input:focus, select:focus, textarea:focus {
 .cal-event-label { flex: 1; font-weight: 500; }
 .cal-event-sub { font-size: 0.8rem; }
 
+/* Update notification bar */
+.update-bar { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 1.25rem; font-size: 0.85rem; font-weight: 500; }
+.update-bar--checking { background: var(--accent); color: white; }
+.update-bar--available { background: #1a73e8; color: white; }
+.update-bar--downloading { background: #1a73e8; color: white; }
+.update-bar--downloaded { background: var(--positive); color: white; }
+.update-bar--error { background: var(--negative); color: white; }
+.update-bar svg { flex-shrink: 0; }
+.update-bar span { flex-shrink: 0; }
+.update-spinner { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.update-btn { border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); color: white; padding: 0.2rem 0.7rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; }
+.update-btn:hover { background: rgba(255,255,255,0.3); }
+.update-btn.primary { background: rgba(255,255,255,0.25); border-color: rgba(255,255,255,0.6); }
+.update-btn.primary:hover { background: rgba(255,255,255,0.4); }
+.update-progress { flex: 1; min-width: 80px; max-width: 200px; height: 6px; background: rgba(255,255,255,0.25); border-radius: 3px; overflow: hidden; }
+.update-progress-fill { height: 100%; background: white; border-radius: 3px; transition: width 0.3s ease; }
+.update-error-text { opacity: 0.9; }
+
 /* Error Boundary */
 .error-boundary { display: flex; align-items: center; justify-content: center; min-height: 60vh; padding: 2rem; }
 .error-boundary-card { text-align: center; max-width: 480px; padding: 2.5rem; background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow-lg); }
@@ -870,7 +889,7 @@ input:focus, select:focus, textarea:focus {
   body { background: white; color: black; }
   .header, .footer, .nav, .breadcrumbs, .row-actions,
   .form-card, .form-inline, .rent-controls-row,
-  .toast-container, .modal-overlay, .header-actions,
+  .toast-container, .modal-overlay, .header-actions, .update-bar,
   .search-trigger, .search-overlay, .report-tabs,
   .no-print, .quick-actions, .filter-bar { display: none !important; }
   .btn { display: none !important; }

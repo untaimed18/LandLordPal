@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
+import UpdateNotification from './UpdateNotification'
 import {
   LayoutDashboard,
   Banknote,
@@ -125,6 +126,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="main">
         {children}
       </main>
+      <UpdateNotification />
       <footer className="footer">
         <span>LandLord Pal</span>
         <span className="footer-sep">·</span>
