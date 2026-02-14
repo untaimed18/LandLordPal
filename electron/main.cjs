@@ -42,9 +42,21 @@ function sendUpdateStatus(event, data) {
 }
 
 function setupAutoUpdater() {
+  // Explicitly set the feed URL so the updater works even without
+  // the auto-generated app-update.yml (e.g. in dev, or when the
+  // installed app was built before the publish config was added).
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'untaimed18',
+    repo: 'LandLordPal',
+  });
+
   // Don't auto-download — let the user choose
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+
+  // Log updater events for debugging
+  autoUpdater.logger = require('electron').app.isPackaged ? null : console;
 
   autoUpdater.on('checking-for-update', () => {
     sendUpdateStatus('checking', {});
@@ -78,14 +90,14 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('error', (err) => {
-    sendUpdateStatus('error', {
-      message: err ? err.message : 'Unknown update error',
-    });
+    const msg = err ? err.message : 'Unknown update error';
+    console.error('Auto-updater error:', msg);
+    sendUpdateStatus('error', { message: msg });
   });
 
   // IPC handlers from renderer
   ipcMain.handle('start-download', () => {
-    autoUpdater.downloadUpdate();
+    return autoUpdater.downloadUpdate();
   });
 
   ipcMain.handle('quit-and-install', () => {
@@ -93,17 +105,17 @@ function setupAutoUpdater() {
   });
 
   ipcMain.handle('check-for-updates', () => {
-    autoUpdater.checkForUpdates().catch(() => {
-      // Silently ignore — e.g. no internet
+    return autoUpdater.checkForUpdates().catch((err) => {
+      console.error('Manual check-for-updates failed:', err.message);
     });
   });
 
   // Check for updates after a short delay so the window is fully loaded
   setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {
-      // Silently ignore — e.g. no internet
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error('Auto check-for-updates failed:', err.message);
     });
-  }, 3000);
+  }, 5000);
 }
 
 // ─── App lifecycle ───────────────────────────────────────────────────────────
