@@ -338,6 +338,135 @@ input:focus, select:focus, textarea:focus {
 .unit-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg); border-radius: var(--radius); flex-wrap: wrap; gap: 0.5rem; }
 .row-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
+/* Single-unit tenant card (PropertyDetail) */
+.single-tenant-card {
+  padding: 0;
+}
+.stc-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+.stc-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-muted);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stc-name-block {
+  flex: 1;
+  min-width: 0;
+}
+.stc-name {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.stc-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.2rem;
+}
+.stc-contact span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.stc-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem 1.5rem;
+}
+.stc-detail {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.stc-detail-icon {
+  margin-top: 2px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.stc-detail-label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.stc-detail-value {
+  display: block;
+  font-size: 0.938rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-top: 1px;
+}
+.stc-notes {
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  border-left: 3px solid var(--border);
+}
+.stc-rent-history {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  font-size: 0.85rem;
+}
+.stc-rent-change {
+  color: var(--text-muted);
+}
+.stc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Vacant state for single-unit */
+.stc-vacant-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--positive-bg);
+  border-radius: var(--radius);
+  color: var(--positive);
+  margin-bottom: 0.5rem;
+}
+.stc-vacant-banner div {
+  display: flex;
+  flex-direction: column;
+}
+.stc-vacant-banner strong {
+  font-size: 0.95rem;
+}
+.stc-vacant-banner span {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
 /* Badges */
 .badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 500; }
 .badge.available { background: var(--positive-bg); color: var(--positive); margin-left: 0.5rem; }

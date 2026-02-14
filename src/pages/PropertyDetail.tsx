@@ -28,6 +28,7 @@ import { US_STATES } from '../lib/us-states'
 import Breadcrumbs from '../components/Breadcrumbs'
 import type { PropertyType, CommunicationType } from '../types'
 import { addCommunicationLog, deleteCommunicationLog } from '../store'
+import { User, Phone, Mail, CalendarDays, DollarSign, Clock, ShieldCheck, BedDouble, CreditCard } from 'lucide-react'
 
 const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
   { value: 'single_family', label: 'Single Family' },
@@ -570,43 +571,152 @@ export default function PropertyDetail() {
                       <button type="submit" className="btn small primary">Save</button>
                       <button type="button" className="btn small" onClick={() => setEditingUnitId(null)}>Cancel</button>
                     </form>
+                  ) : isSingleUnitProp(prop.propertyType) ? (
+                    /* ── Beautiful single-unit layout ── */
+                    <>
+                      {tenant ? (
+                        <div className="single-tenant-card">
+                          <div className="stc-header">
+                            <div className="stc-avatar"><User size={22} /></div>
+                            <div className="stc-name-block">
+                              <h3 className="stc-name">{tenant.name}</h3>
+                              <div className="stc-contact">
+                                {tenant.phone && <span><Phone size={13} /> {tenant.phone}</span>}
+                                {tenant.email && <span><Mail size={13} /> {tenant.email}</span>}
+                              </div>
+                            </div>
+                            {(() => {
+                              const status = getLeaseStatus(tenant.leaseEnd)
+                              if (status === 'expired') return <span className="badge expired">Lease expired</span>
+                              if (status === 'expiring') return <span className="badge expiring">Expiring soon</span>
+                              return <span className="badge active-lease">Active</span>
+                            })()}
+                          </div>
+
+                          <div className="stc-details-grid">
+                            <div className="stc-detail">
+                              <CalendarDays size={14} className="stc-detail-icon" />
+                              <div>
+                                <span className="stc-detail-label">Lease period</span>
+                                <span className="stc-detail-value">{formatDate(tenant.leaseStart)} — {formatDate(tenant.leaseEnd)}</span>
+                              </div>
+                            </div>
+                            <div className="stc-detail">
+                              <DollarSign size={14} className="stc-detail-icon" />
+                              <div>
+                                <span className="stc-detail-label">Monthly rent</span>
+                                <span className="stc-detail-value">{formatMoney(unit.monthlyRent)}</span>
+                              </div>
+                            </div>
+                            {tenant.deposit != null && tenant.deposit > 0 && (
+                              <div className="stc-detail">
+                                <ShieldCheck size={14} className="stc-detail-icon" />
+                                <div>
+                                  <span className="stc-detail-label">Security deposit</span>
+                                  <span className="stc-detail-value">{formatMoney(tenant.deposit)}</span>
+                                </div>
+                              </div>
+                            )}
+                            <div className="stc-detail">
+                              <BedDouble size={14} className="stc-detail-icon" />
+                              <div>
+                                <span className="stc-detail-label">Layout</span>
+                                <span className="stc-detail-value">{unit.bedrooms} bed, {unit.bathrooms} bath{unit.sqft != null && unit.sqft > 0 ? ` · ${unit.sqft.toLocaleString()} sqft` : ''}</span>
+                              </div>
+                            </div>
+                            {(tenant.gracePeriodDays != null && tenant.gracePeriodDays > 0) && (
+                              <div className="stc-detail">
+                                <Clock size={14} className="stc-detail-icon" />
+                                <div>
+                                  <span className="stc-detail-label">Grace period</span>
+                                  <span className="stc-detail-value">{tenant.gracePeriodDays} days{tenant.lateFeeAmount != null && tenant.lateFeeAmount > 0 ? ` · ${formatMoney(tenant.lateFeeAmount)} late fee` : ''}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {tenant.notes && <p className="stc-notes">{tenant.notes}</p>}
+
+                          {tenant.rentHistory && tenant.rentHistory.length > 0 && (
+                            <div className="stc-rent-history">
+                              <span className="stc-detail-label">Rent changes</span>
+                              {tenant.rentHistory.map((r, i) => (
+                                <span key={i} className="stc-rent-change">{formatDate(r.date)}: {formatMoney(r.oldRent)} → {formatMoney(r.newRent)}</span>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="stc-actions">
+                            <button type="button" className="btn small primary" onClick={() => { setPaymentForm(tenant.id); setNewPayment({ tenantId: tenant.id, amount: tenant.monthlyRent, date: nowISO(), method: 'transfer', notes: '' }) }}>
+                              <CreditCard size={14} /> Record payment
+                            </button>
+                            <button type="button" className="btn small" onClick={() => { setTenantForm(null); setEditingTenantId(tenant.id); setNewTenant({ unitId: tenant.unitId, name: tenant.name, email: tenant.email ?? '', phone: tenant.phone ?? '', leaseStart: tenant.leaseStart, leaseEnd: tenant.leaseEnd, monthlyRent: tenant.monthlyRent, deposit: tenant.deposit ?? 0, gracePeriodDays: tenant.gracePeriodDays ?? 5, lateFeeAmount: tenant.lateFeeAmount ?? 0, notes: tenant.notes ?? '' }); }}>Edit tenant</button>
+                            <button type="button" className="btn small" onClick={() => setPaymentHistoryTenant(tenant.id)}>Payment history</button>
+                            <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'tenant', id: tenant.id })}>Add note</button>
+                            <button type="button" className="btn small" onClick={() => { setShowMoveOut(tenant.id); setMoveOutDate(nowISO()); setMoveOutNotes(''); setDepositReturned(tenant.deposit ?? 0); setDepositDeductions(''); }}>Move out</button>
+                            <button type="button" className="btn small danger" onClick={() => handleDeleteTenant(tenant.id, tenant.name)}>Remove tenant</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="single-tenant-card stc-vacant">
+                          <div className="stc-vacant-content">
+                            <div className="stc-details-grid" style={{ marginBottom: '1rem' }}>
+                              <div className="stc-detail">
+                                <BedDouble size={14} className="stc-detail-icon" />
+                                <div>
+                                  <span className="stc-detail-label">Layout</span>
+                                  <span className="stc-detail-value">{unit.bedrooms} bed, {unit.bathrooms} bath{unit.sqft != null && unit.sqft > 0 ? ` · ${unit.sqft.toLocaleString()} sqft` : ''}</span>
+                                </div>
+                              </div>
+                              <div className="stc-detail">
+                                <DollarSign size={14} className="stc-detail-icon" />
+                                <div>
+                                  <span className="stc-detail-label">Monthly rent</span>
+                                  <span className="stc-detail-value">{formatMoney(unit.monthlyRent)}</span>
+                                </div>
+                              </div>
+                              {unit.deposit != null && unit.deposit > 0 && (
+                                <div className="stc-detail">
+                                  <ShieldCheck size={14} className="stc-detail-icon" />
+                                  <div>
+                                    <span className="stc-detail-label">Required deposit</span>
+                                    <span className="stc-detail-value">{formatMoney(unit.deposit)}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="stc-vacant-banner">
+                              <User size={18} />
+                              <div>
+                                <strong>Vacant</strong>
+                                <span>This property is ready for a new tenant.</span>
+                              </div>
+                            </div>
+                            <div className="stc-actions">
+                              <button type="button" className="btn primary" onClick={() => { setEditingTenantId(null); setTenantForm(unit.id); setNewTenant({ unitId: unit.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: unit.monthlyRent, deposit: unit.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, notes: '' }); }}>
+                                <User size={14} /> Add tenant
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
+                    /* ── Standard multi-unit row layout ── */
                     <>
                       <div>
-                        {/* For single-unit properties, skip the unit name and show tenant info directly */}
-                        {isSingleUnitProp(prop.propertyType) ? (
-                          <>
-                            <span className="muted">{unit.bedrooms} bed, {unit.bathrooms} bath</span>
-                            {unit.sqft != null && unit.sqft > 0 && <span className="muted"> · {unit.sqft} sqft</span>}
-                            <span className="muted"> · {formatMoney(unit.monthlyRent)}/mo</span>
-                            {unit.deposit != null && unit.deposit > 0 && <span className="muted"> · Deposit: {formatMoney(unit.deposit)}</span>}
-                          </>
-                        ) : (
-                          <>
-                            <strong>{unit.name}</strong>
-                            <span className="muted"> — {unit.bedrooms} bed, {unit.bathrooms} bath</span>
-                            {unit.sqft != null && unit.sqft > 0 && <span className="muted">, {unit.sqft} sqft</span>}
-                            <span className="muted"> · {formatMoney(unit.monthlyRent)}/mo</span>
-                            {unit.deposit != null && unit.deposit > 0 && <span className="muted"> · Deposit: {formatMoney(unit.deposit)}</span>}
-                          </>
-                        )}
+                        <strong>{unit.name}</strong>
+                        <span className="muted"> — {unit.bedrooms} bed, {unit.bathrooms} bath</span>
+                        {unit.sqft != null && unit.sqft > 0 && <span className="muted">, {unit.sqft} sqft</span>}
+                        <span className="muted"> · {formatMoney(unit.monthlyRent)}/mo</span>
+                        {unit.deposit != null && unit.deposit > 0 && <span className="muted"> · Deposit: {formatMoney(unit.deposit)}</span>}
                         {unit.notes && <span className="muted block">Note: {unit.notes}</span>}
                         {tenant && (
                           <>
                             <span className="tenant-inline-info">
-                              {isSingleUnitProp(prop.propertyType) ? (
-                                <>
-                                  <strong style={{ fontSize: '1.05em' }}>{tenant.name}</strong>
-                                  {tenant.phone && <span className="muted"> · {tenant.phone}</span>}
-                                  {tenant.email && <span className="muted"> · {tenant.email}</span>}
-                                </>
-                              ) : (
-                                <>
-                                  <span> · Tenant: <strong>{tenant.name}</strong></span>
-                                  {tenant.phone && <span className="muted"> · {tenant.phone}</span>}
-                                  {tenant.email && <span className="muted"> · {tenant.email}</span>}
-                                </>
-                              )}
+                              <span> · Tenant: <strong>{tenant.name}</strong></span>
+                              {tenant.phone && <span className="muted"> · {tenant.phone}</span>}
+                              {tenant.email && <span className="muted"> · {tenant.email}</span>}
                             </span>
                             <span className="tenant-lease-dates muted block">
                               Lease: {formatDate(tenant.leaseStart)} — {formatDate(tenant.leaseEnd)}
@@ -628,16 +738,12 @@ export default function PropertyDetail() {
                             })()}
                           </>
                         )}
-                        {unit.available && !tenant && <span className="badge available">Vacant — ready for a tenant</span>}
+                        {unit.available && !tenant && <span className="badge available">Available</span>}
                       </div>
                       <div className="row-actions">
-                        {!isSingleUnitProp(prop.propertyType) && (
-                          <>
-                            <button type="button" className="btn small" onClick={() => setEditingUnitId(unit.id)}>Edit unit</button>
-                            <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'unit', id: unit.id })}>Add note</button>
-                          </>
-                        )}
-                        {!tenant && !isSingleUnitProp(prop.propertyType) && (
+                        <button type="button" className="btn small" onClick={() => setEditingUnitId(unit.id)}>Edit unit</button>
+                        <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'unit', id: unit.id })}>Add note</button>
+                        {!tenant && (
                           <button type="button" className="btn small danger" onClick={() => handleDeleteUnit(unit.id, unit.name)}>Delete unit</button>
                         )}
                         {!tenant && unit.available && (
