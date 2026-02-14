@@ -37,38 +37,97 @@ function isArray(x: unknown): x is unknown[] {
   return Array.isArray(x);
 }
 
-function loadState(): AppState {
+// ─── Persistence helpers (SQLite via Electron IPC, fallback to localStorage) ─
+
+/** Check if running inside Electron with the database bridge available */
+function hasElectronDB(): boolean {
+  return !!(window.electronAPI?.dbLoad && window.electronAPI?.dbSave);
+}
+
+/** Load state from localStorage (fallback for browser dev mode) */
+function loadFromLocalStorage(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState;
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      properties: isArray(parsed.properties) ? parsed.properties : [],
-      units: isArray(parsed.units) ? parsed.units : [],
-      tenants: isArray(parsed.tenants) ? parsed.tenants : [],
-      expenses: isArray(parsed.expenses) ? parsed.expenses : [],
-      payments: isArray(parsed.payments) ? parsed.payments : [],
-      maintenanceRequests: isArray(parsed.maintenanceRequests) ? parsed.maintenanceRequests : [],
-      activityLogs: isArray(parsed.activityLogs) ? parsed.activityLogs : [],
-      vendors: isArray(parsed.vendors) ? parsed.vendors : [],
-    } as AppState;
+    return parseStateData(parsed);
   } catch {
     return defaultState;
   }
 }
 
-function saveState(state: AppState): void {
+/** Save state to localStorage (fallback for browser dev mode) */
+function saveToLocalStorage(s: AppState): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
   } catch (e) {
-    console.error('Failed to save state', e);
+    console.error('Failed to save state to localStorage', e);
   }
 }
 
-// Simple pub/sub for React
+/** Parse raw data into a validated AppState */
+function parseStateData(data: Record<string, unknown>): AppState {
+  return {
+    properties: isArray(data.properties) ? data.properties : [],
+    units: isArray(data.units) ? data.units : [],
+    tenants: isArray(data.tenants) ? data.tenants : [],
+    expenses: isArray(data.expenses) ? data.expenses : [],
+    payments: isArray(data.payments) ? data.payments : [],
+    maintenanceRequests: isArray(data.maintenanceRequests) ? data.maintenanceRequests : [],
+    activityLogs: isArray(data.activityLogs) ? data.activityLogs : [],
+    vendors: isArray(data.vendors) ? data.vendors : [],
+  } as AppState;
+}
+
+function saveState(s: AppState): void {
+  if (hasElectronDB()) {
+    // Fire-and-forget save to SQLite via IPC
+    window.electronAPI!.dbSave(s).catch((e) => {
+      console.error('Failed to save state to SQLite', e);
+    });
+  } else {
+    saveToLocalStorage(s);
+  }
+}
+
+// ─── In-memory state + pub/sub ───────────────────────────────────────────────
+
 type Listener = () => void;
-let state = loadState();
+let state: AppState = defaultState;
 const listeners: Set<Listener> = new Set();
+let _initialized = false;
+
+/**
+ * Initialize the store by loading data from the backend (SQLite or localStorage).
+ * Must be called once before rendering the app. Returns a promise that resolves
+ * when the state is ready.
+ */
+export async function initStore(): Promise<void> {
+  if (_initialized) return;
+
+  if (hasElectronDB()) {
+    try {
+      const data = await window.electronAPI!.dbLoad();
+      if (data) {
+        state = parseStateData(data as unknown as Record<string, unknown>);
+      }
+      console.log('Store initialized from SQLite');
+    } catch (e) {
+      console.error('Failed to load from SQLite, falling back to localStorage', e);
+      state = loadFromLocalStorage();
+    }
+  } else {
+    state = loadFromLocalStorage();
+    console.log('Store initialized from localStorage (no Electron DB)');
+  }
+
+  _initialized = true;
+  listeners.forEach((l) => l());
+}
+
+export function isStoreReady(): boolean {
+  return _initialized;
+}
 
 export function getState(): AppState {
   return state;
@@ -97,16 +156,7 @@ function setState(next: AppState): void {
 
 // Replace entire state (used for backup restore / data clear)
 export function importState(data: Record<string, unknown>): void {
-  const next: AppState = {
-    properties: isArray(data.properties) ? data.properties : [],
-    units: isArray(data.units) ? data.units : [],
-    tenants: isArray(data.tenants) ? data.tenants : [],
-    expenses: isArray(data.expenses) ? data.expenses : [],
-    payments: isArray(data.payments) ? data.payments : [],
-    maintenanceRequests: isArray(data.maintenanceRequests) ? data.maintenanceRequests : [],
-    activityLogs: isArray(data.activityLogs) ? data.activityLogs : [],
-    vendors: isArray(data.vendors) ? data.vendors : [],
-  } as AppState;
+  const next = parseStateData(data);
   setState(next);
 }
 

@@ -12,8 +12,23 @@ interface UpdateStatusEvent {
   message?: string;
 }
 
+interface AppStateData {
+  properties: import('./types').Property[];
+  units: import('./types').Unit[];
+  tenants: import('./types').Tenant[];
+  expenses: import('./types').Expense[];
+  payments: import('./types').Payment[];
+  maintenanceRequests: import('./types').MaintenanceRequest[];
+  activityLogs: import('./types').ActivityLog[];
+  vendors: import('./types').Vendor[];
+}
+
 interface ElectronAPI {
   platform: string;
+  // Database
+  dbLoad: () => Promise<AppStateData | null>;
+  dbSave: (state: AppStateData) => Promise<boolean>;
+  // Auto-update
   onUpdateStatus: (callback: (data: UpdateStatusEvent) => void) => () => void;
   startDownload: () => Promise<void>;
   installUpdate: () => Promise<void>;

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
+const { initDatabase, loadAll, saveAll, closeDatabase } = require('./database.cjs');
 
 // Keep a global reference so the window isn't garbage-collected
 let mainWindow = null;
@@ -118,15 +119,43 @@ function setupAutoUpdater() {
   }, 5000);
 }
 
+// ─── Database IPC handlers ───────────────────────────────────────────────────
+
+function setupDatabase() {
+  const userDataPath = app.getPath('userData');
+  initDatabase(userDataPath);
+
+  ipcMain.handle('db:load', () => {
+    try {
+      return loadAll();
+    } catch (err) {
+      console.error('db:load failed:', err.message);
+      return null;
+    }
+  });
+
+  ipcMain.handle('db:save', (_event, state) => {
+    try {
+      saveAll(state);
+      return true;
+    } catch (err) {
+      console.error('db:save failed:', err.message);
+      return false;
+    }
+  });
+}
+
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
+  setupDatabase();
   createWindow();
   setupAutoUpdater();
 });
 
 // Quit when all windows are closed (Windows & Linux behavior)
 app.on('window-all-closed', () => {
+  closeDatabase();
   app.quit();
 });
 

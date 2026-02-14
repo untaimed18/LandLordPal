@@ -3,6 +3,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
 
+  // Database API
+  dbLoad: () => ipcRenderer.invoke('db:load'),
+  dbSave: (state) => ipcRenderer.invoke('db:save', state),
+
   // Auto-update API
   onUpdateStatus: (callback) => {
     const handler = (_event, data) => callback(data);
