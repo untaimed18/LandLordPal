@@ -6,7 +6,7 @@ import {
   getRentRollForMonth,
   getLeasesEndingSoon,
 } from '../lib/calculations'
-import { formatMoney, formatPct, formatDate } from '../lib/format'
+import { formatMoney, formatPct } from '../lib/format'
 import {
   Building2,
   Banknote,
@@ -19,6 +19,14 @@ import {
   Shield,
   Clock,
   Bell,
+  TrendingUp,
+  TrendingDown,
+  DoorOpen,
+  AlertTriangle,
+  ChevronRight,
+  MapPin,
+  ArrowUpRight,
+  ArrowDownRight,
 } from 'lucide-react'
 
 const LEASES_SOON_DAYS = 90
@@ -69,14 +77,27 @@ export default function Dashboard() {
 
   const hasData = properties.length > 0
 
+  const vacancyCost = units
+    .filter((u) => !tenants.some((t) => t.unitId === u.id))
+    .reduce((sum, u) => sum + u.monthlyRent, 0)
+
+  const collectionRate = stats.expectedMonthlyRent > 0
+    ? (stats.collectedThisMonth / stats.expectedMonthlyRent) * 100
+    : 0
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
   return (
     <div className="dashboard">
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p className="page-desc">Your portfolio at a glance. All numbers update automatically.</p>
+          <p className="page-desc">
+            {hasData
+              ? `${monthNames[now.getMonth()]} ${now.getFullYear()} — ${properties.length} propert${properties.length !== 1 ? 'ies' : 'y'}, ${tenants.length} tenant${tenants.length !== 1 ? 's' : ''}`
+              : 'Your portfolio at a glance.'}
+          </p>
         </div>
-        
       </div>
 
       {!hasData && (
@@ -91,7 +112,7 @@ export default function Dashboard() {
           <div className="welcome-features">
             <div className="welcome-feature">
               <Home size={18} className="welcome-feature-icon" />
-              <span>Track properties & units</span>
+              <span>Track properties &amp; units</span>
             </div>
             <div className="welcome-feature">
               <DollarSign size={18} className="welcome-feature-icon" />
@@ -111,218 +132,295 @@ export default function Dashboard() {
 
       {hasData && (
         <>
-          <div className="quick-actions">
-            <Link to="/rent" className="quick-action-btn">
-              <Banknote size={20} className="quick-action-icon" />
-              <span>Record payment</span>
-            </Link>
-            <Link to="/expenses" className="quick-action-btn">
-              <Receipt size={20} className="quick-action-icon" />
-              <span>Add expense</span>
-            </Link>
-            <Link to="/maintenance" className="quick-action-btn">
-              <Wrench size={20} className="quick-action-icon" />
-              <span>New maintenance</span>
-            </Link>
-            <Link to="/properties" className="quick-action-btn">
-              <Home size={20} className="quick-action-icon" />
-              <span>Add property</span>
-            </Link>
-            <Link to="/calendar" className="quick-action-btn">
-              <CalendarDays size={20} className="quick-action-icon" />
-              <span>Calendar</span>
-            </Link>
-            <Link to="/reports" className="quick-action-btn">
-              <BarChart3 size={20} className="quick-action-icon" />
-              <span>Reports</span>
-            </Link>
-          </div>
-
-          <section className="stats-grid">
-            <div className="stat-card">
-              <span className="stat-label">Expected monthly rent</span>
-              <span className="stat-value">{formatMoney(stats.expectedMonthlyRent)}</span>
+          {/* ── Hero financial cards ── */}
+          <div className="dash-hero">
+            <div className="dash-hero-card dash-hero-primary">
+              <div className="dash-hero-icon-wrap">
+                <DollarSign size={22} />
+              </div>
+              <div className="dash-hero-content">
+                <span className="dash-hero-label">Net cash flow</span>
+                <span className={`dash-hero-value ${stats.netCashFlow >= 0 ? 'positive' : 'negative'}`}>
+                  {formatMoney(stats.netCashFlow)}
+                </span>
+                <span className="dash-hero-sub">This month</span>
+              </div>
             </div>
-            <div className="stat-card">
-              <span className="stat-label">Collected this month</span>
-              <span className="stat-value positive">{formatMoney(stats.collectedThisMonth)}</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-label">Expenses this month</span>
-              <span className="stat-value negative">{formatMoney(stats.expensesThisMonth)}</span>
-            </div>
-            <div className="stat-card highlight">
-              <span className="stat-label">Net cash flow (this month)</span>
-              <span className="stat-value">{formatMoney(stats.netCashFlow)}</span>
-            </div>
-          </section>
-
-          <section className="stats-grid two">
-            <div className="stat-card">
-              <span className="stat-label">Occupancy</span>
-              <span className="stat-value">
-                {stats.totalUnits === 0 ? '—' : `${stats.occupiedUnits} / ${stats.totalUnits} (${formatPct(stats.occupancyRate)})`}
-              </span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-label">YTD income</span>
-              <span className="stat-value positive">{formatMoney(stats.ytdIncome)}</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-label">YTD expenses</span>
-              <span className="stat-value negative">{formatMoney(stats.ytdExpenses)}</span>
-            </div>
-            <div className="stat-card highlight">
-              <span className="stat-label">YTD net profit</span>
-              <span className={`stat-value ${stats.ytdIncome - stats.ytdExpenses >= 0 ? 'positive' : 'negative'}`}>
-                {formatMoney(stats.ytdIncome - stats.ytdExpenses)}
-              </span>
-            </div>
-            {stats.totalUnits > stats.occupiedUnits && (
-              <div className="stat-card">
-                <span className="stat-label">Vacancy cost (monthly)</span>
-                <span className="stat-value negative">
-                  {formatMoney(
-                    units
-                      .filter((u) => !tenants.some((t) => t.unitId === u.id))
-                      .reduce((sum, u) => sum + u.monthlyRent, 0)
+            <div className="dash-hero-card">
+              <div className="dash-hero-icon-wrap income">
+                <TrendingUp size={20} />
+              </div>
+              <div className="dash-hero-content">
+                <span className="dash-hero-label">Collected</span>
+                <span className="dash-hero-value positive">{formatMoney(stats.collectedThisMonth)}</span>
+                <span className="dash-hero-sub">
+                  of {formatMoney(stats.expectedMonthlyRent)} expected
+                  {stats.expectedMonthlyRent > 0 && (
+                    <span className="dash-hero-pct">{Math.round(collectionRate)}%</span>
                   )}
                 </span>
               </div>
-            )}
-            {openMaintenance.length > 0 && (
-              <div className="stat-card">
-                <span className="stat-label">Open maintenance</span>
-                <span className="stat-value negative">{openMaintenance.length}</span>
+            </div>
+            <div className="dash-hero-card">
+              <div className="dash-hero-icon-wrap expense">
+                <TrendingDown size={20} />
+              </div>
+              <div className="dash-hero-content">
+                <span className="dash-hero-label">Expenses</span>
+                <span className="dash-hero-value negative">{formatMoney(stats.expensesThisMonth)}</span>
+                <span className="dash-hero-sub">This month</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Secondary stats row ── */}
+          <div className="dash-stats-row">
+            <div className="dash-stat">
+              <div className="dash-stat-icon"><DoorOpen size={16} /></div>
+              <div>
+                <span className="dash-stat-label">Occupancy</span>
+                <span className="dash-stat-value">
+                  {stats.totalUnits === 0 ? '—' : `${stats.occupiedUnits}/${stats.totalUnits}`}
+                  {stats.totalUnits > 0 && <span className="dash-stat-pct">{formatPct(stats.occupancyRate)}</span>}
+                </span>
+              </div>
+            </div>
+            <div className="dash-stat">
+              <div className="dash-stat-icon income"><ArrowUpRight size={16} /></div>
+              <div>
+                <span className="dash-stat-label">YTD income</span>
+                <span className="dash-stat-value positive">{formatMoney(stats.ytdIncome)}</span>
+              </div>
+            </div>
+            <div className="dash-stat">
+              <div className="dash-stat-icon expense"><ArrowDownRight size={16} /></div>
+              <div>
+                <span className="dash-stat-label">YTD expenses</span>
+                <span className="dash-stat-value negative">{formatMoney(stats.ytdExpenses)}</span>
+              </div>
+            </div>
+            <div className="dash-stat">
+              <div className="dash-stat-icon"><DollarSign size={16} /></div>
+              <div>
+                <span className="dash-stat-label">YTD profit</span>
+                <span className={`dash-stat-value ${stats.ytdIncome - stats.ytdExpenses >= 0 ? 'positive' : 'negative'}`}>
+                  {formatMoney(stats.ytdIncome - stats.ytdExpenses)}
+                </span>
+              </div>
+            </div>
+            {vacancyCost > 0 && (
+              <div className="dash-stat">
+                <div className="dash-stat-icon warning"><AlertTriangle size={16} /></div>
+                <div>
+                  <span className="dash-stat-label">Vacancy loss</span>
+                  <span className="dash-stat-value negative">{formatMoney(vacancyCost)}/mo</span>
+                </div>
               </div>
             )}
-          </section>
+            {openMaintenance.length > 0 && (
+              <div className="dash-stat">
+                <div className="dash-stat-icon warning"><Wrench size={16} /></div>
+                <div>
+                  <span className="dash-stat-label">Open repairs</span>
+                  <span className="dash-stat-value">{openMaintenance.length}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Quick actions ── */}
+          <div className="dash-quick-actions">
+            <Link to="/rent" className="dash-qa">
+              <Banknote size={18} />
+              <span>Record payment</span>
+            </Link>
+            <Link to="/expenses" className="dash-qa">
+              <Receipt size={18} />
+              <span>Add expense</span>
+            </Link>
+            <Link to="/maintenance" className="dash-qa">
+              <Wrench size={18} />
+              <span>Maintenance</span>
+            </Link>
+            <Link to="/properties" className="dash-qa">
+              <Home size={18} />
+              <span>Properties</span>
+            </Link>
+            <Link to="/calendar" className="dash-qa">
+              <CalendarDays size={18} />
+              <span>Calendar</span>
+            </Link>
+            <Link to="/reports" className="dash-qa">
+              <BarChart3 size={18} />
+              <span>Reports</span>
+            </Link>
+          </div>
         </>
       )}
 
+      {/* ── Reminders / Notifications ── */}
       {hasData && notificationCount > 0 && (
-        <section className="card section-card notification-center" style={{ marginTop: '1.5rem' }}>
-          <div className="section-card-header">
-            <h2><Bell size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Reminders ({notificationCount})</h2>
+        <section className="dash-section">
+          <div className="dash-section-header">
+            <h2><Bell size={18} /> Reminders</h2>
+            <span className="dash-section-count">{notificationCount}</span>
           </div>
-          <div className="notification-list">
+          <div className="dash-notification-list">
             {insuranceAlerts.map(({ property: p, daysLeft }) => (
-              <div key={`ins-${p.id}`} className="notification-item notification-warning">
-                <Shield size={16} />
-                <span><strong>{p.name}</strong> — insurance expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''} ({p.insuranceProvider ?? 'Policy'})</span>
-                <Link to={`/properties/${p.id}`} className="btn small">View</Link>
-              </div>
+              <Link key={`ins-${p.id}`} to={`/properties/${p.id}`} className="dash-notif dash-notif-warning">
+                <Shield size={16} className="dash-notif-icon" />
+                <div className="dash-notif-body">
+                  <strong>{p.name}</strong>
+                  <span>Insurance expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}{p.insuranceProvider ? ` (${p.insuranceProvider})` : ''}</span>
+                </div>
+                <ChevronRight size={16} className="dash-notif-arrow" />
+              </Link>
             ))}
             {scheduledMaintenance.map((m) => {
               const prop = properties.find((p) => p.id === m.propertyId)
               const daysUntil = Math.ceil((new Date(m.scheduledDate! + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
               return (
-                <div key={`sched-${m.id}`} className="notification-item notification-info">
-                  <Clock size={16} />
-                  <span><strong>{m.title}</strong>{prop && ` — ${prop.name}`} · Scheduled in {daysUntil} day{daysUntil !== 1 ? 's' : ''}</span>
-                  <Link to="/maintenance" className="btn small">View</Link>
-                </div>
+                <Link key={`sched-${m.id}`} to="/maintenance" className="dash-notif dash-notif-info">
+                  <Clock size={16} className="dash-notif-icon" />
+                  <div className="dash-notif-body">
+                    <strong>{m.title}</strong>
+                    <span>{prop && `${prop.name} · `}Scheduled in {daysUntil} day{daysUntil !== 1 ? 's' : ''}</span>
+                  </div>
+                  <ChevronRight size={16} className="dash-notif-arrow" />
+                </Link>
               )
             })}
             {leasesEndingSoon.slice(0, 5).map(({ tenant, daysLeft }) => (
-              <div key={`lease-${tenant.id}`} className="notification-item notification-alert">
-                <CalendarDays size={16} />
-                <span><strong>{tenant.name}</strong> — lease ends in {daysLeft} day{daysLeft !== 1 ? 's' : ''}</span>
-                <Link to={`/properties/${tenant.propertyId}`} className="btn small">View</Link>
-              </div>
+              <Link key={`lease-${tenant.id}`} to={`/properties/${tenant.propertyId}`} className="dash-notif dash-notif-alert">
+                <CalendarDays size={16} className="dash-notif-icon" />
+                <div className="dash-notif-body">
+                  <strong>{tenant.name}</strong>
+                  <span>Lease ends in {daysLeft} day{daysLeft !== 1 ? 's' : ''}</span>
+                </div>
+                <ChevronRight size={16} className="dash-notif-arrow" />
+              </Link>
             ))}
           </div>
         </section>
       )}
 
+      {/* ── Late rent ── */}
       {lateRentItems.length > 0 && (
-        <section className="card section-card alert-section">
-          <h2>Late rent — past grace period</h2>
-          <p className="section-desc">{lateRentItems.length} tenant{lateRentItems.length !== 1 ? 's' : ''} past grace period with late fees applicable.</p>
-          <ul className="rent-due-list">
+        <section className="dash-section dash-section-alert">
+          <div className="dash-section-header">
+            <h2><AlertTriangle size={18} /> Late rent</h2>
+            <span className="dash-section-count alert">{lateRentItems.length}</span>
+          </div>
+          <p className="dash-section-desc">Past grace period — late fees applicable.</p>
+          <div className="dash-list">
             {lateRentItems.map((r) => (
-              <li key={r.tenant.id}>
+              <Link key={r.tenant.id} to={`/properties/${r.property.id}`} className="dash-list-item">
                 <span className="badge expired">Late</span>
-                <strong>{r.tenant.name}</strong> — {r.property.name}, {r.unit.name} · Owed: {formatMoney(r.expectedRent)}
-                {r.tenant.lateFeeAmount != null && r.tenant.lateFeeAmount > 0 && (
-                  <span className="muted"> · Late fee: {formatMoney(r.tenant.lateFeeAmount)}</span>
-                )}
-                <Link to={`/properties/${r.property.id}`} className="btn small primary">Record payment</Link>
-              </li>
+                <div className="dash-list-body">
+                  <strong>{r.tenant.name}</strong>
+                  <span>{r.property.name} · Owed: {formatMoney(r.expectedRent)}
+                    {r.tenant.lateFeeAmount != null && r.tenant.lateFeeAmount > 0 && ` + ${formatMoney(r.tenant.lateFeeAmount)} fee`}
+                  </span>
+                </div>
+                <ChevronRight size={16} className="dash-notif-arrow" />
+              </Link>
             ))}
-          </ul>
+          </div>
         </section>
       )}
 
+      {/* ── Rent due this month ── */}
       {notPaidThisMonth.length > 0 && (
-        <section className="card section-card alert-section">
-          <h2>Rent due this month</h2>
-          <p className="section-desc">{notPaidThisMonth.length} tenant{notPaidThisMonth.length !== 1 ? 's' : ''} haven&apos;t paid yet.</p>
-          <ul className="rent-due-list">
+        <section className="dash-section">
+          <div className="dash-section-header">
+            <h2><Banknote size={18} /> Rent due this month</h2>
+            <span className="dash-section-count">{notPaidThisMonth.length}</span>
+          </div>
+          <div className="dash-list">
             {notPaidThisMonth.map((r) => (
-              <li key={r.tenant.id}>
-                <strong>{r.tenant.name}</strong> — {r.property.name}, {r.unit.name} · {formatMoney(r.expectedRent)}
-                {r.paidAmount > 0 && <span className="badge partial">Partial: {formatMoney(r.paidAmount)}</span>}
-                <Link to={`/properties/${r.property.id}`} className="btn small primary">Record payment</Link>
-              </li>
+              <Link key={r.tenant.id} to={`/properties/${r.property.id}`} className="dash-list-item">
+                <div className="dash-list-body">
+                  <strong>{r.tenant.name}</strong>
+                  <span>{r.property.name} · {formatMoney(r.expectedRent)}
+                    {r.paidAmount > 0 && ` (${formatMoney(r.paidAmount)} paid)`}
+                  </span>
+                </div>
+                <ChevronRight size={16} className="dash-notif-arrow" />
+              </Link>
             ))}
-          </ul>
-          <Link to="/rent" className="btn primary">View rent roll</Link>
+          </div>
+          <div className="dash-section-footer">
+            <Link to="/rent" className="btn small">View full rent roll <ChevronRight size={14} /></Link>
+          </div>
         </section>
       )}
 
+      {/* ── Open maintenance ── */}
       {openMaintenance.length > 0 && (
-        <section className="card section-card">
-          <h2>Open maintenance requests</h2>
-          <ul className="rent-due-list">
+        <section className="dash-section">
+          <div className="dash-section-header">
+            <h2><Wrench size={18} /> Open maintenance</h2>
+            <span className="dash-section-count">{openMaintenance.length}</span>
+          </div>
+          <div className="dash-list">
             {openMaintenance.slice(0, 5).map((r) => {
               const prop = properties.find((p) => p.id === r.propertyId)
               return (
-                <li key={r.id}>
+                <Link key={r.id} to="/maintenance" className="dash-list-item">
                   <span className={`badge priority-${r.priority}`}>{r.priority}</span>
-                  <strong>{r.title}</strong>
-                  {prop && <span className="muted"> — {prop.name}</span>}
-                </li>
+                  <div className="dash-list-body">
+                    <strong>{r.title}</strong>
+                    {prop && <span>{prop.name}</span>}
+                  </div>
+                  <ChevronRight size={16} className="dash-notif-arrow" />
+                </Link>
               )
             })}
-          </ul>
-          <Link to="/maintenance" className="btn">View all requests</Link>
+          </div>
+          {openMaintenance.length > 5 && (
+            <div className="dash-section-footer">
+              <Link to="/maintenance" className="btn small">View all {openMaintenance.length} requests <ChevronRight size={14} /></Link>
+            </div>
+          )}
         </section>
       )}
 
-      {leasesEndingSoon.length > 0 && (
-        <section className="card section-card">
-          <h2>Leases ending soon</h2>
-          <p className="section-desc">Within the next {LEASES_SOON_DAYS} days.</p>
-          <ul className="leases-list">
-            {leasesEndingSoon.slice(0, 10).map(({ tenant, daysLeft }) => (
-              <li key={tenant.id}>
-                <strong>{tenant.name}</strong> — Lease ends {formatDate(tenant.leaseEnd)} ({daysLeft} days)
-                <Link to={`/properties/${tenant.propertyId}`} className="btn small">View property</Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
+      {/* ── Properties overview ── */}
       {hasData && (
-        <section className="section">
-          <h2>Properties</h2>
-          <div className="property-cards">
+        <section className="dash-section">
+          <div className="dash-section-header">
+            <h2><Building2 size={18} /> Properties</h2>
+            <Link to="/properties" className="btn small">View all <ChevronRight size={14} /></Link>
+          </div>
+          <div className="dash-property-grid">
             {summaries.map((s) => (
-              <Link key={s.property.id} to={`/properties/${s.property.id}`} className="property-card">
-                <div className="property-card-header">
+              <Link key={s.property.id} to={`/properties/${s.property.id}`} className="dash-prop-card">
+                <div className="dash-prop-header">
                   <h3>{s.property.name}</h3>
-                  <span className="occupancy-badge">{formatPct(s.occupancyRate)} occupied</span>
-                </div>
-                <p className="property-address">{s.property.address}, {s.property.city}</p>
-                <div className="property-metrics">
-                  <span>Rent: {formatMoney(s.totalMonthlyRent)}</span>
-                  <span>Collected: {formatMoney(s.collectedThisMonth)}</span>
-                  <span>Expenses: {formatMoney(s.expensesThisMonth)}</span>
-                  <span className={s.netThisMonth >= 0 ? 'positive' : 'negative'}>
-                    Net: {formatMoney(s.netThisMonth)}
+                  <span className={`dash-prop-occ ${s.occupancyRate >= 1 ? 'full' : s.occupancyRate > 0 ? 'partial' : 'empty'}`}>
+                    {formatPct(s.occupancyRate)}
                   </span>
+                </div>
+                <p className="dash-prop-addr"><MapPin size={12} /> {s.property.address}, {s.property.city}</p>
+                <div className="dash-prop-metrics">
+                  <div className="dash-prop-metric">
+                    <span className="dash-prop-metric-label">Rent</span>
+                    <span className="dash-prop-metric-value">{formatMoney(s.totalMonthlyRent)}</span>
+                  </div>
+                  <div className="dash-prop-metric">
+                    <span className="dash-prop-metric-label">Collected</span>
+                    <span className="dash-prop-metric-value positive">{formatMoney(s.collectedThisMonth)}</span>
+                  </div>
+                  <div className="dash-prop-metric">
+                    <span className="dash-prop-metric-label">Expenses</span>
+                    <span className="dash-prop-metric-value negative">{formatMoney(s.expensesThisMonth)}</span>
+                  </div>
+                  <div className="dash-prop-metric">
+                    <span className="dash-prop-metric-label">Net</span>
+                    <span className={`dash-prop-metric-value ${s.netThisMonth >= 0 ? 'positive' : 'negative'}`}>
+                      {formatMoney(s.netThisMonth)}
+                    </span>
+                  </div>
                 </div>
               </Link>
             ))}
