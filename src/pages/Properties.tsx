@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { getPropertySummary } from '../lib/calculations'
-import { addProperty, updateProperty, deleteProperty, takeSnapshot, restoreSnapshot } from '../store'
+import { addProperty, addUnit, updateUnit, updateProperty, deleteProperty, takeSnapshot, restoreSnapshot } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import { US_STATES } from '../lib/us-states'
-import { Home } from 'lucide-react'
+import { Home, MapPin, Building2, DoorOpen, TrendingUp, TrendingDown, Pencil, Trash2, Eye, Shield, UserPlus } from 'lucide-react'
 import type { PropertyType } from '../types'
 
 const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
@@ -24,6 +24,12 @@ const COMMON_AMENITIES = [
   'Parking', 'Garage', 'Pool', 'Laundry', 'Dishwasher', 'AC', 'Heating',
   'Balcony', 'Patio', 'Yard', 'Storage', 'Gym', 'Pet Friendly', 'Elevator',
 ]
+
+const SINGLE_UNIT_TYPES: PropertyType[] = ['single_family', 'condo', 'townhouse']
+
+function isSingleUnitType(type: string): boolean {
+  return SINGLE_UNIT_TYPES.includes(type as PropertyType)
+}
 
 function formatNumberWithCommas(value: string): string {
   const digits = value.replace(/[^\d]/g, '')
@@ -48,6 +54,10 @@ export default function Properties() {
     amenities: [] as string[],
     purchasePrice: 0,
     purchaseDate: '',
+    monthlyRent: 0,
+    deposit: 0,
+    bedrooms: 0,
+    bathrooms: 0,
     insuranceProvider: '',
     insurancePolicyNumber: '',
     insuranceExpiry: '',
@@ -60,6 +70,7 @@ export default function Properties() {
 
   function openEdit(property: (typeof properties)[0]) {
     setEditingId(property.id)
+    const propUnit = units.find((u) => u.propertyId === property.id)
     setForm({
       name: property.name,
       address: property.address,
@@ -71,6 +82,10 @@ export default function Properties() {
       amenities: property.amenities ?? [],
       purchasePrice: property.purchasePrice ?? 0,
       purchaseDate: property.purchaseDate ?? '',
+      monthlyRent: propUnit?.monthlyRent ?? 0,
+      deposit: propUnit?.deposit ?? 0,
+      bedrooms: propUnit?.bedrooms ?? 0,
+      bathrooms: propUnit?.bathrooms ?? 0,
       insuranceProvider: property.insuranceProvider ?? '',
       insurancePolicyNumber: property.insurancePolicyNumber ?? '',
       insuranceExpiry: property.insuranceExpiry ?? '',
@@ -79,7 +94,7 @@ export default function Properties() {
     setShowForm(true)
   }
 
-  const emptyForm = { name: '', address: '', city: '', state: '', zip: '', propertyType: '', sqft: 0, amenities: [] as string[], purchasePrice: 0, purchaseDate: '', insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '', notes: '' }
+  const emptyForm = { name: '', address: '', city: '', state: '', zip: '', propertyType: '', sqft: 0, amenities: [] as string[], purchasePrice: 0, purchaseDate: '', monthlyRent: 0, deposit: 0, bedrooms: 0, bathrooms: 0, insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '', notes: '' }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -101,11 +116,39 @@ export default function Properties() {
     }
     if (editingId) {
       updateProperty(editingId, data)
+      // If single-unit type, also update the unit's rent/deposit/beds/baths
+      if (isSingleUnitType(form.propertyType)) {
+        const existingUnit = units.find((u) => u.propertyId === editingId)
+        if (existingUnit) {
+          updateUnit(existingUnit.id, {
+            monthlyRent: form.monthlyRent || 0,
+            deposit: form.deposit || undefined,
+            bedrooms: form.bedrooms || 0,
+            bathrooms: form.bathrooms || 0,
+            sqft: form.sqft || undefined,
+          })
+        }
+      }
       setEditingId(null)
       toast('Property updated')
     } else {
-      addProperty(data)
-      toast('Property added')
+      const newProperty = addProperty(data)
+      // Auto-create a default unit for single-unit property types
+      if (isSingleUnitType(form.propertyType)) {
+        addUnit({
+          propertyId: newProperty.id,
+          name: form.name,
+          bedrooms: form.bedrooms || 0,
+          bathrooms: form.bathrooms || 0,
+          monthlyRent: form.monthlyRent || 0,
+          sqft: form.sqft || undefined,
+          deposit: form.deposit || undefined,
+          available: true,
+        })
+        toast('Property added with unit ready for a tenant')
+      } else {
+        toast('Property added')
+      }
     }
     setForm(emptyForm)
     setShowForm(false)
@@ -169,6 +212,19 @@ export default function Properties() {
             <label>Purchase price <input type="text" inputMode="numeric" value={form.purchasePrice ? formatNumberWithCommas(String(form.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} placeholder="350,000" /></label>
             <label>Purchase date <input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
           </div>
+
+          {isSingleUnitType(form.propertyType) && (
+            <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
+              <legend>Rent &amp; unit details</legend>
+              <div className="form-grid">
+                <label>Monthly rent * <input type="text" inputMode="numeric" required={isSingleUnitType(form.propertyType)} value={form.monthlyRent ? formatNumberWithCommas(String(form.monthlyRent)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, monthlyRent: raw ? Number(raw) : 0 })) }} placeholder="1,200" /></label>
+                <label>Security deposit <input type="text" inputMode="numeric" value={form.deposit ? formatNumberWithCommas(String(form.deposit)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, deposit: raw ? Number(raw) : 0 })) }} placeholder="1,200" /></label>
+                <label>Bedrooms <input type="number" min={0} value={form.bedrooms || ''} onChange={(e) => setForm((f) => ({ ...f, bedrooms: +e.target.value || 0 }))} placeholder="3" /></label>
+                <label>Bathrooms <input type="number" min={0} step={0.5} value={form.bathrooms || ''} onChange={(e) => setForm((f) => ({ ...f, bathrooms: +e.target.value || 0 }))} placeholder="2" /></label>
+              </div>
+            </fieldset>
+          )}
+
           <div style={{ marginTop: '0.75rem' }}>
             <label>Amenities</label>
             <div className="amenity-chips">
@@ -202,62 +258,99 @@ export default function Properties() {
         </form>
       )}
 
-      <div className="table-wrap">
-        {properties.length === 0 ? (
-          !showForm ? (
-            <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
-              <div className="empty-icon"><Home size={32} /></div>
-              <p className="empty-state-title">No properties yet</p>
-              <p className="empty-state-text">Add your first rental property to start tracking units, tenants, and income.</p>
-            </div>
-          ) : null
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Property</th>
-                <th>Address</th>
-                <th>Units</th>
-                <th>Monthly rent</th>
-                <th>Collected (month)</th>
-                <th>Expenses (month)</th>
-                <th>Net</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {summaries.map((s) => (
-                <tr key={s.property.id}>
-                  <td>
-                    <Link to={`/properties/${s.property.id}`} className="link-strong">
-                      {s.property.name}
-                    </Link>
-                    {s.property.propertyType && (
-                      <span className="muted block">{PROPERTY_TYPES.find((t) => t.value === s.property.propertyType)?.label}{s.property.sqft ? ` · ${s.property.sqft.toLocaleString()} sqft` : ''}</span>
+      {properties.length === 0 ? (
+        !showForm ? (
+          <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
+            <div className="empty-icon"><Home size={32} /></div>
+            <p className="empty-state-title">No properties yet</p>
+            <p className="empty-state-text">Add your first rental property to start tracking units, tenants, and income.</p>
+          </div>
+        ) : null
+      ) : (
+        <div className="prop-list">
+          {summaries.map((s) => {
+            const p = s.property
+            const typeLabel = PROPERTY_TYPES.find((t) => t.value === p.propertyType)?.label
+            const occupancyPct = s.unitCount > 0 ? Math.round((s.occupiedUnits / s.unitCount) * 100) : 0
+            const isVacant = s.unitCount > 0 && s.occupiedUnits === 0
+            const isSingle = isSingleUnitType(p.propertyType ?? '')
+            return (
+              <div key={p.id} className="prop-card card">
+                <div className="prop-card-top">
+                  <div className="prop-card-info">
+                    <Link to={`/properties/${p.id}`} className="prop-card-name">{p.name}</Link>
+                    <div className="prop-card-meta">
+                      <span className="prop-card-address"><MapPin size={13} /> {p.address}, {p.city}, {p.state} {p.zip}</span>
+                      {typeLabel && (
+                        <span className="prop-card-type-badge">
+                          <Building2 size={12} /> {typeLabel}{p.sqft ? ` · ${p.sqft.toLocaleString()} sqft` : ''}
+                        </span>
+                      )}
+                    </div>
+                    {p.amenities && p.amenities.length > 0 && (
+                      <div className="prop-card-amenities">
+                        {p.amenities.slice(0, 5).map((a) => <span key={a} className="amenity-chip active small">{a}</span>)}
+                        {p.amenities.length > 5 && <span className="amenity-chip small">+{p.amenities.length - 5}</span>}
+                      </div>
                     )}
-                    {s.property.purchasePrice != null && s.property.purchasePrice > 0 && (
-                      <span className="muted block">Purchased: {formatMoney(s.property.purchasePrice)}{s.property.purchaseDate ? ` (${formatDate(s.property.purchaseDate)})` : ''}</span>
+                  </div>
+                  <div className="prop-card-actions">
+                    {isVacant && (
+                      <Link to={`/properties/${p.id}?addTenant=1`} className="btn small accent" title="Add a tenant"><UserPlus size={14} /> Add tenant</Link>
                     )}
-                  </td>
-                  <td>{s.property.address}, {s.property.city}</td>
-                  <td>{s.occupiedUnits} / {s.unitCount}</td>
-                  <td>{formatMoney(s.totalMonthlyRent)}</td>
-                  <td className="positive">{formatMoney(s.collectedThisMonth)}</td>
-                  <td className="negative">{formatMoney(s.expensesThisMonth)}</td>
-                  <td className={s.netThisMonth >= 0 ? 'positive' : 'negative'}>
-                    {formatMoney(s.netThisMonth)}
-                  </td>
-                  <td className="actions-cell">
-                    <Link to={`/properties/${s.property.id}`} className="btn small">View</Link>
-                    <button type="button" className="btn small" onClick={() => openEdit(s.property)}>Edit</button>
-                    <button type="button" className="btn small danger" onClick={() => handleDelete(s.property.id, s.property.name)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+                    <Link to={`/properties/${p.id}`} className="btn small" title="View details"><Eye size={14} /> View</Link>
+                    <button type="button" className="btn small" onClick={() => openEdit(p)} title="Edit property"><Pencil size={14} /> Edit</button>
+                    <button type="button" className="btn small danger" onClick={() => handleDelete(p.id, p.name)} title="Delete property"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+
+                <div className="prop-card-stats">
+                  <div className="prop-stat">
+                    <span className="prop-stat-label"><DoorOpen size={13} /> Status</span>
+                    {isSingle ? (
+                      <span className={`prop-stat-value ${s.occupiedUnits > 0 ? 'positive' : 'negative'}`}>
+                        {s.occupiedUnits > 0 ? 'Occupied' : 'Vacant'}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="prop-stat-value">{s.occupiedUnits} / {s.unitCount}</span>
+                        <div className="occupancy-bar"><div className="occupancy-fill" style={{ width: `${occupancyPct}%` }} /></div>
+                      </>
+                    )}
+                  </div>
+                  <div className="prop-stat">
+                    <span className="prop-stat-label">Monthly rent</span>
+                    <span className="prop-stat-value">{formatMoney(s.totalMonthlyRent)}</span>
+                  </div>
+                  <div className="prop-stat">
+                    <span className="prop-stat-label"><TrendingUp size={13} /> Collected</span>
+                    <span className="prop-stat-value positive">{formatMoney(s.collectedThisMonth)}</span>
+                  </div>
+                  <div className="prop-stat">
+                    <span className="prop-stat-label"><TrendingDown size={13} /> Expenses</span>
+                    <span className="prop-stat-value negative">{formatMoney(s.expensesThisMonth)}</span>
+                  </div>
+                  <div className={`prop-stat prop-stat-net ${s.netThisMonth >= 0 ? 'net-positive' : 'net-negative'}`}>
+                    <span className="prop-stat-label">Net</span>
+                    <span className="prop-stat-value">{formatMoney(s.netThisMonth)}</span>
+                  </div>
+                </div>
+
+                {(p.purchasePrice || p.insuranceProvider) && (
+                  <div className="prop-card-footer">
+                    {p.purchasePrice != null && p.purchasePrice > 0 && (
+                      <span className="prop-footer-item">Purchased: {formatMoney(p.purchasePrice)}{p.purchaseDate ? ` (${formatDate(p.purchaseDate)})` : ''}</span>
+                    )}
+                    {p.insuranceProvider && (
+                      <span className="prop-footer-item"><Shield size={12} /> {p.insuranceProvider}{p.insuranceExpiry ? ` · Exp ${formatDate(p.insuranceExpiry)}` : ''}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

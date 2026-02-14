@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import {
   addUnit,
@@ -53,6 +53,11 @@ const COMM_TYPES: { value: CommunicationType; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
+const SINGLE_UNIT_TYPES: PropertyType[] = ['single_family', 'condo', 'townhouse']
+function isSingleUnitProp(type?: string): boolean {
+  return SINGLE_UNIT_TYPES.includes(type as PropertyType)
+}
+
 function formatNumberWithCommas(value: string): string {
   const digits = value.replace(/[^\d]/g, '')
   if (!digits) return ''
@@ -81,6 +86,7 @@ const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const toast = useToast()
   const confirm = useConfirm()
@@ -121,6 +127,19 @@ export default function PropertyDetail() {
       setShowMoveOut(null)
     }
   }, [id])
+
+  // Auto-open tenant form when navigated with ?addTenant=1
+  useEffect(() => {
+    if (searchParams.get('addTenant') === '1' && id) {
+      const propUnitsLocal = units.filter((u) => u.propertyId === id)
+      const firstAvailable = propUnitsLocal.find((u) => !tenants.some((t) => t.unitId === u.id))
+      if (firstAvailable) {
+        setTenantForm(firstAvailable.id)
+        setNewTenant({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, notes: '' })
+        setSearchParams({}, { replace: true })
+      }
+    }
+  }, [searchParams, id, units, tenants, setSearchParams])
 
   if (!property) {
     return (
@@ -486,29 +505,37 @@ export default function PropertyDetail() {
       )}
 
       <section className="card section-card">
-        <div className="section-card-header">
-          <h2>Units</h2>
-          <button type="button" className="btn primary" onClick={() => setUnitForm(!unitForm)}>
-            {unitForm ? 'Cancel' : '+ Add unit'}
-          </button>
-        </div>
-        {unitForm && (
-          <form className="form-card" onSubmit={handleAddUnit} style={{ marginBottom: '1rem' }}>
-            <div className="form-grid">
-              <label>Name * <input required placeholder="Unit name" value={newUnit.name} onChange={(e) => setNewUnit((u) => ({ ...u, name: e.target.value }))} /></label>
-              <label>Beds <input type="number" min={0} value={newUnit.bedrooms} onChange={(e) => setNewUnit((u) => ({ ...u, bedrooms: +e.target.value || 0 }))} /></label>
-              <label>Baths <input type="number" min={0} step={0.5} value={newUnit.bathrooms} onChange={(e) => setNewUnit((u) => ({ ...u, bathrooms: +e.target.value || 0 }))} /></label>
-              <label>Sq ft <input type="number" min={0} value={newUnit.sqft || ''} onChange={(e) => setNewUnit((u) => ({ ...u, sqft: +e.target.value || 0 }))} /></label>
-              <label>Monthly rent * <input type="number" min={0} value={newUnit.monthlyRent || ''} onChange={(e) => setNewUnit((u) => ({ ...u, monthlyRent: +e.target.value || 0 }))} /></label>
-              <label>Deposit <input type="number" min={0} value={newUnit.deposit || ''} onChange={(e) => setNewUnit((u) => ({ ...u, deposit: +e.target.value || 0 }))} /></label>
+        {isSingleUnitProp(prop.propertyType) ? (
+          <div className="section-card-header">
+            <h2>Tenant &amp; lease</h2>
+          </div>
+        ) : (
+          <>
+            <div className="section-card-header">
+              <h2>Units</h2>
+              <button type="button" className="btn primary" onClick={() => setUnitForm(!unitForm)}>
+                {unitForm ? 'Cancel' : '+ Add unit'}
+              </button>
             </div>
-            <label>Notes <input placeholder="Optional notes" value={newUnit.notes} onChange={(e) => setNewUnit((u) => ({ ...u, notes: e.target.value }))} /></label>
-            <div className="form-actions"><button type="submit" className="btn primary">Add unit</button></div>
-          </form>
+            {unitForm && (
+              <form className="form-card" onSubmit={handleAddUnit} style={{ marginBottom: '1rem' }}>
+                <div className="form-grid">
+                  <label>Name * <input required placeholder="Unit name" value={newUnit.name} onChange={(e) => setNewUnit((u) => ({ ...u, name: e.target.value }))} /></label>
+                  <label>Beds <input type="number" min={0} value={newUnit.bedrooms} onChange={(e) => setNewUnit((u) => ({ ...u, bedrooms: +e.target.value || 0 }))} /></label>
+                  <label>Baths <input type="number" min={0} step={0.5} value={newUnit.bathrooms} onChange={(e) => setNewUnit((u) => ({ ...u, bathrooms: +e.target.value || 0 }))} /></label>
+                  <label>Sq ft <input type="number" min={0} value={newUnit.sqft || ''} onChange={(e) => setNewUnit((u) => ({ ...u, sqft: +e.target.value || 0 }))} /></label>
+                  <label>Monthly rent * <input type="number" min={0} value={newUnit.monthlyRent || ''} onChange={(e) => setNewUnit((u) => ({ ...u, monthlyRent: +e.target.value || 0 }))} /></label>
+                  <label>Deposit <input type="number" min={0} value={newUnit.deposit || ''} onChange={(e) => setNewUnit((u) => ({ ...u, deposit: +e.target.value || 0 }))} /></label>
+                </div>
+                <label>Notes <input placeholder="Optional notes" value={newUnit.notes} onChange={(e) => setNewUnit((u) => ({ ...u, notes: e.target.value }))} /></label>
+                <div className="form-actions"><button type="submit" className="btn primary">Add unit</button></div>
+              </form>
+            )}
+          </>
         )}
         <div className="units-list">
           {propUnits.length === 0 ? (
-            <p className="empty-state">No units. Add one above.</p>
+            <p className="empty-state">{isSingleUnitProp(prop.propertyType) ? 'No unit found. This may have been created before the auto-unit feature.' : 'No units. Add one above.'}</p>
           ) : (
             propUnits.map((unit) => {
               const tenant = propTenants.find((t) => t.unitId === unit.id)
@@ -546,18 +573,40 @@ export default function PropertyDetail() {
                   ) : (
                     <>
                       <div>
-                        <strong>{unit.name}</strong>
-                        <span className="muted"> — {unit.bedrooms} bed, {unit.bathrooms} bath</span>
-                        {unit.sqft != null && unit.sqft > 0 && <span className="muted">, {unit.sqft} sqft</span>}
-                        <span className="muted"> · {formatMoney(unit.monthlyRent)}/mo</span>
-                        {unit.deposit != null && unit.deposit > 0 && <span className="muted"> · Deposit: {formatMoney(unit.deposit)}</span>}
+                        {/* For single-unit properties, skip the unit name and show tenant info directly */}
+                        {isSingleUnitProp(prop.propertyType) ? (
+                          <>
+                            <span className="muted">{unit.bedrooms} bed, {unit.bathrooms} bath</span>
+                            {unit.sqft != null && unit.sqft > 0 && <span className="muted"> · {unit.sqft} sqft</span>}
+                            <span className="muted"> · {formatMoney(unit.monthlyRent)}/mo</span>
+                            {unit.deposit != null && unit.deposit > 0 && <span className="muted"> · Deposit: {formatMoney(unit.deposit)}</span>}
+                          </>
+                        ) : (
+                          <>
+                            <strong>{unit.name}</strong>
+                            <span className="muted"> — {unit.bedrooms} bed, {unit.bathrooms} bath</span>
+                            {unit.sqft != null && unit.sqft > 0 && <span className="muted">, {unit.sqft} sqft</span>}
+                            <span className="muted"> · {formatMoney(unit.monthlyRent)}/mo</span>
+                            {unit.deposit != null && unit.deposit > 0 && <span className="muted"> · Deposit: {formatMoney(unit.deposit)}</span>}
+                          </>
+                        )}
                         {unit.notes && <span className="muted block">Note: {unit.notes}</span>}
                         {tenant && (
                           <>
                             <span className="tenant-inline-info">
-                              <span> · Tenant: <strong>{tenant.name}</strong></span>
-                              {tenant.phone && <span className="muted"> · {tenant.phone}</span>}
-                              {tenant.email && <span className="muted"> · {tenant.email}</span>}
+                              {isSingleUnitProp(prop.propertyType) ? (
+                                <>
+                                  <strong style={{ fontSize: '1.05em' }}>{tenant.name}</strong>
+                                  {tenant.phone && <span className="muted"> · {tenant.phone}</span>}
+                                  {tenant.email && <span className="muted"> · {tenant.email}</span>}
+                                </>
+                              ) : (
+                                <>
+                                  <span> · Tenant: <strong>{tenant.name}</strong></span>
+                                  {tenant.phone && <span className="muted"> · {tenant.phone}</span>}
+                                  {tenant.email && <span className="muted"> · {tenant.email}</span>}
+                                </>
+                              )}
                             </span>
                             <span className="tenant-lease-dates muted block">
                               Lease: {formatDate(tenant.leaseStart)} — {formatDate(tenant.leaseEnd)}
@@ -579,18 +628,22 @@ export default function PropertyDetail() {
                             })()}
                           </>
                         )}
-                        {unit.available && !tenant && <span className="badge available">Available</span>}
+                        {unit.available && !tenant && <span className="badge available">Vacant — ready for a tenant</span>}
                       </div>
                       <div className="row-actions">
-                        <button type="button" className="btn small" onClick={() => setEditingUnitId(unit.id)}>Edit unit</button>
-                        <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'unit', id: unit.id })}>Add note</button>
-                        {!tenant && (
+                        {!isSingleUnitProp(prop.propertyType) && (
+                          <>
+                            <button type="button" className="btn small" onClick={() => setEditingUnitId(unit.id)}>Edit unit</button>
+                            <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'unit', id: unit.id })}>Add note</button>
+                          </>
+                        )}
+                        {!tenant && !isSingleUnitProp(prop.propertyType) && (
                           <button type="button" className="btn small danger" onClick={() => handleDeleteUnit(unit.id, unit.name)}>Delete unit</button>
                         )}
                         {!tenant && unit.available && (
                           <button
                             type="button"
-                            className="btn small"
+                            className="btn small primary"
                             onClick={() => {
                               setEditingTenantId(null)
                               setTenantForm(unit.id)

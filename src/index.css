@@ -212,6 +212,8 @@ input:focus, select:focus, textarea:focus {
 .btn.small { padding: 0.35rem 0.65rem; font-size: 0.875rem; }
 .btn.danger { background: var(--negative); color: white; border-color: var(--negative); }
 .btn.danger:hover { filter: brightness(1.1); }
+.btn.accent { background: #0d9488; color: white; border-color: #0d9488; }
+.btn.accent:hover { background: #0f766e; }
 
 /* Cards */
 .card {
@@ -880,6 +882,121 @@ input:focus, select:focus, textarea:focus {
 .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
 .pagination-ellipsis { padding: 0 0.25rem; color: var(--text-muted); }
 .pagination-size { border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
+
+/* Property list cards */
+.prop-list { display: flex; flex-direction: column; gap: 1rem; }
+.prop-card {
+  padding: 0;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.prop-card:hover { box-shadow: var(--shadow-lg); border-color: var(--accent); }
+
+.prop-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+}
+.prop-card-info { flex: 1; min-width: 0; }
+.prop-card-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+.prop-card-name:hover { color: var(--accent); }
+.prop-card-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-bottom: 0.4rem; }
+.prop-card-address {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.88rem; color: var(--text-muted);
+}
+.prop-card-type-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 100px;
+  background: var(--accent-muted, rgba(37,99,235,0.08));
+  color: var(--accent);
+  font-weight: 500;
+}
+.prop-card-amenities { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
+.amenity-chip.small { font-size: 0.7rem; padding: 0.15rem 0.5rem; }
+.prop-card-actions {
+  display: flex; gap: 0.35rem; flex-shrink: 0; align-items: flex-start; padding-top: 0.15rem;
+}
+.prop-card-actions .btn { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+.prop-card-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.prop-stat {
+  padding: 0.75rem 1rem;
+  text-align: center;
+  border-right: 1px solid var(--border);
+}
+.prop-stat:last-child { border-right: none; }
+.prop-stat-label {
+  display: flex; align-items: center; justify-content: center; gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 500;
+}
+.prop-stat-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.prop-stat-value.positive { color: var(--positive); }
+.prop-stat-value.negative { color: var(--negative); }
+.prop-stat-net.net-positive { background: rgba(22,163,74,0.06); }
+.prop-stat-net.net-negative { background: rgba(220,38,38,0.06); }
+.prop-stat-net .prop-stat-value { font-size: 1.1rem; }
+
+.occupancy-bar {
+  margin-top: 0.35rem;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.occupancy-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.prop-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  padding: 0.6rem 1.5rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.prop-footer-item {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .prop-card-top { flex-direction: column; padding: 1rem; }
+  .prop-card-actions { width: 100%; }
+  .prop-card-stats { grid-template-columns: repeat(3, 1fr); }
+  .prop-stat:nth-child(3) { border-right: none; }
+  .prop-card-footer { padding: 0.6rem 1rem; }
+}
 
 /* Amenity chips */
 .amenity-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.25rem; }
