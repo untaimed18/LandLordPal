@@ -739,7 +739,7 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
   gap: 0.4rem;
   padding: 1rem 0.75rem;
-  background: var(--card-bg);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
@@ -771,7 +771,7 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
-  background: var(--card-bg);
+  background: var(--surface);
   margin-bottom: 1rem;
 }
 .cal-header {
@@ -861,7 +861,7 @@ input:focus, select:focus, textarea:focus {
 
 /* Error Boundary */
 .error-boundary { display: flex; align-items: center; justify-content: center; min-height: 60vh; padding: 2rem; }
-.error-boundary-card { text-align: center; max-width: 480px; padding: 2.5rem; background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+.error-boundary-card { text-align: center; max-width: 480px; padding: 2.5rem; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-lg); }
 .error-boundary-icon { color: var(--negative); margin-bottom: 1rem; }
 .error-boundary-card h2 { margin: 0 0 0.75rem; }
 .error-boundary-message { color: var(--text-muted); margin-bottom: 1.5rem; }
