@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
-import { addExpense, updateExpense, deleteExpense } from '../store'
+import { addExpense, updateExpense, deleteExpense, takeSnapshot, restoreSnapshot } from '../store'
 import { getExpensesThisMonth, getYTDExpenses } from '../lib/calculations'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import type { ExpenseCategory } from '../types'
 import { nowISO } from '../lib/id'
+import { usePagination } from '../hooks/usePagination'
+import Pagination from '../components/Pagination'
+import { Receipt } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 
 function formatAmountDisplay(value: number): string {
@@ -90,6 +93,7 @@ export default function Expenses() {
       default: return 0
     }
   })
+  const pagination = usePagination(sortedExpenses)
 
   // Auto-generate recurring expenses for all missed months up to the current month
   // (guard against StrictMode double-fire)
@@ -232,7 +236,7 @@ export default function Expenses() {
 
       {properties.length === 0 && (
         <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
-          <div className="empty-icon">💸</div>
+          <div className="empty-icon"><Receipt size={32} /></div>
           <p className="empty-state-title">No expenses yet</p>
           <p className="empty-state-text">Add a property first, then start tracking mortgage, repairs, and other costs.</p>
           <Link to="/properties" className="btn primary">Add a property</Link>
@@ -352,7 +356,7 @@ export default function Expenses() {
               </tr>
             </thead>
             <tbody>
-              {sortedExpenses.map((e) => (
+              {pagination.paged.map((e) => (
                 <tr key={e.id}>
                   <td>{formatDate(e.date)}{e.recurring && <span className="badge small" style={{ marginLeft: 4 }}>recurring</span>}</td>
                   <td>
@@ -364,7 +368,7 @@ export default function Expenses() {
                   <td className="negative">{formatMoney(e.amount)}</td>
                   <td className="actions-cell">
                     <button type="button" className="btn small" onClick={() => openEdit(e)}>Edit</button>
-                    <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete expense', message: `Delete "${e.description}"?`, confirmText: 'Delete', danger: true })) { deleteExpense(e.id); toast('Expense deleted') } }}>Delete</button>
+                    <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete expense', message: `Delete "${e.description}"?`, confirmText: 'Delete', danger: true })) { const snap = takeSnapshot(); deleteExpense(e.id); toast('Expense deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Expense restored', 'info') } } }) } }}>Delete</button>
                   </td>
                 </tr>
               ))}
@@ -372,6 +376,7 @@ export default function Expenses() {
           </table>
         )}
       </div>
+      {sortedExpenses.length > 0 && <Pagination pagination={pagination} />}
     </div>
   )
 }

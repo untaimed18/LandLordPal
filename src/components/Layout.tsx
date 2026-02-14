@@ -1,17 +1,30 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
+import {
+  LayoutDashboard,
+  Banknote,
+  Home,
+  Receipt,
+  Wrench,
+  BarChart3,
+  CalendarDays,
+  Users,
+  Settings,
+  Search,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
-const nav = [
-  { to: '/', label: 'Dashboard', icon: '📋' },
-  { to: '/rent', label: 'Rent', icon: '💰' },
-  { to: '/properties', label: 'Properties', icon: '🏠' },
-  { to: '/expenses', label: 'Expenses', icon: '💸' },
-  { to: '/maintenance', label: 'Maintenance', icon: '🔧' },
-  { to: '/reports', label: 'Reports', icon: '📊' },
-  { to: '/calendar', label: 'Calendar', icon: '📅' },
-  { to: '/vendors', label: 'Vendors', icon: '🤝' },
-  { to: '/settings', label: 'Settings', icon: '⚙️' },
+const nav: { to: string; label: string; Icon: LucideIcon }[] = [
+  { to: '/', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/rent', label: 'Rent', Icon: Banknote },
+  { to: '/properties', label: 'Properties', Icon: Home },
+  { to: '/expenses', label: 'Expenses', Icon: Receipt },
+  { to: '/maintenance', label: 'Maintenance', Icon: Wrench },
+  { to: '/reports', label: 'Reports', Icon: BarChart3 },
+  { to: '/calendar', label: 'Calendar', Icon: CalendarDays },
+  { to: '/vendors', label: 'Vendors', Icon: Users },
+  { to: '/settings', label: 'Settings', Icon: Settings },
 ]
 
 interface SearchResult {
@@ -89,23 +102,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="layout">
       <header className="header">
         <Link to="/" className="logo">
-          <span className="logo-icon">🏠</span>
+          <Home size={22} />
           <span>LandLord Pal</span>
         </Link>
         <nav className="nav">
-          {nav.map(({ to, label, icon }) => (
+          {nav.map(({ to, label, Icon }) => (
             <Link
               key={to}
               to={to}
               className={location.pathname === to || (to !== '/' && location.pathname.startsWith(to)) ? 'active' : ''}
             >
-              <span className="nav-icon">{icon}</span>
+              <Icon size={16} className="nav-icon" />
               {label}
             </Link>
           ))}
         </nav>
         <button type="button" className="search-trigger" onClick={() => { setSearchOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }} title="Search (Ctrl+K)">
-          <span className="search-icon">🔍</span>
+          <Search size={16} />
           <span className="search-hint">Ctrl+K</span>
         </button>
       </header>

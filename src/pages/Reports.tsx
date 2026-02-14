@@ -5,6 +5,7 @@ import { formatMoney } from '../lib/format'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { useToast } from '../context/ToastContext'
 import type { ExpenseCategory } from '../types'
+import { BarChart3 } from 'lucide-react'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -155,7 +156,7 @@ export default function Reports() {
 
       {!hasData && (
         <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
-          <div className="empty-icon">📊</div>
+          <div className="empty-icon"><BarChart3 size={32} /></div>
           <p className="empty-state-title">No financial data yet</p>
           <p className="empty-state-text">Reports will appear once you start recording rent payments and expenses. Add a property and start tracking to see your Profit & Loss, tax summaries, and cash flow trends.</p>
           <Link to="/properties" className="btn primary">Get started</Link>

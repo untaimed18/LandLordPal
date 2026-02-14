@@ -14,6 +14,8 @@ import {
   deleteProperty,
   addActivityLog,
   deleteActivityLog,
+  takeSnapshot,
+  restoreSnapshot,
 } from '../store'
 import { getPropertySummary, getLeaseStatus } from '../lib/calculations'
 import type { ExpenseCategory } from '../types'
@@ -150,8 +152,10 @@ export default function PropertyDetail() {
       danger: true,
     })
     if (ok) {
+      const snap = takeSnapshot()
       deleteProperty(prop.id)
       navigate('/properties')
+      toast('Property deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); navigate(`/properties/${prop.id}`); toast('Property restored', 'info') } } })
     }
   }
 
@@ -168,9 +172,10 @@ export default function PropertyDetail() {
       danger: true,
     })
     if (ok) {
+      const snap = takeSnapshot()
       deleteUnit(unitId)
       setEditingUnitId(null)
-      toast('Unit deleted')
+      toast('Unit deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Unit restored', 'info') } } })
     }
   }
 
@@ -182,9 +187,10 @@ export default function PropertyDetail() {
       danger: true,
     })
     if (ok) {
+      const snap = takeSnapshot()
       deleteTenant(tenantId)
       setEditingTenantId(null)
-      toast('Tenant removed')
+      toast('Tenant removed', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Tenant restored', 'info') } } })
     }
   }
 
@@ -196,8 +202,9 @@ export default function PropertyDetail() {
       danger: true,
     })
     if (ok) {
+      const snap = takeSnapshot()
       deletePayment(paymentId)
-      toast('Payment deleted')
+      toast('Payment deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Payment restored', 'info') } } })
     }
   }
 
@@ -224,6 +231,15 @@ export default function PropertyDetail() {
     if (!newTenant.unitId) return
     if (newTenant.leaseEnd <= newTenant.leaseStart) {
       toast('Lease end date must be after start date', 'error')
+      return
+    }
+    // Overlapping lease detection
+    const overlapping = tenants.find(
+      (t) => t.unitId === newTenant.unitId && t.id !== editingTenantId &&
+        t.leaseStart <= newTenant.leaseEnd && t.leaseEnd >= newTenant.leaseStart
+    )
+    if (overlapping) {
+      toast(`Lease overlaps with "${overlapping.name}" (${formatDate(overlapping.leaseStart)} – ${formatDate(overlapping.leaseEnd)})`, 'error')
       return
     }
     const unit = units.find((u) => u.id === newTenant.unitId)
@@ -468,6 +484,11 @@ export default function PropertyDetail() {
                               {tenant.lateFeeAmount != null && tenant.lateFeeAmount > 0 && <> · Late fee: {formatMoney(tenant.lateFeeAmount)}</>}
                             </span>
                             {tenant.notes && <span className="muted block">Note: {tenant.notes}</span>}
+                            {tenant.rentHistory && tenant.rentHistory.length > 0 && (
+                              <span className="muted block">Rent history: {tenant.rentHistory.map((r, i) => (
+                                <span key={i}>{formatDate(r.date)}: {formatMoney(r.oldRent)} → {formatMoney(r.newRent)}{i < tenant.rentHistory!.length - 1 ? ', ' : ''}</span>
+                              ))}</span>
+                            )}
                             {(() => {
                               const status = getLeaseStatus(tenant.leaseEnd)
                               if (status === 'expired') return <span className="badge expired">Lease expired</span>
@@ -588,6 +609,14 @@ export default function PropertyDetail() {
             e.preventDefault()
             if (newTenant.leaseEnd <= newTenant.leaseStart) {
               toast('Lease end date must be after start date', 'error')
+              return
+            }
+            const overlapping = tenants.find(
+              (t) => t.unitId === newTenant.unitId && t.id !== editingTenantId &&
+                t.leaseStart <= newTenant.leaseEnd && t.leaseEnd >= newTenant.leaseStart
+            )
+            if (overlapping) {
+              toast(`Lease overlaps with "${overlapping.name}" (${formatDate(overlapping.leaseStart)} – ${formatDate(overlapping.leaseEnd)})`, 'error')
               return
             }
             updateTenant(editingTenantId, {

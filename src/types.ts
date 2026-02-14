@@ -29,6 +29,12 @@ export interface Unit {
   updatedAt: string;
 }
 
+export interface RentChange {
+  date: string;
+  oldRent: number;
+  newRent: number;
+}
+
 export interface Tenant {
   id: Id;
   unitId: Id;
@@ -49,6 +55,7 @@ export interface Tenant {
   moveInNotes?: string;
   moveOutNotes?: string;
   notes?: string;
+  rentHistory?: RentChange[];
   createdAt: string;
   updatedAt: string;
 }

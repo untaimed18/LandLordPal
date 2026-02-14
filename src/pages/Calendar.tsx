@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { formatMoney, formatDate } from '../lib/format'
+import { DollarSign, FileText, KeyRound, Wrench, Receipt, CalendarDays } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 interface CalendarEvent {
   date: string
@@ -12,12 +14,12 @@ interface CalendarEvent {
   priority?: string
 }
 
-const TYPE_LABELS: Record<string, { label: string; icon: string; className: string }> = {
-  rent_due: { label: 'Rent due', icon: '💰', className: 'cal-rent' },
-  lease_end: { label: 'Lease ends', icon: '📋', className: 'cal-lease-end' },
-  lease_start: { label: 'Lease starts', icon: '🔑', className: 'cal-lease-start' },
-  maintenance: { label: 'Maintenance', icon: '🔧', className: 'cal-maintenance' },
-  expense_recurring: { label: 'Recurring expense', icon: '💸', className: 'cal-expense' },
+const TYPE_LABELS: Record<string, { label: string; Icon: LucideIcon; className: string }> = {
+  rent_due: { label: 'Rent due', Icon: DollarSign, className: 'cal-rent' },
+  lease_end: { label: 'Lease ends', Icon: FileText, className: 'cal-lease-end' },
+  lease_start: { label: 'Lease starts', Icon: KeyRound, className: 'cal-lease-start' },
+  maintenance: { label: 'Maintenance', Icon: Wrench, className: 'cal-maintenance' },
+  expense_recurring: { label: 'Recurring expense', Icon: Receipt, className: 'cal-expense' },
 }
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -206,7 +208,7 @@ export default function Calendar() {
                   const meta = TYPE_LABELS[ev.type]
                   return (
                     <div key={j} className={`cal-event ${meta.className}`} title={`${ev.label} — ${ev.sub}`}>
-                      <span className="cal-event-icon">{meta.icon}</span>
+                      <meta.Icon size={12} className="cal-event-icon" />
                       <span className="cal-event-text">{ev.label.length > 20 ? ev.label.slice(0, 20) + '…' : ev.label}</span>
                     </div>
                   )
@@ -230,7 +232,7 @@ export default function Calendar() {
               return (
                 <div key={i} className={`calendar-event-item ${meta.className}`}>
                   <span className="cal-event-date">{formatDate(ev.date)}</span>
-                  <span className="cal-event-icon">{meta.icon}</span>
+                  <meta.Icon size={14} className="cal-event-icon" />
                   <span className="cal-event-type badge small">{meta.label}</span>
                   <span className="cal-event-label">{ev.label}</span>
                   <span className="cal-event-sub muted">{ev.sub}</span>
@@ -244,7 +246,7 @@ export default function Calendar() {
 
       {events.length === 0 && (
         <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
-          <div className="empty-icon">📅</div>
+          <div className="empty-icon"><CalendarDays size={32} /></div>
           <p className="empty-state-title">No events this month</p>
           <p className="empty-state-text">Events like rent due dates, lease expirations, and maintenance will show up here.</p>
         </div>
@@ -259,7 +261,7 @@ export default function Calendar() {
               return (
                 <div key={i} className={`calendar-event-item ${meta.className}`}>
                   <span className="cal-event-date">{formatDate(ev.date)}</span>
-                  <span className="cal-event-icon">{meta.icon}</span>
+                  <meta.Icon size={14} className="cal-event-icon" />
                   <span className="cal-event-type badge small">{meta.label}</span>
                   <span className="cal-event-label">{ev.label}</span>
                   <span className="cal-event-sub muted">{ev.sub}</span>

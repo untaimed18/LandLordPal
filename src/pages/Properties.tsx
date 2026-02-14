@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { getPropertySummary } from '../lib/calculations'
-import { addProperty, updateProperty, deleteProperty } from '../store'
+import { addProperty, updateProperty, deleteProperty, takeSnapshot, restoreSnapshot } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import { US_STATES } from '../lib/us-states'
+import { Home } from 'lucide-react'
 
 function formatNumberWithCommas(value: string): string {
   const digits = value.replace(/[^\d]/g, '')
@@ -82,12 +83,13 @@ export default function Properties() {
       danger: true,
     })
     if (ok) {
+      const snap = takeSnapshot()
       deleteProperty(id)
       if (editingId === id) {
         setEditingId(null)
         setShowForm(false)
       }
-      toast('Property deleted')
+      toast('Property deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Property restored', 'info') } } })
     }
   }
 
@@ -137,7 +139,7 @@ export default function Properties() {
         {properties.length === 0 ? (
           !showForm ? (
             <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
-              <div className="empty-icon">🏠</div>
+              <div className="empty-icon"><Home size={32} /></div>
               <p className="empty-state-title">No properties yet</p>
               <p className="empty-state-text">Add your first rental property to start tracking units, tenants, and income.</p>
             </div>

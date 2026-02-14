@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useStore } from '../hooks/useStore'
-import { addVendor, updateVendor, deleteVendor } from '../store'
+import { addVendor, updateVendor, deleteVendor, takeSnapshot, restoreSnapshot } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatPhoneNumber } from '../lib/format'
+import { Phone, Mail } from 'lucide-react'
 
 const SPECIALTIES = [
   'Plumbing',
@@ -71,8 +72,9 @@ export default function Vendors() {
       danger: true,
     })
     if (ok) {
+      const snap = takeSnapshot()
       deleteVendor(id)
-      toast('Vendor deleted')
+      toast('Vendor deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Vendor restored', 'info') } } })
     }
   }
 
@@ -124,8 +126,8 @@ export default function Vendors() {
                   {v.specialty && <span className="badge">{v.specialty}</span>}
                 </div>
                 <div className="vendor-contact">
-                  {v.phone && <span>📞 {v.phone}</span>}
-                  {v.email && <span>✉ {v.email}</span>}
+                  {v.phone && <span><Phone size={13} style={{ verticalAlign: 'text-bottom', marginRight: 3 }} />{v.phone}</span>}
+                  {v.email && <span><Mail size={13} style={{ verticalAlign: 'text-bottom', marginRight: 3 }} />{v.email}</span>}
                 </div>
                 {v.notes && <p className="muted vendor-notes">{v.notes}</p>}
                 <div className="vendor-stats muted">

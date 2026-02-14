@@ -74,6 +74,16 @@ export function getState(): AppState {
   return state;
 }
 
+/** Take a snapshot for undo operations */
+export function takeSnapshot(): AppState {
+  return JSON.parse(JSON.stringify(state));
+}
+
+/** Restore a previous snapshot */
+export function restoreSnapshot(snapshot: AppState): void {
+  setState(snapshot);
+}
+
 export function subscribe(listener: Listener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -173,9 +183,17 @@ export function addTenant(input: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'>)
 }
 
 export function updateTenant(id: string, input: Partial<Omit<Tenant, 'id'>>): void {
-  const tenants = state.tenants.map((t) =>
-    t.id === id ? { ...t, ...input, updatedAt: nowISO() } : t
-  );
+  const tenants = state.tenants.map((t) => {
+    if (t.id !== id) return t;
+    const updated = { ...t, ...input, updatedAt: nowISO() };
+    // Auto-track rent changes
+    if (input.monthlyRent !== undefined && input.monthlyRent !== t.monthlyRent) {
+      const history = [...(t.rentHistory ?? [])];
+      history.push({ date: nowISO(), oldRent: t.monthlyRent, newRent: input.monthlyRent });
+      updated.rentHistory = history;
+    }
+    return updated;
+  });
   setState({ ...state, tenants });
 }
 

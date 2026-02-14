@@ -4,6 +4,9 @@ import { getState, importState } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
+import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon } from 'lucide-react'
+
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
 
 function getTheme(): 'light' | 'dark' {
   return (localStorage.getItem('landlordpal-theme') as 'light' | 'dark') || 'light'
@@ -104,14 +107,14 @@ export default function Settings() {
             className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
             onClick={() => setTheme('light')}
           >
-            ☀️ Light
+            <Sun size={14} /> Light
           </button>
           <button
             type="button"
             className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
             onClick={() => setTheme('dark')}
           >
-            🌙 Dark
+            <Moon size={14} /> Dark
           </button>
         </div>
       </section>
@@ -119,14 +122,14 @@ export default function Settings() {
       <section className="card section-card">
         <h2>Data summary</h2>
         <div className="data-summary-grid">
-          <div className="data-summary-item"><span className="data-summary-icon">🏠</span><span className="data-summary-count">{properties.length}</span><span className="data-summary-label">Properties</span></div>
-          <div className="data-summary-item"><span className="data-summary-icon">🚪</span><span className="data-summary-count">{units.length}</span><span className="data-summary-label">Units</span></div>
-          <div className="data-summary-item"><span className="data-summary-icon">👤</span><span className="data-summary-count">{tenants.length}</span><span className="data-summary-label">Tenants</span></div>
-          <div className="data-summary-item"><span className="data-summary-icon">💰</span><span className="data-summary-count">{payments.length}</span><span className="data-summary-label">Payments</span></div>
-          <div className="data-summary-item"><span className="data-summary-icon">💸</span><span className="data-summary-count">{expenses.length}</span><span className="data-summary-label">Expenses</span></div>
-          <div className="data-summary-item"><span className="data-summary-icon">🔧</span><span className="data-summary-count">{maintenanceRequests.length}</span><span className="data-summary-label">Maintenance</span></div>
-          <div className="data-summary-item"><span className="data-summary-icon">🤝</span><span className="data-summary-count">{vendors.length}</span><span className="data-summary-label">Vendors</span></div>
-          <div className="data-summary-item"><span className="data-summary-icon">📝</span><span className="data-summary-count">{activityLogs.length}</span><span className="data-summary-label">Notes</span></div>
+          <div className="data-summary-item"><Home size={16} className="data-summary-icon" /><span className="data-summary-count">{properties.length}</span><span className="data-summary-label">Properties</span></div>
+          <div className="data-summary-item"><DoorOpen size={16} className="data-summary-icon" /><span className="data-summary-count">{units.length}</span><span className="data-summary-label">Units</span></div>
+          <div className="data-summary-item"><User size={16} className="data-summary-icon" /><span className="data-summary-count">{tenants.length}</span><span className="data-summary-label">Tenants</span></div>
+          <div className="data-summary-item"><DollarSign size={16} className="data-summary-icon" /><span className="data-summary-count">{payments.length}</span><span className="data-summary-label">Payments</span></div>
+          <div className="data-summary-item"><Receipt size={16} className="data-summary-icon" /><span className="data-summary-count">{expenses.length}</span><span className="data-summary-label">Expenses</span></div>
+          <div className="data-summary-item"><Wrench size={16} className="data-summary-icon" /><span className="data-summary-count">{maintenanceRequests.length}</span><span className="data-summary-label">Maintenance</span></div>
+          <div className="data-summary-item"><Users size={16} className="data-summary-icon" /><span className="data-summary-count">{vendors.length}</span><span className="data-summary-label">Vendors</span></div>
+          <div className="data-summary-item"><FileText size={16} className="data-summary-icon" /><span className="data-summary-count">{activityLogs.length}</span><span className="data-summary-label">Notes</span></div>
         </div>
         <p className="muted" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>{totalRecords} total records</p>
       </section>
@@ -163,6 +166,13 @@ export default function Settings() {
         <button type="button" className="btn danger" onClick={handleClearData}>
           Delete all data
         </button>
+      </section>
+
+      <section className="card section-card" style={{ marginTop: '1.5rem' }}>
+        <h2>About</h2>
+        <p className="muted" style={{ fontSize: '0.85rem' }}>
+          LandLord Pal v{APP_VERSION} · Property management for landlords
+        </p>
       </section>
     </div>
   )

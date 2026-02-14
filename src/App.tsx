@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { ToastProvider } from './context/ToastContext'
 import { ConfirmProvider } from './context/ConfirmContext'
+import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Properties from './pages/Properties'
@@ -16,6 +17,7 @@ import NotFound from './pages/NotFound'
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <ToastProvider>
       <ConfirmProvider>
         <Layout>
@@ -35,5 +37,6 @@ export default function App() {
         </Layout>
       </ConfirmProvider>
     </ToastProvider>
+    </ErrorBoundary>
   )
 }

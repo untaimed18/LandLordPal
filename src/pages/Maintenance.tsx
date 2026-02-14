@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
-import { addMaintenanceRequest, updateMaintenanceRequest, deleteMaintenanceRequest } from '../store'
+import { addMaintenanceRequest, updateMaintenanceRequest, deleteMaintenanceRequest, takeSnapshot, restoreSnapshot } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import { nowISO } from '../lib/id'
 import type { MaintenancePriority, MaintenanceStatus, MaintenanceCategory } from '../types'
+import { usePagination } from '../hooks/usePagination'
+import Pagination from '../components/Pagination'
+import { Wrench } from 'lucide-react'
 
 const PRIORITIES: { value: MaintenancePriority; label: string }[] = [
   { value: 'low', label: 'Low' },
@@ -65,6 +68,7 @@ export default function Maintenance() {
     }
     return (pOrder[a.priority] ?? 9) - (pOrder[b.priority] ?? 9)
   })
+  const pagination = usePagination(filtered)
 
   const openCount = maintenanceRequests.filter((r) => r.status === 'open').length
   const inProgressCount = maintenanceRequests.filter((r) => r.status === 'in_progress').length
@@ -148,7 +152,7 @@ export default function Maintenance() {
 
       {properties.length === 0 && (
         <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
-          <div className="empty-icon">🔧</div>
+          <div className="empty-icon"><Wrench size={32} /></div>
           <p className="empty-state-title">No maintenance requests yet</p>
           <p className="empty-state-text">Add a property first, then create maintenance requests to track repairs and issues.</p>
           <Link to="/properties" className="btn primary">Go to properties</Link>
@@ -234,7 +238,7 @@ export default function Maintenance() {
               <tr><th>Title</th><th>Property / Unit</th><th>Priority</th><th>Category</th><th>Status</th><th>Cost</th><th>Date</th><th></th></tr>
             </thead>
             <tbody>
-              {filtered.map((r) => {
+              {pagination.paged.map((r) => {
                 const prop = properties.find((p) => p.id === r.propertyId)
                 const unit = r.unitId ? units.find((u) => u.id === r.unitId) : null
                 return (
@@ -252,7 +256,7 @@ export default function Maintenance() {
                     <td>{formatDate(r.createdAt)}</td>
                     <td className="actions-cell">
                       <button type="button" className="btn small" onClick={() => openEdit(r)}>Edit</button>
-                      <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete request', message: `Delete "${r.title}"?`, confirmText: 'Delete', danger: true })) { deleteMaintenanceRequest(r.id); toast('Request deleted') } }}>Delete</button>
+                      <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete request', message: `Delete "${r.title}"?`, confirmText: 'Delete', danger: true })) { const snap = takeSnapshot(); deleteMaintenanceRequest(r.id); toast('Request deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Request restored', 'info') } } }) } }}>Delete</button>
                     </td>
                   </tr>
                 )
@@ -261,6 +265,7 @@ export default function Maintenance() {
           </table>
         </div>
       )}
+      {filtered.length > 0 && <Pagination pagination={pagination} />}
     </div>
   )
 }

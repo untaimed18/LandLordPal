@@ -7,6 +7,16 @@ import {
   getLeasesEndingSoon,
 } from '../lib/calculations'
 import { formatMoney, formatPct, formatDate } from '../lib/format'
+import {
+  Building2,
+  Banknote,
+  Receipt,
+  Wrench,
+  Home,
+  BarChart3,
+  CalendarDays,
+  DollarSign,
+} from 'lucide-react'
 
 const LEASES_SOON_DAYS = 90
 
@@ -44,7 +54,7 @@ export default function Dashboard() {
 
       {!hasData && (
         <div className="welcome-card card">
-          <div className="welcome-icon">🏘️</div>
+          <div className="welcome-icon"><Building2 size={40} /></div>
           <h2>Welcome to LandLord Pal</h2>
           <p className="welcome-text">Get started by adding your first property. Then add units, assign tenants, and start tracking rent payments and expenses — all from one place.</p>
           <div className="welcome-actions">
@@ -53,19 +63,19 @@ export default function Dashboard() {
           </div>
           <div className="welcome-features">
             <div className="welcome-feature">
-              <span className="welcome-feature-icon">🏠</span>
+              <Home size={18} className="welcome-feature-icon" />
               <span>Track properties & units</span>
             </div>
             <div className="welcome-feature">
-              <span className="welcome-feature-icon">💰</span>
+              <DollarSign size={18} className="welcome-feature-icon" />
               <span>Record rent payments</span>
             </div>
             <div className="welcome-feature">
-              <span className="welcome-feature-icon">📊</span>
+              <BarChart3 size={18} className="welcome-feature-icon" />
               <span>Financial reports</span>
             </div>
             <div className="welcome-feature">
-              <span className="welcome-feature-icon">🔧</span>
+              <Wrench size={18} className="welcome-feature-icon" />
               <span>Maintenance tracking</span>
             </div>
           </div>
@@ -76,27 +86,27 @@ export default function Dashboard() {
         <>
           <div className="quick-actions">
             <Link to="/rent" className="quick-action-btn">
-              <span className="quick-action-icon">💰</span>
+              <Banknote size={20} className="quick-action-icon" />
               <span>Record payment</span>
             </Link>
             <Link to="/expenses" className="quick-action-btn">
-              <span className="quick-action-icon">💸</span>
+              <Receipt size={20} className="quick-action-icon" />
               <span>Add expense</span>
             </Link>
             <Link to="/maintenance" className="quick-action-btn">
-              <span className="quick-action-icon">🔧</span>
+              <Wrench size={20} className="quick-action-icon" />
               <span>New maintenance</span>
             </Link>
             <Link to="/properties" className="quick-action-btn">
-              <span className="quick-action-icon">🏠</span>
+              <Home size={20} className="quick-action-icon" />
               <span>Add property</span>
             </Link>
             <Link to="/calendar" className="quick-action-btn">
-              <span className="quick-action-icon">📅</span>
+              <CalendarDays size={20} className="quick-action-icon" />
               <span>Calendar</span>
             </Link>
             <Link to="/reports" className="quick-action-btn">
-              <span className="quick-action-icon">📊</span>
+              <BarChart3 size={20} className="quick-action-icon" />
               <span>Reports</span>
             </Link>
           </div>
