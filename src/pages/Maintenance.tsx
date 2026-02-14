@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { addMaintenanceRequest, updateMaintenanceRequest, deleteMaintenanceRequest } from '../store'
 import { useToast } from '../context/ToastContext'
+import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import { nowISO } from '../lib/id'
 import type { MaintenancePriority, MaintenanceStatus, MaintenanceCategory } from '../types'
@@ -44,6 +45,7 @@ const emptyForm = {
 
 export default function Maintenance() {
   const toast = useToast()
+  const confirm = useConfirm()
   const { properties, units, tenants, maintenanceRequests } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -250,7 +252,7 @@ export default function Maintenance() {
                     <td>{formatDate(r.createdAt)}</td>
                     <td className="actions-cell">
                       <button type="button" className="btn small" onClick={() => openEdit(r)}>Edit</button>
-                      <button type="button" className="btn small danger" onClick={() => { if (window.confirm('Delete this request?')) { deleteMaintenanceRequest(r.id); toast('Request deleted') } }}>Delete</button>
+                      <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete request', message: `Delete "${r.title}"?`, confirmText: 'Delete', danger: true })) { deleteMaintenanceRequest(r.id); toast('Request deleted') } }}>Delete</button>
                     </td>
                   </tr>
                 )

@@ -20,7 +20,8 @@ import type { ExpenseCategory } from '../types'
 import { useNavigate } from 'react-router-dom'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
-import { formatMoney, formatDate } from '../lib/format'
+import { useConfirm } from '../context/ConfirmContext'
+import { formatMoney, formatDate, formatPhoneNumber } from '../lib/format'
 import { US_STATES } from '../lib/us-states'
 import Breadcrumbs from '../components/Breadcrumbs'
 
@@ -54,7 +55,9 @@ export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const toast = useToast()
+  const confirm = useConfirm()
   const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs } = useStore()
+  const [paymentHistoryTenant, setPaymentHistoryTenant] = useState<string | null>(null)
   const [unitForm, setUnitForm] = useState(false)
   const [tenantForm, setTenantForm] = useState<string | null>(null)
   const [paymentForm, setPaymentForm] = useState<string | null>(null)
@@ -139,36 +142,60 @@ export default function PropertyDetail() {
     toast('Property updated')
   }
 
-  function handleDeleteProperty() {
-    if (window.confirm(`Delete "${prop.name}"? This will remove all units, tenants, expenses, and payments for this property.`)) {
+  async function handleDeleteProperty() {
+    const ok = await confirm({
+      title: 'Delete property',
+      message: `Delete "${prop.name}"? This will remove all units, tenants, expenses, and payments for this property.`,
+      confirmText: 'Delete',
+      danger: true,
+    })
+    if (ok) {
       deleteProperty(prop.id)
       navigate('/properties')
     }
   }
 
-  function handleDeleteUnit(unitId: string, unitName: string) {
+  async function handleDeleteUnit(unitId: string, unitName: string) {
     const tenant = propTenants.find((t) => t.unitId === unitId)
     if (tenant) {
-      window.alert('Remove the tenant first before deleting the unit.')
+      await confirm({ title: 'Cannot delete unit', message: 'Remove the tenant first before deleting the unit.', confirmText: 'OK' })
       return
     }
-    if (window.confirm(`Delete unit "${unitName}"?`)) {
+    const ok = await confirm({
+      title: 'Delete unit',
+      message: `Delete unit "${unitName}"?`,
+      confirmText: 'Delete',
+      danger: true,
+    })
+    if (ok) {
       deleteUnit(unitId)
       setEditingUnitId(null)
       toast('Unit deleted')
     }
   }
 
-  function handleDeleteTenant(tenantId: string, tenantName: string) {
-    if (window.confirm(`Remove tenant "${tenantName}"? The unit will be marked available again.`)) {
+  async function handleDeleteTenant(tenantId: string, tenantName: string) {
+    const ok = await confirm({
+      title: 'Remove tenant',
+      message: `Remove tenant "${tenantName}"? The unit will be marked available again.`,
+      confirmText: 'Remove',
+      danger: true,
+    })
+    if (ok) {
       deleteTenant(tenantId)
       setEditingTenantId(null)
       toast('Tenant removed')
     }
   }
 
-  function handleDeletePaymentClick(paymentId: string) {
-    if (window.confirm('Delete this payment record?')) {
+  async function handleDeletePaymentClick(paymentId: string) {
+    const ok = await confirm({
+      title: 'Delete payment',
+      message: 'Delete this payment record?',
+      confirmText: 'Delete',
+      danger: true,
+    })
+    if (ok) {
       deletePayment(paymentId)
       toast('Payment deleted')
     }
@@ -195,6 +222,10 @@ export default function PropertyDetail() {
   function handleAddTenant(e: React.FormEvent) {
     e.preventDefault()
     if (!newTenant.unitId) return
+    if (newTenant.leaseEnd <= newTenant.leaseStart) {
+      toast('Lease end date must be after start date', 'error')
+      return
+    }
     const unit = units.find((u) => u.id === newTenant.unitId)
     addTenant({
       propertyId: prop.id,
@@ -217,11 +248,24 @@ export default function PropertyDetail() {
     toast('Tenant added')
   }
 
-  function handleRecordPayment(e: React.FormEvent) {
+  async function handleRecordPayment(e: React.FormEvent) {
     e.preventDefault()
     const t = tenants.find((x) => x.id === newPayment.tenantId)
     if (!t) return
     const d = new Date(newPayment.date + 'T12:00:00')
+    // Duplicate payment detection
+    const payMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const existingPayment = payments.find(
+      (p) => p.tenantId === t.id && p.date.startsWith(payMonth)
+    )
+    if (existingPayment) {
+      const ok = await confirm({
+        title: 'Possible duplicate',
+        message: `A payment of ${formatMoney(existingPayment.amount)} was already recorded for ${t.name} in ${payMonth}. Record another payment anyway?`,
+        confirmText: 'Record anyway',
+      })
+      if (!ok) return
+    }
     addPayment({
       propertyId: prop.id,
       unitId: t.unitId,
@@ -294,7 +338,7 @@ export default function PropertyDetail() {
                   <option value="">Select state</option>
                   {US_STATES.map((s) => <option key={s.value} value={s.value}>{s.value} — {s.label}</option>)}
                 </select></label>
-                <label>ZIP * <input required value={propertyForm.zip} onChange={(e) => setPropertyForm((f) => ({ ...f, zip: e.target.value }))} /></label>
+                <label>ZIP * <input required pattern="\d{5}(-\d{4})?" title="5-digit ZIP or ZIP+4 (e.g. 78701 or 78701-1234)" value={propertyForm.zip} onChange={(e) => setPropertyForm((f) => ({ ...f, zip: e.target.value }))} /></label>
                 <label>Purchase price <input type="text" inputMode="numeric" value={propertyForm.purchasePrice ? formatNumberWithCommas(String(propertyForm.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setPropertyForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} /></label>
                 <label>Purchase date <input type="date" value={propertyForm.purchaseDate} onChange={(e) => setPropertyForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
               </div>
@@ -466,6 +510,7 @@ export default function PropertyDetail() {
                               Record payment
                             </button>
                             <button type="button" className="btn small" onClick={() => { setTenantForm(null); setEditingTenantId(tenant.id); setNewTenant({ unitId: tenant.unitId, name: tenant.name, email: tenant.email ?? '', phone: tenant.phone ?? '', leaseStart: tenant.leaseStart, leaseEnd: tenant.leaseEnd, monthlyRent: tenant.monthlyRent, deposit: tenant.deposit ?? 0, gracePeriodDays: tenant.gracePeriodDays ?? 5, lateFeeAmount: tenant.lateFeeAmount ?? 0, notes: tenant.notes ?? '' }); }}>Edit tenant</button>
+                            <button type="button" className="btn small" onClick={() => setPaymentHistoryTenant(tenant.id)}>Payment history</button>
                             <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'tenant', id: tenant.id })}>Add note</button>
                             <button type="button" className="btn small" onClick={() => { setShowMoveOut(tenant.id); setMoveOutDate(nowISO()); setMoveOutNotes(''); setDepositReturned(tenant.deposit ?? 0); setDepositDeductions(''); }}>Move out</button>
                             <button type="button" className="btn small danger" onClick={() => handleDeleteTenant(tenant.id, tenant.name)}>Remove tenant</button>
@@ -520,7 +565,7 @@ export default function PropertyDetail() {
           <div className="form-grid">
             <label>Name * <input required value={newTenant.name} onChange={(e) => setNewTenant((n) => ({ ...n, name: e.target.value }))} /></label>
             <label>Email <input type="email" value={newTenant.email} onChange={(e) => setNewTenant((n) => ({ ...n, email: e.target.value }))} /></label>
-            <label>Phone <input value={newTenant.phone} onChange={(e) => setNewTenant((n) => ({ ...n, phone: e.target.value }))} /></label>
+            <label>Phone <input type="tel" value={newTenant.phone} onChange={(e) => setNewTenant((n) => ({ ...n, phone: formatPhoneNumber(e.target.value) }))} placeholder="(555) 123-4567" /></label>
             <label>Lease start * <input type="date" required value={newTenant.leaseStart} onChange={(e) => setNewTenant((n) => ({ ...n, leaseStart: e.target.value }))} /></label>
             <label>Lease end * <input type="date" required value={newTenant.leaseEnd} onChange={(e) => setNewTenant((n) => ({ ...n, leaseEnd: e.target.value }))} /></label>
             <label>Monthly rent * <input type="number" min={0} required value={newTenant.monthlyRent || ''} onChange={(e) => setNewTenant((n) => ({ ...n, monthlyRent: +e.target.value }))} /></label>
@@ -541,6 +586,10 @@ export default function PropertyDetail() {
           className="card form-card"
           onSubmit={(e) => {
             e.preventDefault()
+            if (newTenant.leaseEnd <= newTenant.leaseStart) {
+              toast('Lease end date must be after start date', 'error')
+              return
+            }
             updateTenant(editingTenantId, {
               name: newTenant.name,
               email: newTenant.email || undefined,
@@ -561,7 +610,7 @@ export default function PropertyDetail() {
           <div className="form-grid">
             <label>Name * <input required value={newTenant.name} onChange={(e) => setNewTenant((n) => ({ ...n, name: e.target.value }))} /></label>
             <label>Email <input type="email" value={newTenant.email} onChange={(e) => setNewTenant((n) => ({ ...n, email: e.target.value }))} /></label>
-            <label>Phone <input value={newTenant.phone} onChange={(e) => setNewTenant((n) => ({ ...n, phone: e.target.value }))} /></label>
+            <label>Phone <input type="tel" value={newTenant.phone} onChange={(e) => setNewTenant((n) => ({ ...n, phone: formatPhoneNumber(e.target.value) }))} placeholder="(555) 123-4567" /></label>
             <label>Lease start * <input type="date" required value={newTenant.leaseStart} onChange={(e) => setNewTenant((n) => ({ ...n, leaseStart: e.target.value }))} /></label>
             <label>Lease end * <input type="date" required value={newTenant.leaseEnd} onChange={(e) => setNewTenant((n) => ({ ...n, leaseEnd: e.target.value }))} /></label>
             <label>Monthly rent * <input type="number" min={0} required value={newTenant.monthlyRent || ''} onChange={(e) => setNewTenant((n) => ({ ...n, monthlyRent: +e.target.value }))} /></label>
@@ -677,7 +726,7 @@ export default function PropertyDetail() {
                   <span className="activity-date">{formatDate(log.date)}</span>
                   <span className="activity-entity badge">{log.entityType}: {entityLabel}</span>
                   <span className="activity-note">{log.note}</span>
-                  <button type="button" className="btn-icon small" onClick={() => { if (window.confirm('Delete this note?')) { deleteActivityLog(log.id); toast('Note deleted') } }} title="Delete note">×</button>
+                  <button type="button" className="btn-icon small" onClick={async () => { if (await confirm({ title: 'Delete note', message: 'Delete this note?', confirmText: 'Delete', danger: true })) { deleteActivityLog(log.id); toast('Note deleted') } }} title="Delete note">×</button>
                 </div>
               )
             })}
@@ -694,6 +743,49 @@ export default function PropertyDetail() {
           <p className="empty-state">No notes yet. Add notes to track interactions, inspections, and other events.</p>
         </section>
       )}
+
+      {/* Tenant payment history modal */}
+      {paymentHistoryTenant && (() => {
+        const t = tenants.find((x) => x.id === paymentHistoryTenant)
+        if (!t) return null
+        const tenantPayments = payments
+          .filter((p) => p.tenantId === t.id)
+          .sort((a, b) => b.date.localeCompare(a.date))
+        const totalPaid = tenantPayments.reduce((s, p) => s + p.amount, 0)
+        return (
+          <div className="modal-overlay" onClick={() => setPaymentHistoryTenant(null)}>
+            <div className="modal card" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Payment history — {t.name}</h3>
+                <button type="button" className="btn-icon" onClick={() => setPaymentHistoryTenant(null)} aria-label="Close">×</button>
+              </div>
+              <p className="muted" style={{ marginBottom: '1rem' }}>
+                Total paid: <strong className="positive">{formatMoney(totalPaid)}</strong> across {tenantPayments.length} payment{tenantPayments.length !== 1 ? 's' : ''}
+              </p>
+              {tenantPayments.length === 0 ? (
+                <p className="empty-state">No payments recorded for this tenant.</p>
+              ) : (
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Period</th><th>Notes</th></tr></thead>
+                    <tbody>
+                      {tenantPayments.map((p) => (
+                        <tr key={p.id}>
+                          <td>{formatDate(p.date)}</td>
+                          <td className="positive">{formatMoney(p.amount)}</td>
+                          <td>{p.method ?? '—'}</td>
+                          <td className="muted">{formatDate(p.periodStart)} – {formatDate(p.periodEnd)}</td>
+                          <td className="muted">{p.notes ?? ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

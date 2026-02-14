@@ -4,6 +4,7 @@ import { useStore } from '../hooks/useStore'
 import { addExpense, updateExpense, deleteExpense } from '../store'
 import { getExpensesThisMonth, getYTDExpenses } from '../lib/calculations'
 import { useToast } from '../context/ToastContext'
+import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import type { ExpenseCategory } from '../types'
 import { nowISO } from '../lib/id'
@@ -42,6 +43,7 @@ const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
 
 export default function Expenses() {
   const toast = useToast()
+  const confirm = useConfirm()
   const { properties, units, expenses } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -61,13 +63,33 @@ export default function Expenses() {
 
   const [filterProperty, setFilterProperty] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
+  const [sortCol, setSortCol] = useState<'date' | 'property' | 'category' | 'description' | 'amount'>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  function toggleSort(col: typeof sortCol) {
+    if (sortCol === col) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir(col === 'amount' ? 'desc' : 'asc') }
+  }
+  function sortIndicator(col: typeof sortCol) {
+    return sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
+  }
 
   const filteredExpenses = expenses.filter((ex) => {
     if (filterProperty && ex.propertyId !== filterProperty) return false
     if (filterCategory && ex.category !== filterCategory) return false
     return true
   })
-  const sortedExpenses = [...filteredExpenses].sort((a, b) => b.date.localeCompare(a.date))
+  const sortedExpenses = [...filteredExpenses].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    switch (sortCol) {
+      case 'date': return dir * a.date.localeCompare(b.date)
+      case 'property': return dir * ((properties.find((p) => p.id === a.propertyId)?.name ?? '').localeCompare(properties.find((p) => p.id === b.propertyId)?.name ?? ''))
+      case 'category': return dir * a.category.localeCompare(b.category)
+      case 'description': return dir * a.description.localeCompare(b.description)
+      case 'amount': return dir * (a.amount - b.amount)
+      default: return 0
+    }
+  })
 
   // Auto-generate recurring expenses for all missed months up to the current month
   // (guard against StrictMode double-fire)
@@ -321,11 +343,11 @@ export default function Expenses() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Property</th>
-                <th>Category</th>
-                <th>Description</th>
-                <th>Amount</th>
+                <th className="sortable" onClick={() => toggleSort('date')}>Date{sortIndicator('date')}</th>
+                <th className="sortable" onClick={() => toggleSort('property')}>Property{sortIndicator('property')}</th>
+                <th className="sortable" onClick={() => toggleSort('category')}>Category{sortIndicator('category')}</th>
+                <th className="sortable" onClick={() => toggleSort('description')}>Description{sortIndicator('description')}</th>
+                <th className="sortable" onClick={() => toggleSort('amount')}>Amount{sortIndicator('amount')}</th>
                 <th></th>
               </tr>
             </thead>
@@ -342,7 +364,7 @@ export default function Expenses() {
                   <td className="negative">{formatMoney(e.amount)}</td>
                   <td className="actions-cell">
                     <button type="button" className="btn small" onClick={() => openEdit(e)}>Edit</button>
-                    <button type="button" className="btn small danger" onClick={() => { if (window.confirm('Delete this expense?')) { deleteExpense(e.id); toast('Expense deleted') } }}>Delete</button>
+                    <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete expense', message: `Delete "${e.description}"?`, confirmText: 'Delete', danger: true })) { deleteExpense(e.id); toast('Expense deleted') } }}>Delete</button>
                   </td>
                 </tr>
               ))}

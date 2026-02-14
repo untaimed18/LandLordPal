@@ -714,13 +714,141 @@ input:focus, select:focus, textarea:focus {
   .cashflow-bar-group { min-width: 45px; }
 }
 
+/* Confirm modal */
+.confirm-overlay { z-index: 1100; }
+.confirm-modal { max-width: 440px; }
+.confirm-message { margin: 0.5rem 0 1.5rem; line-height: 1.5; color: var(--text-muted); }
+
+/* Sortable table headers */
+.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable:hover { color: var(--accent); }
+
+/* Quick actions on dashboard */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1rem 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.quick-action-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+.quick-action-icon { font-size: 1.5rem; }
+
+/* Calendar */
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.calendar-title { margin: 0; font-size: 1.3rem; flex: 1; text-align: center; }
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--card-bg);
+  margin-bottom: 1rem;
+}
+.cal-header {
+  padding: 0.5rem;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.cal-cell {
+  min-height: 90px;
+  padding: 0.35rem;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  font-size: 0.8rem;
+  position: relative;
+}
+.cal-cell.empty { background: var(--bg); }
+.cal-cell.today { background: rgba(37, 99, 235, 0.06); }
+.cal-cell.today .cal-day-number {
+  background: var(--accent);
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cal-day-number { font-weight: 600; font-size: 0.85rem; margin-bottom: 2px; display: block; }
+.cal-events { display: flex; flex-direction: column; gap: 2px; }
+.cal-event {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-event-icon { font-size: 0.7rem; flex-shrink: 0; }
+.cal-event-text { overflow: hidden; text-overflow: ellipsis; }
+.cal-rent { background: rgba(34, 197, 94, 0.12); color: #15803d; }
+.cal-lease-end { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
+.cal-lease-start { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
+.cal-maintenance { background: rgba(245, 158, 11, 0.12); color: #b45309; }
+.cal-expense { background: rgba(168, 85, 247, 0.12); color: #7c3aed; }
+.cal-more { color: var(--text-muted); font-style: italic; }
+
+.calendar-event-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.calendar-event-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.cal-event-date { min-width: 90px; color: var(--text-muted); font-size: 0.8rem; }
+.cal-event-type { font-size: 0.7rem; }
+.cal-event-label { flex: 1; font-weight: 500; }
+.cal-event-sub { font-size: 0.8rem; }
+
+/* No-print utility */
+.no-print { }
+
 /* Print styles */
 @media print {
   body { background: white; color: black; }
-  .header, .footer, .nav, .breadcrumbs, .btn, .row-actions,
-  .form-card, .form-inline, .filter-bar, .rent-controls-row,
+  .header, .footer, .nav, .breadcrumbs, .row-actions,
+  .form-card, .form-inline, .rent-controls-row,
   .toast-container, .modal-overlay, .header-actions,
-  .search-trigger, .search-overlay, .report-tabs { display: none !important; }
+  .search-trigger, .search-overlay, .report-tabs,
+  .no-print, .quick-actions, .filter-bar { display: none !important; }
+  .btn { display: none !important; }
   .main { max-width: 100%; padding: 0; margin: 0; }
   .card, .stat-card, .section-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
   .data-table { font-size: 0.85rem; }
@@ -728,4 +856,5 @@ input:focus, select:focus, textarea:focus {
   h1 { font-size: 1.4rem; }
   h2 { font-size: 1.1rem; }
   a { color: inherit; text-decoration: none; }
+  .print-report-area .section-card { display: block !important; }
 }

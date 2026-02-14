@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
 import { getState, importState } from '../store'
 import { useToast } from '../context/ToastContext'
+import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
 
 function getTheme(): 'light' | 'dark' {
@@ -15,6 +16,7 @@ function setThemeClass(theme: 'light' | 'dark') {
 
 export default function Settings() {
   const toast = useToast()
+  const confirm = useConfirm()
   const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, vendors } = useStore()
   const fileInput = useRef<HTMLInputElement>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(getTheme)
@@ -42,17 +44,17 @@ export default function Settings() {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const data = JSON.parse(reader.result as string)
         if (!data || typeof data !== 'object') throw new Error('Invalid data')
-        if (
-          !window.confirm(
-            'Importing a backup will replace ALL current data. This cannot be undone.\n\nContinue?'
-          )
-        ) {
-          return
-        }
+        const ok = await confirm({
+          title: 'Import backup',
+          message: 'Importing a backup will replace ALL current data. This cannot be undone.',
+          confirmText: 'Import',
+          danger: true,
+        })
+        if (!ok) return
         importState(data)
         toast('Backup restored successfully')
       } catch {
@@ -63,17 +65,21 @@ export default function Settings() {
     if (fileInput.current) fileInput.current.value = ''
   }
 
-  function handleClearData() {
-    if (
-      !window.confirm(
-        'This will permanently delete ALL properties, units, tenants, expenses, payments, maintenance requests, notes, and vendors.\n\nAre you sure?'
-      )
-    ) {
-      return
-    }
-    if (!window.confirm('This is your last chance. All data will be gone forever. Continue?')) {
-      return
-    }
+  async function handleClearData() {
+    const ok1 = await confirm({
+      title: 'Delete all data',
+      message: 'This will permanently delete ALL properties, units, tenants, expenses, payments, maintenance requests, notes, and vendors.',
+      confirmText: 'Yes, delete everything',
+      danger: true,
+    })
+    if (!ok1) return
+    const ok2 = await confirm({
+      title: 'Final confirmation',
+      message: 'This is your last chance. All data will be gone forever. Continue?',
+      confirmText: 'Delete forever',
+      danger: true,
+    })
+    if (!ok2) return
     importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [] })
     toast('All data cleared')
   }

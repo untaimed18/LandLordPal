@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useStore } from '../hooks/useStore'
 import { addVendor, updateVendor, deleteVendor } from '../store'
 import { useToast } from '../context/ToastContext'
+import { useConfirm } from '../context/ConfirmContext'
+import { formatPhoneNumber } from '../lib/format'
 
 const SPECIALTIES = [
   'Plumbing',
@@ -23,6 +25,7 @@ const emptyForm = { name: '', phone: '', email: '', specialty: '', notes: '' }
 
 export default function Vendors() {
   const toast = useToast()
+  const confirm = useConfirm()
   const { vendors, maintenanceRequests, expenses } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -60,8 +63,14 @@ export default function Vendors() {
     setShowForm(false)
   }
 
-  function handleDelete(id: string, name: string) {
-    if (window.confirm(`Delete vendor "${name}"?`)) {
+  async function handleDelete(id: string, name: string) {
+    const ok = await confirm({
+      title: 'Delete vendor',
+      message: `Delete vendor "${name}"?`,
+      confirmText: 'Delete',
+      danger: true,
+    })
+    if (ok) {
       deleteVendor(id)
       toast('Vendor deleted')
     }
@@ -84,7 +93,7 @@ export default function Vendors() {
           <h3>{editingId ? 'Edit vendor' : 'New vendor'}</h3>
           <div className="form-grid">
             <label>Name * <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Mike's Plumbing" /></label>
-            <label>Phone <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="555-123-4567" /></label>
+            <label>Phone <input type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: formatPhoneNumber(e.target.value) }))} placeholder="(555) 123-4567" /></label>
             <label>Email <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></label>
             <label>Specialty <select value={form.specialty} onChange={(e) => setForm((f) => ({ ...f, specialty: e.target.value }))}>
               <option value="">Select...</option>

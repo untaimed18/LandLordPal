@@ -4,6 +4,7 @@ import { useStore } from '../hooks/useStore'
 import { getPropertySummary } from '../lib/calculations'
 import { addProperty, updateProperty, deleteProperty } from '../store'
 import { useToast } from '../context/ToastContext'
+import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import { US_STATES } from '../lib/us-states'
 
@@ -15,6 +16,7 @@ function formatNumberWithCommas(value: string): string {
 
 export default function Properties() {
   const toast = useToast()
+  const confirm = useConfirm()
   const { properties, units, tenants, expenses, payments } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -72,8 +74,14 @@ export default function Properties() {
     setShowForm(false)
   }
 
-  function handleDelete(id: string, name: string) {
-    if (window.confirm(`Delete property "${name}"? This will also remove all units, tenants, expenses, and payments for this property.`)) {
+  async function handleDelete(id: string, name: string) {
+    const ok = await confirm({
+      title: 'Delete property',
+      message: `Delete "${name}"? This will also remove all units, tenants, expenses, and payments for this property.`,
+      confirmText: 'Delete',
+      danger: true,
+    })
+    if (ok) {
       deleteProperty(id)
       if (editingId === id) {
         setEditingId(null)
@@ -114,7 +122,7 @@ export default function Properties() {
               <option value="">Select state</option>
               {US_STATES.map((s) => <option key={s.value} value={s.value}>{s.value} — {s.label}</option>)}
             </select></label>
-            <label>ZIP * <input required value={form.zip} onChange={(e) => setForm((f) => ({ ...f, zip: e.target.value }))} placeholder="78701" /></label>
+            <label>ZIP * <input required pattern="\d{5}(-\d{4})?" title="5-digit ZIP or ZIP+4 (e.g. 78701 or 78701-1234)" value={form.zip} onChange={(e) => setForm((f) => ({ ...f, zip: e.target.value }))} placeholder="78701" /></label>
             <label>Purchase price <input type="text" inputMode="numeric" value={form.purchasePrice ? formatNumberWithCommas(String(form.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} placeholder="350,000" /></label>
             <label>Purchase date <input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
           </div>

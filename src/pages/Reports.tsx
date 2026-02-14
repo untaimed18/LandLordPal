@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { formatMoney } from '../lib/format'
 import { toCSV, downloadCSV } from '../lib/csv'
+import { useToast } from '../context/ToastContext'
 import type { ExpenseCategory } from '../types'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -23,6 +24,8 @@ type ReportType = 'pnl' | 'expenses' | 'tax' | 'cashflow'
 
 export default function Reports() {
   const { properties, expenses, payments } = useStore()
+  const toast = useToast()
+  const printRef = useRef<HTMLDivElement>(null)
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [propertyFilter, setPropertyFilter] = useState('')
@@ -127,6 +130,11 @@ export default function Reports() {
     downloadCSV(`tax-summary-${year}.csv`, csv)
   }
 
+  function handlePrintReport() {
+    window.print()
+    toast('Print dialog opened — save as PDF to export', 'info')
+  }
+
   const hasData = payments.length > 0 || expenses.length > 0
 
   return (
@@ -136,6 +144,13 @@ export default function Reports() {
           <h1>Reports</h1>
           <p className="page-desc">Financial reports and analysis for your properties.</p>
         </div>
+        {hasData && (
+          <div className="header-actions">
+            <button type="button" className="btn" onClick={handlePrintReport}>
+              Print / Save PDF
+            </button>
+          </div>
+        )}
       </div>
 
       {!hasData && (
@@ -147,8 +162,8 @@ export default function Reports() {
         </div>
       )}
 
-      {hasData && <>
-      <div className="filter-bar" style={{ marginBottom: '1.5rem' }}>
+      {hasData && <div ref={printRef} className="print-report-area">
+      <div className="filter-bar no-print" style={{ marginBottom: '1.5rem' }}>
         <label>
           <span className="label-text">Year</span>
           <select className="select-inline" value={year} onChange={(e) => setYear(Number(e.target.value))}>
@@ -302,7 +317,7 @@ export default function Reports() {
           </div>
         </section>
       )}
-      </>}
+      </div>}
     </div>
   )
 }

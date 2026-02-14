@@ -39,11 +39,7 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <p className="page-desc">Your portfolio at a glance. All numbers update automatically.</p>
         </div>
-        {tenants.length > 0 && (
-          <Link to="/rent" className="btn primary">
-            Record payment
-          </Link>
-        )}
+        
       </div>
 
       {!hasData && (
@@ -78,6 +74,33 @@ export default function Dashboard() {
 
       {hasData && (
         <>
+          <div className="quick-actions">
+            <Link to="/rent" className="quick-action-btn">
+              <span className="quick-action-icon">💰</span>
+              <span>Record payment</span>
+            </Link>
+            <Link to="/expenses" className="quick-action-btn">
+              <span className="quick-action-icon">💸</span>
+              <span>Add expense</span>
+            </Link>
+            <Link to="/maintenance" className="quick-action-btn">
+              <span className="quick-action-icon">🔧</span>
+              <span>New maintenance</span>
+            </Link>
+            <Link to="/properties" className="quick-action-btn">
+              <span className="quick-action-icon">🏠</span>
+              <span>Add property</span>
+            </Link>
+            <Link to="/calendar" className="quick-action-btn">
+              <span className="quick-action-icon">📅</span>
+              <span>Calendar</span>
+            </Link>
+            <Link to="/reports" className="quick-action-btn">
+              <span className="quick-action-icon">📊</span>
+              <span>Reports</span>
+            </Link>
+          </div>
+
           <section className="stats-grid">
             <div className="stat-card">
               <span className="stat-label">Expected monthly rent</span>
