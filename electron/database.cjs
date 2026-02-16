@@ -278,11 +278,21 @@ function createTables() {
 
 // ─── Row <-> Object helpers ──────────────────────────────────────────────────
 
+/** Safe JSON parse for stored JSON columns; returns undefined on invalid data */
+function safeJsonParse(str, fallback) {
+  if (!str) return fallback;
+  try {
+    return JSON.parse(str);
+  } catch {
+    return fallback;
+  }
+}
+
 /** Convert a SQLite row to a JS object, handling boolean and JSON fields */
 function rowToProperty(row) {
   return {
     ...row,
-    amenities: row.amenities ? JSON.parse(row.amenities) : undefined,
+    amenities: safeJsonParse(row.amenities, undefined),
     propertyType: row.propertyType || undefined,
     sqft: row.sqft != null ? row.sqft : undefined,
     insuranceProvider: row.insuranceProvider || undefined,
@@ -298,7 +308,7 @@ function rowToUnit(row) {
 function rowToTenant(row) {
   return {
     ...row,
-    rentHistory: row.rentHistory ? JSON.parse(row.rentHistory) : undefined,
+    rentHistory: safeJsonParse(row.rentHistory, undefined),
   };
 }
 

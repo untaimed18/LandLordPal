@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { addExpense, updateExpense, deleteExpense, takeSnapshot, restoreSnapshot } from '../store'
@@ -28,8 +28,9 @@ function parseAmountInput(raw: string): number {
   const sanitized = dotIdx === -1 ? cleaned : cleaned.slice(0, dotIdx + 1) + cleaned.slice(dotIdx + 1).replace(/\./g, '')
   // Limit to 2 decimal places
   const [intPart, decPart] = sanitized.split('.')
-  const final = decPart !== undefined ? `${intPart}.${decPart.slice(0, 2)}` : intPart
-  return final ? Number(final) : 0
+  const final = decPart !== undefined ? `${intPart ?? ''}.${decPart.slice(0, 2)}` : (intPart ?? '')
+  const num = final ? Number(final) : 0
+  return Number.isFinite(num) ? num : 0
 }
 
 const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
@@ -61,8 +62,10 @@ export default function Expenses() {
   })
 
   const now = new Date()
-  const thisMonth = getExpensesThisMonth(expenses, now.getFullYear(), now.getMonth())
-  const ytd = getYTDExpenses(expenses, now.getFullYear())
+  const currentYear = now.getFullYear()
+  const currentMonthIdx = now.getMonth()
+  const thisMonth = getExpensesThisMonth(expenses, currentYear, currentMonthIdx)
+  const ytd = getYTDExpenses(expenses, currentYear)
 
   const [filterProperty, setFilterProperty] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
@@ -95,26 +98,19 @@ export default function Expenses() {
   })
   const pagination = usePagination(sortedExpenses)
 
-  // Auto-generate recurring expenses for all missed months up to the current month
-  // (guard against StrictMode double-fire)
-  const recurringRan = useRef(false)
+  // Auto-generate recurring expenses for all missed months up to the current month.
+  // Runs when expenses change so new recurring expenses get backfilled too.
   useEffect(() => {
-    if (recurringRan.current) return
-    recurringRan.current = true
     const recurring = expenses.filter((e) => e.recurring)
     if (recurring.length === 0) return
-    const currentYear = now.getFullYear()
-    const currentMonthIdx = now.getMonth()
     const currentMonth = `${currentYear}-${String(currentMonthIdx + 1).padStart(2, '0')}`
     let generatedCount = 0
-    // Build a set of existing expense signatures to avoid duplicates quickly
     const existingKeys = new Set(
       expenses.map((e) => `${e.propertyId}|${e.category}|${e.description}|${e.date.slice(0, 7)}`)
     )
     for (const re of recurring) {
       const reYear = Number(re.date.slice(0, 4))
       const reMonthIdx = Number(re.date.slice(5, 7)) - 1
-      // Walk forward from the month AFTER the source, up to and including the current month
       let y = reYear
       let m = reMonthIdx + 1
       if (m > 11) { m = 0; y++ }
@@ -143,8 +139,7 @@ export default function Expenses() {
     if (generatedCount > 0) {
       toast(`Auto-generated ${generatedCount} recurring expense${generatedCount > 1 ? 's' : ''} for missed months`, 'info')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [expenses, toast, currentYear, currentMonthIdx])
 
   const propUnitsForForm = form.propertyId ? units.filter((u) => u.propertyId === form.propertyId) : []
 

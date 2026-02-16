@@ -4,6 +4,7 @@ import { useStore } from '../hooks/useStore'
 import { getRentRollForMonth } from '../lib/calculations'
 import { addPayment } from '../store'
 import { useToast } from '../context/ToastContext'
+import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate, formatMonthYear } from '../lib/format'
 import { nowISO } from '../lib/id'
 import { toCSV, downloadCSV } from '../lib/csv'
@@ -19,6 +20,7 @@ function endOfMonth(d: Date) {
 export default function RentIncome() {
   const { properties, units, tenants, payments } = useStore()
   const toast = useToast()
+  const confirm = useConfirm()
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
@@ -41,12 +43,24 @@ export default function RentIncome() {
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({ value: i, label: new Date(2000, i, 1).toLocaleString('en-US', { month: 'long' }) }))
   const yearOptions = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
 
-  function handleRecordPayment(e: React.FormEvent) {
+  async function handleRecordPayment(e: React.FormEvent) {
     e.preventDefault()
     if (!paymentModal) return
     const tenant = tenants.find((t) => t.id === paymentModal.tenantId)
     if (!tenant) return
     const d = new Date(paymentDate + 'T12:00:00')
+    const payMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const existingPayment = payments.find(
+      (p) => p.tenantId === tenant.id && p.date.startsWith(payMonth)
+    )
+    if (existingPayment) {
+      const ok = await confirm({
+        title: 'Possible duplicate',
+        message: `A payment of ${formatMoney(existingPayment.amount)} was already recorded for ${tenant.name} in ${payMonth}. Record another payment anyway?`,
+        confirmText: 'Record anyway',
+      })
+      if (!ok) return
+    }
     addPayment({
       propertyId: tenant.propertyId,
       unitId: tenant.unitId,
@@ -215,7 +229,7 @@ export default function RentIncome() {
                 </label>
                 <label>Amount * <input type="number" min={0} step={0.01} required value={paymentModal.amount} onChange={(e) => setPaymentModal((p) => p && { ...p, amount: +e.target.value })} /></label>
                 <label>Date * <input type="date" required value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} /></label>
-                <label>Method <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as any)}><option value="check">Check</option><option value="transfer">Transfer</option><option value="cash">Cash</option><option value="other">Other</option></select></label>
+                <label>Method <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'check' | 'transfer' | 'cash' | 'other')}><option value="check">Check</option><option value="transfer">Transfer</option><option value="cash">Cash</option><option value="other">Other</option></select></label>
               </div>
               <div className="form-actions">
                 <button type="submit" className="btn primary">Record payment</button>

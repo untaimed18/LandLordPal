@@ -918,7 +918,7 @@ export default function PropertyDetail() {
             </label>
             <label>Amount * <input type="number" min={0} step={0.01} required value={newPayment.amount || ''} onChange={(e) => setNewPayment((p) => ({ ...p, amount: +e.target.value }))} /></label>
             <label>Date * <input type="date" required value={newPayment.date} onChange={(e) => setNewPayment((p) => ({ ...p, date: e.target.value }))} /></label>
-            <label>Method <select value={newPayment.method} onChange={(e) => setNewPayment((p) => ({ ...p, method: e.target.value as any }))}><option value="check">Check</option><option value="transfer">Transfer</option><option value="cash">Cash</option><option value="other">Other</option></select></label>
+            <label>Method <select value={newPayment.method} onChange={(e) => setNewPayment((p) => ({ ...p, method: e.target.value as 'check' | 'transfer' | 'cash' | 'other' }))}><option value="check">Check</option><option value="transfer">Transfer</option><option value="cash">Cash</option><option value="other">Other</option></select></label>
           </div>
           <label>Notes <input value={newPayment.notes} onChange={(e) => setNewPayment((p) => ({ ...p, notes: e.target.value }))} placeholder="e.g. Check #1234, partial payment" /></label>
           <div className="form-actions">

@@ -16,7 +16,7 @@ function isInMonth(dateStr: string, year: number, month: number): boolean {
   return !Number.isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === month;
 }
 
-export function getExpectedMonthlyRent(_units: Unit[], tenants: Tenant[]): number {
+export function getExpectedMonthlyRent(tenants: Tenant[]): number {
   return tenants.reduce((sum, t) => sum + t.monthlyRent, 0);
 }
 
@@ -90,7 +90,7 @@ export function getDashboardStats(
   const y = now.getFullYear();
   const m = now.getMonth();
 
-  const expectedMonthlyRent = getExpectedMonthlyRent(units, tenants);
+  const expectedMonthlyRent = getExpectedMonthlyRent(tenants);
   const collectedThisMonth = getCollectedThisMonth(payments, y, m);
   const expensesThisMonth = getExpensesThisMonth(expenses, y, m);
   const totalUnits = units.length;

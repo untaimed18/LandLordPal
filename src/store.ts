@@ -40,6 +40,15 @@ function isArray(x: unknown): x is unknown[] {
   return Array.isArray(x);
 }
 
+/** Ensure item is a record with a string id (basic validation for imported/loaded data) */
+function hasValidId(x: unknown): x is Record<string, unknown> & { id: string } {
+  return x != null && typeof x === 'object' && typeof (x as Record<string, unknown>).id === 'string';
+}
+
+function filterValidItems<T>(arr: unknown[]): T[] {
+  return arr.filter(hasValidId) as T[];
+}
+
 // ─── Persistence helpers (SQLite via Electron IPC, fallback to localStorage) ─
 
 /** Check if running inside Electron with the database bridge available */
@@ -68,19 +77,19 @@ function saveToLocalStorage(s: AppState): void {
   }
 }
 
-/** Parse raw data into a validated AppState */
+/** Parse raw data into a validated AppState (only keeps items with valid id to avoid runtime errors) */
 function parseStateData(data: Record<string, unknown>): AppState {
   return {
-    properties: isArray(data.properties) ? data.properties : [],
-    units: isArray(data.units) ? data.units : [],
-    tenants: isArray(data.tenants) ? data.tenants : [],
-    expenses: isArray(data.expenses) ? data.expenses : [],
-    payments: isArray(data.payments) ? data.payments : [],
-    maintenanceRequests: isArray(data.maintenanceRequests) ? data.maintenanceRequests : [],
-    activityLogs: isArray(data.activityLogs) ? data.activityLogs : [],
-    vendors: isArray(data.vendors) ? data.vendors : [],
-    communicationLogs: isArray(data.communicationLogs) ? data.communicationLogs : [],
-  } as AppState;
+    properties: isArray(data.properties) ? filterValidItems<Property>(data.properties) : [],
+    units: isArray(data.units) ? filterValidItems<Unit>(data.units) : [],
+    tenants: isArray(data.tenants) ? filterValidItems<Tenant>(data.tenants) : [],
+    expenses: isArray(data.expenses) ? filterValidItems<Expense>(data.expenses) : [],
+    payments: isArray(data.payments) ? filterValidItems<Payment>(data.payments) : [],
+    maintenanceRequests: isArray(data.maintenanceRequests) ? filterValidItems<MaintenanceRequest>(data.maintenanceRequests) : [],
+    activityLogs: isArray(data.activityLogs) ? filterValidItems<ActivityLog>(data.activityLogs) : [],
+    vendors: isArray(data.vendors) ? filterValidItems<Vendor>(data.vendors) : [],
+    communicationLogs: isArray(data.communicationLogs) ? filterValidItems<CommunicationLog>(data.communicationLogs) : [],
+  };
 }
 
 function saveState(s: AppState): void {
