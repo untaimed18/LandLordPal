@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
+import { useToast } from '../context/ToastContext'
+import { loadSettings } from '../lib/settings'
 import UpdateNotification from './UpdateNotification'
 import {
   LayoutDashboard,
@@ -18,7 +20,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { getLeasesEndingSoon } from '../lib/calculations'
 
-const nav: { to: string; label: string; Icon: LucideIcon }[] = [
+const navItems: { to: string; label: string; Icon: LucideIcon }[] = [
   { to: '/', label: 'Dashboard', Icon: LayoutDashboard },
   { to: '/rent', label: 'Rent', Icon: Banknote },
   { to: '/properties', label: 'Properties', Icon: Home },
@@ -40,25 +42,33 @@ interface SearchResult {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const toast = useToast()
   const { properties, units, tenants, vendors, maintenanceRequests } = useStore()
+  const settings = loadSettings()
 
-  // Calculate notification count for badge
+  // Listen for save errors from the store and surface them as toasts
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ message: string }>).detail
+      toast(`Failed to save data: ${detail.message}`, 'error')
+    }
+    window.addEventListener('landlordpal:save-error', handler)
+    return () => window.removeEventListener('landlordpal:save-error', handler)
+  }, [toast])
+
   const notificationCount = (() => {
     const now = new Date()
     let count = 0
-    // Leases ending within 90 days
-    count += getLeasesEndingSoon(tenants, 90).length
-    // Insurance expiring within 60 days
+    count += getLeasesEndingSoon(tenants, settings.leaseWarningDays).length
     count += properties.filter((p) => {
       if (!p.insuranceExpiry) return false
       const daysLeft = Math.ceil((new Date(p.insuranceExpiry + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      return daysLeft >= 0 && daysLeft <= 60
+      return daysLeft >= 0 && daysLeft <= settings.insuranceWarningDays
     }).length
-    // Scheduled maintenance within 30 days
     count += maintenanceRequests.filter((r) => {
       if (!r.scheduledDate || r.status === 'completed') return false
       const daysUntil = Math.ceil((new Date(r.scheduledDate + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      return daysUntil >= 0 && daysUntil <= 30
+      return daysUntil >= 0 && daysUntil <= settings.maintenanceLookaheadDays
     }).length
     return count
   })()
@@ -67,7 +77,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Keyboard shortcut for search
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -125,48 +134,61 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="layout">
-      <header className="header">
-        <Link to="/" className="logo">
-          <Home size={22} />
+      <a href="#main-content" className="skip-to-content">Skip to main content</a>
+      <header className="header" role="banner">
+        <Link to="/" className="logo" aria-label="LandLord Pal home">
+          <Home size={22} aria-hidden="true" />
           <span>LandLord Pal</span>
         </Link>
-        <nav className="nav">
-          {nav.map(({ to, label, Icon }) => (
+        <nav className="nav" aria-label="Main navigation">
+          {navItems.map(({ to, label, Icon }) => (
             <Link
               key={to}
               to={to}
               className={location.pathname === to || (to !== '/' && location.pathname.startsWith(to)) ? 'active' : ''}
+              aria-current={location.pathname === to ? 'page' : undefined}
             >
-              <Icon size={16} className="nav-icon" />
+              <Icon size={16} className="nav-icon" aria-hidden="true" />
               {label}
             </Link>
           ))}
         </nav>
         <div className="header-actions-right">
           {notificationCount > 0 && (
-            <Link to="/" className="notification-bell" title={`${notificationCount} reminder${notificationCount !== 1 ? 's' : ''}`}>
-              <Bell size={18} />
-              <span className="notification-badge">{notificationCount > 9 ? '9+' : notificationCount}</span>
+            <Link to="/" className="notification-bell" aria-label={`${notificationCount} reminder${notificationCount !== 1 ? 's' : ''}`}>
+              <Bell size={18} aria-hidden="true" />
+              <span className="notification-badge" aria-hidden="true">{notificationCount > 9 ? '9+' : notificationCount}</span>
             </Link>
           )}
-          <button type="button" className="search-trigger" onClick={() => { setSearchOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }} title="Search (Ctrl+K)">
-            <Search size={16} />
-            <span className="search-hint">Ctrl+K</span>
+          <button
+            type="button"
+            className="search-trigger"
+            onClick={() => { setSearchOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }}
+            aria-label="Search (Ctrl+K)"
+          >
+            <Search size={16} aria-hidden="true" />
+            <span className="search-hint" aria-hidden="true">Ctrl+K</span>
           </button>
         </div>
       </header>
-      <main className="main">
+      <main className="main" role="main" id="main-content">
         {children}
       </main>
       <UpdateNotification />
-      <footer className="footer">
+      <footer className="footer" role="contentinfo">
         <span>LandLord Pal</span>
-        <span className="footer-sep">·</span>
-        <span>Data stored locally in this browser</span>
+        <span className="footer-sep" aria-hidden="true">·</span>
+        <span>Data stored locally on this device</span>
       </footer>
 
       {searchOpen && (
-        <div className="search-overlay" onClick={() => { setSearchOpen(false); setSearchQuery('') }}>
+        <div
+          className="search-overlay"
+          onClick={() => { setSearchOpen(false); setSearchQuery('') }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search"
+        >
           <div className="search-modal" onClick={(e) => e.stopPropagation()}>
             <input
               ref={inputRef}
@@ -176,11 +198,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
+              aria-label="Search properties, tenants, vendors"
             />
             {searchQuery.trim().length >= 2 && (
-              <div className="search-results">
+              <div className="search-results" role="listbox" aria-label="Search results">
                 {results.length === 0 ? (
-                  <div className="search-empty">No results found</div>
+                  <div className="search-empty" role="option" aria-selected={false}>No results found</div>
                 ) : (
                   results.slice(0, 15).map((r, i) => (
                     <button
@@ -188,6 +211,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       type="button"
                       className="search-result"
                       onClick={() => selectResult(r)}
+                      role="option"
+                      aria-selected={false}
                     >
                       <span className="search-result-type">{r.type}</span>
                       <span className="search-result-label">{r.label}</span>

@@ -1,9 +1,9 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
-const { initDatabase, loadAll, saveAll, closeDatabase } = require('./database.cjs');
+const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase } = require('./database.cjs');
+const log = require('./logger.cjs');
 
-// Keep a global reference so the window isn't garbage-collected
 let mainWindow = null;
 
 function createWindow() {
@@ -20,8 +20,6 @@ function createWindow() {
     },
   });
 
-  // In production, load the built files from dist/
-  // In development, load from the Vite dev server
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     mainWindow.webContents.openDevTools();
@@ -43,21 +41,15 @@ function sendUpdateStatus(event, data) {
 }
 
 function setupAutoUpdater() {
-  // Explicitly set the feed URL so the updater works even without
-  // the auto-generated app-update.yml (e.g. in dev, or when the
-  // installed app was built before the publish config was added).
   autoUpdater.setFeedURL({
     provider: 'github',
     owner: 'untaimed18',
     repo: 'LandLordPal',
   });
 
-  // Don't auto-download — let the user choose
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
-
-  // Log updater events for debugging
-  autoUpdater.logger = require('electron').app.isPackaged ? null : console;
+  autoUpdater.logger = app.isPackaged ? null : console;
 
   autoUpdater.on('checking-for-update', () => {
     sendUpdateStatus('checking', {});
@@ -85,38 +77,33 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    sendUpdateStatus('downloaded', {
-      version: info.version,
-    });
+    sendUpdateStatus('downloaded', { version: info.version });
   });
 
   autoUpdater.on('error', (err) => {
     const msg = err ? err.message : 'Unknown update error';
-    console.error('Auto-updater error:', msg);
+    log.error('Auto-updater error:', msg);
     sendUpdateStatus('error', { message: msg });
   });
 
-  // IPC handlers from renderer
   ipcMain.handle('start-download', () => {
     return autoUpdater.downloadUpdate();
   });
 
   ipcMain.handle('quit-and-install', () => {
-    // Ensure the database is cleanly closed before the app quits for the update
     closeDatabase();
     autoUpdater.quitAndInstall(false, true);
   });
 
   ipcMain.handle('check-for-updates', () => {
     return autoUpdater.checkForUpdates().catch((err) => {
-      console.error('Manual check-for-updates failed:', err.message);
+      log.error('Manual check-for-updates failed:', err.message);
     });
   });
 
-  // Check for updates after a short delay so the window is fully loaded
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch((err) => {
-      console.error('Auto check-for-updates failed:', err.message);
+      log.error('Auto check-for-updates failed:', err.message);
     });
   }, 5000);
 }
@@ -131,20 +118,30 @@ function setupDatabase() {
     try {
       const data = loadAll();
       const counts = Object.entries(data).map(([k, v]) => `${k}: ${v.length}`).join(', ');
-      console.log('Database loaded —', counts);
+      log.info('Database loaded —', counts);
       return data;
     } catch (err) {
-      console.error('db:load failed:', err.message);
+      log.error('db:load failed:', err.message);
       return null;
     }
   });
 
   ipcMain.handle('db:save', (_event, state) => {
     try {
-      saveAll(state);
+      replaceAll(state);
       return true;
     } catch (err) {
-      console.error('db:save failed:', err.message);
+      log.error('db:save failed:', err.message);
+      return false;
+    }
+  });
+
+  ipcMain.handle('db:batch', (_event, operations) => {
+    try {
+      executeBatch(operations);
+      return true;
+    } catch (err) {
+      log.error('db:batch failed:', err.message);
       return false;
     }
   });
@@ -158,14 +155,12 @@ app.whenReady().then(() => {
   setupAutoUpdater();
 });
 
-// Quit when all windows are closed (Windows & Linux behavior)
 app.on('window-all-closed', () => {
   closeDatabase();
   app.quit();
 });
 
 app.on('activate', () => {
-  // macOS: re-create window when dock icon is clicked
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }

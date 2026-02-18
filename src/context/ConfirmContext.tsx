@@ -49,13 +49,13 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <ConfirmContext.Provider value={confirm}>
       {children}
       {state && (
-        <div className="modal-overlay confirm-overlay" onClick={handleCancel}>
+        <div className="modal-overlay confirm-overlay" onClick={handleCancel} role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
           <div className="modal card confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{state.title || 'Confirm'}</h3>
+              <h3 id="confirm-title">{state.title || 'Confirm'}</h3>
               <button type="button" className="btn-icon" onClick={handleCancel} aria-label="Close">×</button>
             </div>
-            <p className="confirm-message">{state.message}</p>
+            <p id="confirm-message" className="confirm-message">{state.message}</p>
             <div className="form-actions">
               <button
                 type="button"

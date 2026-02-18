@@ -13,12 +13,10 @@ import {
   updateProperty,
   deleteProperty,
   addActivityLog,
-  deleteActivityLog,
   takeSnapshot,
   restoreSnapshot,
 } from '../store'
 import { getPropertySummary, getLeaseStatus } from '../lib/calculations'
-import type { ExpenseCategory } from '../types'
 import { useNavigate } from 'react-router-dom'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
@@ -26,9 +24,13 @@ import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate, formatPhoneNumber } from '../lib/format'
 import { US_STATES } from '../lib/us-states'
 import Breadcrumbs from '../components/Breadcrumbs'
-import type { PropertyType, CommunicationType } from '../types'
-import { addCommunicationLog, deleteCommunicationLog } from '../store'
+import type { PropertyType } from '../types'
 import { User, Phone, Mail, CalendarDays, DollarSign, Clock, ShieldCheck, BedDouble, CreditCard } from 'lucide-react'
+import PaymentHistoryModal from '../components/PaymentHistoryModal'
+import RecentPayments from '../components/RecentPayments'
+import PropertyExpenses from '../components/PropertyExpenses'
+import CommunicationLogSection from '../components/CommunicationLog'
+import ActivityLogSection from '../components/ActivityLog'
 
 const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
   { value: 'single_family', label: 'Single Family' },
@@ -45,14 +47,6 @@ const COMMON_AMENITIES = [
   'Balcony', 'Patio', 'Yard', 'Storage', 'Gym', 'Pet Friendly', 'Elevator',
 ]
 
-const COMM_TYPES: { value: CommunicationType; label: string }[] = [
-  { value: 'call', label: 'Phone Call' },
-  { value: 'email', label: 'Email' },
-  { value: 'text', label: 'Text Message' },
-  { value: 'in_person', label: 'In Person' },
-  { value: 'letter', label: 'Letter' },
-  { value: 'other', label: 'Other' },
-]
 
 const SINGLE_UNIT_TYPES: PropertyType[] = ['single_family', 'condo', 'townhouse']
 function isSingleUnitProp(type?: string): boolean {
@@ -73,17 +67,6 @@ function endOfMonth(d: Date) {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
 }
 
-const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
-  { value: 'mortgage', label: 'Mortgage' },
-  { value: 'insurance', label: 'Insurance' },
-  { value: 'taxes', label: 'Taxes' },
-  { value: 'utilities', label: 'Utilities' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'repairs', label: 'Repairs' },
-  { value: 'management', label: 'Management' },
-  { value: 'legal', label: 'Legal' },
-  { value: 'other', label: 'Other' },
-]
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>()
@@ -93,8 +76,6 @@ export default function PropertyDetail() {
   const confirm = useConfirm()
   const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, communicationLogs } = useStore()
   const [paymentHistoryTenant, setPaymentHistoryTenant] = useState<string | null>(null)
-  const [commForm, setCommForm] = useState<string | null>(null)
-  const [newComm, setNewComm] = useState({ type: 'call' as CommunicationType, date: nowISO(), subject: '', notes: '' })
   const [unitForm, setUnitForm] = useState(false)
   const [tenantForm, setTenantForm] = useState<string | null>(null)
   const [paymentForm, setPaymentForm] = useState<string | null>(null)
@@ -928,199 +909,24 @@ export default function PropertyDetail() {
         </form>
       )}
 
-      <section className="card section-card">
-        <h2>Recent payments</h2>
-        {propPayments.length === 0 ? (
-          <p className="empty-state">No payments recorded yet.</p>
-        ) : (
-          <table className="data-table">
-            <thead><tr><th>Date</th><th>Tenant</th><th>Amount</th><th>Method</th><th>Notes</th><th></th></tr></thead>
-            <tbody>
-              {propPayments
-                .slice()
-                .sort((a, b) => b.date.localeCompare(a.date))
-                .slice(0, 10)
-                .map((p) => {
-                  const t = tenants.find((x) => x.id === p.tenantId)
-                  return (
-                    <tr key={p.id}>
-                      <td>{formatDate(p.date)}</td>
-                      <td>{t?.name ?? '—'}</td>
-                      <td className="positive">{formatMoney(p.amount)}</td>
-                      <td>{p.method ?? '—'}</td>
-                      <td className="muted">{p.notes ?? ''}</td>
-                      <td><button type="button" className="btn small" onClick={() => handleDeletePaymentClick(p.id)}>Delete</button></td>
-                    </tr>
-                  )
-                })}
-            </tbody>
-          </table>
-        )}
-      </section>
+      <RecentPayments payments={propPayments} tenants={tenants} onDelete={handleDeletePaymentClick} />
 
-      <section className="card section-card">
-        <h2>Expenses (this property)</h2>
-        <p className="muted">Add expenses from the <Link to="/expenses">Expenses</Link> page and assign this property.</p>
-        {propExpenses.length === 0 ? (
-          <p className="empty-state">No expenses for this property.</p>
-        ) : (
-          <table className="data-table">
-            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead>
-            <tbody>
-              {propExpenses
-                .slice()
-                .sort((a, b) => b.date.localeCompare(a.date))
-                .slice(0, 10)
-                .map((e) => (
-                  <tr key={e.id}><td>{formatDate(e.date)}</td><td>{EXPENSE_CATEGORIES.find((c) => c.value === e.category)?.label ?? e.category}</td><td>{e.description}</td><td className="negative">{formatMoney(e.amount)}</td></tr>
-                ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      <PropertyExpenses expenses={propExpenses} />
 
-      {/* Communication Log */}
-      <section className="card section-card">
-        <div className="section-card-header">
-          <h2>Communication log</h2>
-          {propTenants.length > 0 && (
-            <button type="button" className="btn small primary" onClick={() => { setCommForm(commForm ? null : 'new'); setNewComm({ type: 'call', date: nowISO(), subject: '', notes: '' }) }}>
-              {commForm ? 'Cancel' : '+ Log communication'}
-            </button>
-          )}
-        </div>
-        {commForm && (
-          <form className="form-card" style={{ marginBottom: '1rem' }} onSubmit={(e) => {
-            e.preventDefault()
-            const tenantId = (e.currentTarget.querySelector('[name="comm-tenant"]') as HTMLSelectElement)?.value
-            if (!tenantId || !newComm.subject.trim()) return
-            const t = tenants.find((x) => x.id === tenantId)
-            addCommunicationLog({
-              tenantId,
-              propertyId: prop.id,
-              type: newComm.type,
-              date: newComm.date,
-              subject: newComm.subject,
-              notes: newComm.notes || undefined,
-            })
-            setCommForm(null)
-            toast(`Communication with ${t?.name ?? 'tenant'} logged`)
-          }}>
-            <div className="form-grid">
-              <label>Tenant * <select name="comm-tenant" required>
-                <option value="">Select tenant</option>
-                {propTenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select></label>
-              <label>Type <select value={newComm.type} onChange={(e) => setNewComm((c) => ({ ...c, type: e.target.value as CommunicationType }))}>
-                {COMM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select></label>
-              <label>Date * <input type="date" required value={newComm.date} onChange={(e) => setNewComm((c) => ({ ...c, date: e.target.value }))} /></label>
-            </div>
-            <label>Subject * <input required value={newComm.subject} onChange={(e) => setNewComm((c) => ({ ...c, subject: e.target.value }))} placeholder="e.g. Discussed lease renewal" /></label>
-            <label style={{ marginTop: '0.5rem' }}>Notes <textarea rows={2} value={newComm.notes} onChange={(e) => setNewComm((c) => ({ ...c, notes: e.target.value }))} placeholder="Details of the conversation..." /></label>
-            <div className="form-actions"><button type="submit" className="btn primary">Save</button></div>
-          </form>
-        )}
-        {(() => {
-          const propComms = communicationLogs
-            .filter((c) => c.propertyId === prop.id)
-            .sort((a, b) => b.date.localeCompare(a.date))
-          if (propComms.length === 0) return <p className="empty-state">No communications logged yet.{propTenants.length === 0 ? ' Add a tenant first.' : ''}</p>
-          return (
-            <div className="activity-timeline">
-              {propComms.slice(0, 20).map((c) => {
-                const t = tenants.find((x) => x.id === c.tenantId)
-                return (
-                  <div key={c.id} className="activity-item">
-                    <span className="activity-date">{formatDate(c.date)}</span>
-                    <span className="badge small">{COMM_TYPES.find((ct) => ct.value === c.type)?.label ?? c.type}</span>
-                    <strong>{t?.name ?? 'Unknown'}</strong>
-                    <span className="activity-note">{c.subject}{c.notes ? ` — ${c.notes}` : ''}</span>
-                    <button type="button" className="btn-icon small" onClick={async () => { if (await confirm({ title: 'Delete communication', message: 'Delete this entry?', confirmText: 'Delete', danger: true })) { deleteCommunicationLog(c.id); toast('Entry deleted') } }} title="Delete">×</button>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })()}
-      </section>
+      <CommunicationLogSection propertyId={prop.id} tenants={propTenants} communicationLogs={communicationLogs} />
 
-      {propLogs.length > 0 && (
-        <section className="card section-card">
-          <div className="section-card-header">
-            <h2>Activity log</h2>
-            <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'property', id: prop.id })}>Add note</button>
-          </div>
-          <div className="activity-timeline">
-            {propLogs.slice(0, 20).map((log) => {
-              let entityLabel = ''
-              if (log.entityType === 'property') entityLabel = prop.name
-              else if (log.entityType === 'unit') entityLabel = units.find((u) => u.id === log.entityId)?.name ?? 'Unit'
-              else entityLabel = tenants.find((t) => t.id === log.entityId)?.name ?? 'Tenant'
-              return (
-                <div key={log.id} className="activity-item">
-                  <span className="activity-date">{formatDate(log.date)}</span>
-                  <span className="activity-entity badge">{log.entityType}: {entityLabel}</span>
-                  <span className="activity-note">{log.note}</span>
-                  <button type="button" className="btn-icon small" onClick={async () => { if (await confirm({ title: 'Delete note', message: 'Delete this note?', confirmText: 'Delete', danger: true })) { deleteActivityLog(log.id); toast('Note deleted') } }} title="Delete note">×</button>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
+      <ActivityLogSection
+        property={prop}
+        units={propUnits}
+        tenants={propTenants}
+        activityLogs={propLogs}
+        onAddNote={() => setNoteEntity({ type: 'property', id: prop.id })}
+      />
 
-      {propLogs.length === 0 && (
-        <section className="card section-card">
-          <div className="section-card-header">
-            <h2>Activity log</h2>
-            <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'property', id: prop.id })}>Add note</button>
-          </div>
-          <p className="empty-state">No notes yet. Add notes to track interactions, inspections, and other events.</p>
-        </section>
-      )}
-
-      {/* Tenant payment history modal */}
       {paymentHistoryTenant && (() => {
         const t = tenants.find((x) => x.id === paymentHistoryTenant)
         if (!t) return null
-        const tenantPayments = payments
-          .filter((p) => p.tenantId === t.id)
-          .sort((a, b) => b.date.localeCompare(a.date))
-        const totalPaid = tenantPayments.reduce((s, p) => s + p.amount, 0)
-        return (
-          <div className="modal-overlay" onClick={() => setPaymentHistoryTenant(null)}>
-            <div className="modal card" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3>Payment history — {t.name}</h3>
-                <button type="button" className="btn-icon" onClick={() => setPaymentHistoryTenant(null)} aria-label="Close">×</button>
-              </div>
-              <p className="muted" style={{ marginBottom: '1rem' }}>
-                Total paid: <strong className="positive">{formatMoney(totalPaid)}</strong> across {tenantPayments.length} payment{tenantPayments.length !== 1 ? 's' : ''}
-              </p>
-              {tenantPayments.length === 0 ? (
-                <p className="empty-state">No payments recorded for this tenant.</p>
-              ) : (
-                <div className="table-wrap">
-                  <table className="data-table">
-                    <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Period</th><th>Notes</th></tr></thead>
-                    <tbody>
-                      {tenantPayments.map((p) => (
-                        <tr key={p.id}>
-                          <td>{formatDate(p.date)}</td>
-                          <td className="positive">{formatMoney(p.amount)}</td>
-                          <td>{p.method ?? '—'}</td>
-                          <td className="muted">{formatDate(p.periodStart)} – {formatDate(p.periodEnd)}</td>
-                          <td className="muted">{p.notes ?? ''}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )
+        return <PaymentHistoryModal tenant={t} payments={payments} onClose={() => setPaymentHistoryTenant(null)} />
       })()}
     </div>
   )

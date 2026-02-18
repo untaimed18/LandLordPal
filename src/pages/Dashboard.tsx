@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
+import { loadSettings } from '../lib/settings'
 import {
   getDashboardStats,
   getPropertySummary,
@@ -29,11 +30,9 @@ import {
   ArrowDownRight,
 } from 'lucide-react'
 
-const LEASES_SOON_DAYS = 90
-const INSURANCE_ALERT_DAYS = 60
-
 export default function Dashboard() {
   const { properties, units, tenants, expenses, payments, maintenanceRequests } = useStore()
+  const settings = loadSettings()
   const stats = getDashboardStats(properties, units, tenants, expenses, payments)
   const summaries = properties.map((p) =>
     getPropertySummary(p, units, tenants, expenses, payments)
@@ -41,37 +40,33 @@ export default function Dashboard() {
   const now = new Date()
   const rentRoll = getRentRollForMonth(now.getFullYear(), now.getMonth(), properties, units, tenants, payments)
   const notPaidThisMonth = rentRoll.filter((r) => !r.paid)
-  const leasesEndingSoon = getLeasesEndingSoon(tenants, LEASES_SOON_DAYS)
+  const leasesEndingSoon = getLeasesEndingSoon(tenants, settings.leaseWarningDays)
   const openMaintenance = maintenanceRequests.filter((r) => r.status !== 'completed')
 
-  // Insurance expiring soon
   const insuranceAlerts = properties.filter((p) => {
     if (!p.insuranceExpiry) return false
     const expiry = new Date(p.insuranceExpiry + 'T12:00:00')
     const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    return daysLeft >= 0 && daysLeft <= INSURANCE_ALERT_DAYS
+    return daysLeft >= 0 && daysLeft <= settings.insuranceWarningDays
   }).map((p) => {
     const expiry = new Date(p.insuranceExpiry! + 'T12:00:00')
     const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     return { property: p, daysLeft }
   }).sort((a, b) => a.daysLeft - b.daysLeft)
 
-  // Scheduled maintenance coming up (next 30 days)
   const scheduledMaintenance = maintenanceRequests.filter((r) => {
     if (!r.scheduledDate || r.status === 'completed') return false
     const scheduled = new Date(r.scheduledDate + 'T12:00:00')
     const daysUntil = Math.ceil((scheduled.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    return daysUntil >= 0 && daysUntil <= 30
+    return daysUntil >= 0 && daysUntil <= settings.maintenanceLookaheadDays
   }).sort((a, b) => (a.scheduledDate ?? '').localeCompare(b.scheduledDate ?? ''))
 
-  // Total notification count
   const notificationCount = leasesEndingSoon.length + insuranceAlerts.length + scheduledMaintenance.length
 
-  // Late fee detection
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const dayOfMonth = today.getDate()
   const lateRentItems = notPaidThisMonth.filter((r) => {
-    const graceDays = r.tenant.gracePeriodDays ?? 5
+    const graceDays = r.tenant.gracePeriodDays ?? settings.defaultGracePeriodDays
     return dayOfMonth > graceDays && (r.tenant.lateFeeAmount ?? 0) > 0
   })
 
@@ -101,8 +96,8 @@ export default function Dashboard() {
       </div>
 
       {!hasData && (
-        <div className="welcome-card card">
-          <div className="welcome-icon"><Building2 size={40} /></div>
+        <div className="welcome-card card" role="region" aria-label="Welcome">
+          <div className="welcome-icon"><Building2 size={40} aria-hidden="true" /></div>
           <h2>Welcome to LandLord Pal</h2>
           <p className="welcome-text">Get started by adding your first property. Then add units, assign tenants, and start tracking rent payments and expenses — all from one place.</p>
           <div className="welcome-actions">
@@ -111,19 +106,19 @@ export default function Dashboard() {
           </div>
           <div className="welcome-features">
             <div className="welcome-feature">
-              <Home size={18} className="welcome-feature-icon" />
+              <Home size={18} className="welcome-feature-icon" aria-hidden="true" />
               <span>Track properties &amp; units</span>
             </div>
             <div className="welcome-feature">
-              <DollarSign size={18} className="welcome-feature-icon" />
+              <DollarSign size={18} className="welcome-feature-icon" aria-hidden="true" />
               <span>Record rent payments</span>
             </div>
             <div className="welcome-feature">
-              <BarChart3 size={18} className="welcome-feature-icon" />
+              <BarChart3 size={18} className="welcome-feature-icon" aria-hidden="true" />
               <span>Financial reports</span>
             </div>
             <div className="welcome-feature">
-              <Wrench size={18} className="welcome-feature-icon" />
+              <Wrench size={18} className="welcome-feature-icon" aria-hidden="true" />
               <span>Maintenance tracking</span>
             </div>
           </div>
@@ -132,11 +127,10 @@ export default function Dashboard() {
 
       {hasData && (
         <>
-          {/* ── Hero financial cards ── */}
-          <div className="dash-hero">
+          <div className="dash-hero" role="region" aria-label="Financial overview">
             <div className="dash-hero-card dash-hero-primary">
               <div className="dash-hero-icon-wrap">
-                <DollarSign size={22} />
+                <DollarSign size={22} aria-hidden="true" />
               </div>
               <div className="dash-hero-content">
                 <span className="dash-hero-label">Net cash flow</span>
@@ -148,7 +142,7 @@ export default function Dashboard() {
             </div>
             <div className="dash-hero-card">
               <div className="dash-hero-icon-wrap income">
-                <TrendingUp size={20} />
+                <TrendingUp size={20} aria-hidden="true" />
               </div>
               <div className="dash-hero-content">
                 <span className="dash-hero-label">Collected</span>
@@ -163,7 +157,7 @@ export default function Dashboard() {
             </div>
             <div className="dash-hero-card">
               <div className="dash-hero-icon-wrap expense">
-                <TrendingDown size={20} />
+                <TrendingDown size={20} aria-hidden="true" />
               </div>
               <div className="dash-hero-content">
                 <span className="dash-hero-label">Expenses</span>
@@ -173,10 +167,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* ── Secondary stats row ── */}
-          <div className="dash-stats-row">
+          <div className="dash-stats-row" role="region" aria-label="Portfolio statistics">
             <div className="dash-stat">
-              <div className="dash-stat-icon"><DoorOpen size={16} /></div>
+              <div className="dash-stat-icon"><DoorOpen size={16} aria-hidden="true" /></div>
               <div>
                 <span className="dash-stat-label">Occupancy</span>
                 <span className="dash-stat-value">
@@ -186,21 +179,21 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="dash-stat">
-              <div className="dash-stat-icon income"><ArrowUpRight size={16} /></div>
+              <div className="dash-stat-icon income"><ArrowUpRight size={16} aria-hidden="true" /></div>
               <div>
                 <span className="dash-stat-label">YTD income</span>
                 <span className="dash-stat-value positive">{formatMoney(stats.ytdIncome)}</span>
               </div>
             </div>
             <div className="dash-stat">
-              <div className="dash-stat-icon expense"><ArrowDownRight size={16} /></div>
+              <div className="dash-stat-icon expense"><ArrowDownRight size={16} aria-hidden="true" /></div>
               <div>
                 <span className="dash-stat-label">YTD expenses</span>
                 <span className="dash-stat-value negative">{formatMoney(stats.ytdExpenses)}</span>
               </div>
             </div>
             <div className="dash-stat">
-              <div className="dash-stat-icon"><DollarSign size={16} /></div>
+              <div className="dash-stat-icon"><DollarSign size={16} aria-hidden="true" /></div>
               <div>
                 <span className="dash-stat-label">YTD profit</span>
                 <span className={`dash-stat-value ${stats.ytdIncome - stats.ytdExpenses >= 0 ? 'positive' : 'negative'}`}>
@@ -210,7 +203,7 @@ export default function Dashboard() {
             </div>
             {vacancyCost > 0 && (
               <div className="dash-stat">
-                <div className="dash-stat-icon warning"><AlertTriangle size={16} /></div>
+                <div className="dash-stat-icon warning"><AlertTriangle size={16} aria-hidden="true" /></div>
                 <div>
                   <span className="dash-stat-label">Vacancy loss</span>
                   <span className="dash-stat-value negative">{formatMoney(vacancyCost)}/mo</span>
@@ -219,7 +212,7 @@ export default function Dashboard() {
             )}
             {openMaintenance.length > 0 && (
               <div className="dash-stat">
-                <div className="dash-stat-icon warning"><Wrench size={16} /></div>
+                <div className="dash-stat-icon warning"><Wrench size={16} aria-hidden="true" /></div>
                 <div>
                   <span className="dash-stat-label">Open repairs</span>
                   <span className="dash-stat-value">{openMaintenance.length}</span>
@@ -228,52 +221,50 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* ── Quick actions ── */}
-          <div className="dash-quick-actions">
+          <nav className="dash-quick-actions" aria-label="Quick actions">
             <Link to="/rent" className="dash-qa">
-              <Banknote size={18} />
+              <Banknote size={18} aria-hidden="true" />
               <span>Record payment</span>
             </Link>
             <Link to="/expenses" className="dash-qa">
-              <Receipt size={18} />
+              <Receipt size={18} aria-hidden="true" />
               <span>Add expense</span>
             </Link>
             <Link to="/maintenance" className="dash-qa">
-              <Wrench size={18} />
+              <Wrench size={18} aria-hidden="true" />
               <span>Maintenance</span>
             </Link>
             <Link to="/properties" className="dash-qa">
-              <Home size={18} />
+              <Home size={18} aria-hidden="true" />
               <span>Properties</span>
             </Link>
             <Link to="/calendar" className="dash-qa">
-              <CalendarDays size={18} />
+              <CalendarDays size={18} aria-hidden="true" />
               <span>Calendar</span>
             </Link>
             <Link to="/reports" className="dash-qa">
-              <BarChart3 size={18} />
+              <BarChart3 size={18} aria-hidden="true" />
               <span>Reports</span>
             </Link>
-          </div>
+          </nav>
         </>
       )}
 
-      {/* ── Reminders / Notifications ── */}
       {hasData && notificationCount > 0 && (
-        <section className="dash-section">
+        <section className="dash-section" aria-label="Reminders">
           <div className="dash-section-header">
-            <h2><Bell size={18} /> Reminders</h2>
+            <h2><Bell size={18} aria-hidden="true" /> Reminders</h2>
             <span className="dash-section-count">{notificationCount}</span>
           </div>
           <div className="dash-notification-list">
             {insuranceAlerts.map(({ property: p, daysLeft }) => (
               <Link key={`ins-${p.id}`} to={`/properties/${p.id}`} className="dash-notif dash-notif-warning">
-                <Shield size={16} className="dash-notif-icon" />
+                <Shield size={16} className="dash-notif-icon" aria-hidden="true" />
                 <div className="dash-notif-body">
                   <strong>{p.name}</strong>
                   <span>Insurance expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}{p.insuranceProvider ? ` (${p.insuranceProvider})` : ''}</span>
                 </div>
-                <ChevronRight size={16} className="dash-notif-arrow" />
+                <ChevronRight size={16} className="dash-notif-arrow" aria-hidden="true" />
               </Link>
             ))}
             {scheduledMaintenance.map((m) => {
@@ -281,34 +272,33 @@ export default function Dashboard() {
               const daysUntil = Math.ceil((new Date(m.scheduledDate! + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
               return (
                 <Link key={`sched-${m.id}`} to="/maintenance" className="dash-notif dash-notif-info">
-                  <Clock size={16} className="dash-notif-icon" />
+                  <Clock size={16} className="dash-notif-icon" aria-hidden="true" />
                   <div className="dash-notif-body">
                     <strong>{m.title}</strong>
                     <span>{prop && `${prop.name} · `}Scheduled in {daysUntil} day{daysUntil !== 1 ? 's' : ''}</span>
                   </div>
-                  <ChevronRight size={16} className="dash-notif-arrow" />
+                  <ChevronRight size={16} className="dash-notif-arrow" aria-hidden="true" />
                 </Link>
               )
             })}
             {leasesEndingSoon.slice(0, 5).map(({ tenant, daysLeft }) => (
               <Link key={`lease-${tenant.id}`} to={`/properties/${tenant.propertyId}`} className="dash-notif dash-notif-alert">
-                <CalendarDays size={16} className="dash-notif-icon" />
+                <CalendarDays size={16} className="dash-notif-icon" aria-hidden="true" />
                 <div className="dash-notif-body">
                   <strong>{tenant.name}</strong>
                   <span>Lease ends in {daysLeft} day{daysLeft !== 1 ? 's' : ''}</span>
                 </div>
-                <ChevronRight size={16} className="dash-notif-arrow" />
+                <ChevronRight size={16} className="dash-notif-arrow" aria-hidden="true" />
               </Link>
             ))}
           </div>
         </section>
       )}
 
-      {/* ── Late rent ── */}
       {lateRentItems.length > 0 && (
-        <section className="dash-section dash-section-alert">
+        <section className="dash-section dash-section-alert" aria-label="Late rent">
           <div className="dash-section-header">
-            <h2><AlertTriangle size={18} /> Late rent</h2>
+            <h2><AlertTriangle size={18} aria-hidden="true" /> Late rent</h2>
             <span className="dash-section-count alert">{lateRentItems.length}</span>
           </div>
           <p className="dash-section-desc">Past grace period — late fees applicable.</p>
@@ -322,18 +312,17 @@ export default function Dashboard() {
                     {r.tenant.lateFeeAmount != null && r.tenant.lateFeeAmount > 0 && ` + ${formatMoney(r.tenant.lateFeeAmount)} fee`}
                   </span>
                 </div>
-                <ChevronRight size={16} className="dash-notif-arrow" />
+                <ChevronRight size={16} className="dash-notif-arrow" aria-hidden="true" />
               </Link>
             ))}
           </div>
         </section>
       )}
 
-      {/* ── Rent due this month ── */}
       {notPaidThisMonth.length > 0 && (
-        <section className="dash-section">
+        <section className="dash-section" aria-label="Rent due this month">
           <div className="dash-section-header">
-            <h2><Banknote size={18} /> Rent due this month</h2>
+            <h2><Banknote size={18} aria-hidden="true" /> Rent due this month</h2>
             <span className="dash-section-count">{notPaidThisMonth.length}</span>
           </div>
           <div className="dash-list">
@@ -345,21 +334,20 @@ export default function Dashboard() {
                     {r.paidAmount > 0 && ` (${formatMoney(r.paidAmount)} paid)`}
                   </span>
                 </div>
-                <ChevronRight size={16} className="dash-notif-arrow" />
+                <ChevronRight size={16} className="dash-notif-arrow" aria-hidden="true" />
               </Link>
             ))}
           </div>
           <div className="dash-section-footer">
-            <Link to="/rent" className="btn small">View full rent roll <ChevronRight size={14} /></Link>
+            <Link to="/rent" className="btn small">View full rent roll <ChevronRight size={14} aria-hidden="true" /></Link>
           </div>
         </section>
       )}
 
-      {/* ── Open maintenance ── */}
       {openMaintenance.length > 0 && (
-        <section className="dash-section">
+        <section className="dash-section" aria-label="Open maintenance">
           <div className="dash-section-header">
-            <h2><Wrench size={18} /> Open maintenance</h2>
+            <h2><Wrench size={18} aria-hidden="true" /> Open maintenance</h2>
             <span className="dash-section-count">{openMaintenance.length}</span>
           </div>
           <div className="dash-list">
@@ -372,25 +360,24 @@ export default function Dashboard() {
                     <strong>{r.title}</strong>
                     {prop && <span>{prop.name}</span>}
                   </div>
-                  <ChevronRight size={16} className="dash-notif-arrow" />
+                  <ChevronRight size={16} className="dash-notif-arrow" aria-hidden="true" />
                 </Link>
               )
             })}
           </div>
           {openMaintenance.length > 5 && (
             <div className="dash-section-footer">
-              <Link to="/maintenance" className="btn small">View all {openMaintenance.length} requests <ChevronRight size={14} /></Link>
+              <Link to="/maintenance" className="btn small">View all {openMaintenance.length} requests <ChevronRight size={14} aria-hidden="true" /></Link>
             </div>
           )}
         </section>
       )}
 
-      {/* ── Properties overview ── */}
       {hasData && (
-        <section className="dash-section">
+        <section className="dash-section" aria-label="Properties overview">
           <div className="dash-section-header">
-            <h2><Building2 size={18} /> Properties</h2>
-            <Link to="/properties" className="btn small">View all <ChevronRight size={14} /></Link>
+            <h2><Building2 size={18} aria-hidden="true" /> Properties</h2>
+            <Link to="/properties" className="btn small">View all <ChevronRight size={14} aria-hidden="true" /></Link>
           </div>
           <div className="dash-property-grid">
             {summaries.map((s) => (
@@ -401,7 +388,7 @@ export default function Dashboard() {
                     {formatPct(s.occupancyRate)}
                   </span>
                 </div>
-                <p className="dash-prop-addr"><MapPin size={12} /> {s.property.address}, {s.property.city}</p>
+                <p className="dash-prop-addr"><MapPin size={12} aria-hidden="true" /> {s.property.address}, {s.property.city}</p>
                 <div className="dash-prop-metrics">
                   <div className="dash-prop-metric">
                     <span className="dash-prop-metric-label">Rent</span>

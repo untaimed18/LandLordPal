@@ -4,7 +4,8 @@ import { getState, importState } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
-import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare } from 'lucide-react'
+import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../lib/settings'
+import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell } from 'lucide-react'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
 
@@ -23,10 +24,24 @@ export default function Settings() {
   const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, vendors, communicationLogs } = useStore()
   const fileInput = useRef<HTMLInputElement>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(getTheme)
+  const [appSettings, setAppSettings] = useState<AppSettings>(() => loadSettings())
 
   useEffect(() => {
     setThemeClass(theme)
   }, [theme])
+
+  function handleSettingChange<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    const next = { ...appSettings, [key]: value }
+    setAppSettings(next)
+    saveSettings(next)
+    toast('Setting updated', 'info')
+  }
+
+  function handleResetSettings() {
+    setAppSettings({ ...DEFAULT_SETTINGS })
+    saveSettings({ ...DEFAULT_SETTINGS })
+    toast('Settings reset to defaults', 'info')
+  }
 
   function handleExport() {
     const data = getState()
@@ -101,36 +116,128 @@ export default function Settings() {
       <section className="card section-card">
         <h2>Appearance</h2>
         <p className="section-desc">Choose your preferred theme.</p>
-        <div className="theme-toggle">
+        <div className="theme-toggle" role="radiogroup" aria-label="Theme selection">
           <button
             type="button"
             className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
             onClick={() => setTheme('light')}
+            role="radio"
+            aria-checked={theme === 'light'}
           >
-            <Sun size={14} /> Light
+            <Sun size={14} aria-hidden="true" /> Light
           </button>
           <button
             type="button"
             className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
             onClick={() => setTheme('dark')}
+            role="radio"
+            aria-checked={theme === 'dark'}
           >
-            <Moon size={14} /> Dark
+            <Moon size={14} aria-hidden="true" /> Dark
           </button>
         </div>
       </section>
 
       <section className="card section-card">
+        <div className="section-card-header">
+          <h2><Bell size={18} aria-hidden="true" /> Notification thresholds</h2>
+        </div>
+        <p className="section-desc">Configure when alerts and reminders appear on the dashboard.</p>
+        <div className="settings-thresholds">
+          <div className="threshold-item">
+            <div className="threshold-header">
+              <span className="threshold-label">Lease expiration warning</span>
+              <div className="threshold-input-wrap">
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={appSettings.leaseWarningDays}
+                  onChange={(e) => handleSettingChange('leaseWarningDays', Math.max(1, +e.target.value || DEFAULT_SETTINGS.leaseWarningDays))}
+                  aria-label="Lease expiration warning days"
+                />
+                <span className="threshold-unit">days</span>
+              </div>
+            </div>
+            <span className="threshold-desc">
+              Alert when a lease expires within this window (default: {DEFAULT_SETTINGS.leaseWarningDays})
+            </span>
+          </div>
+          <div className="threshold-item">
+            <div className="threshold-header">
+              <span className="threshold-label">Insurance expiration warning</span>
+              <div className="threshold-input-wrap">
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={appSettings.insuranceWarningDays}
+                  onChange={(e) => handleSettingChange('insuranceWarningDays', Math.max(1, +e.target.value || DEFAULT_SETTINGS.insuranceWarningDays))}
+                  aria-label="Insurance expiration warning days"
+                />
+                <span className="threshold-unit">days</span>
+              </div>
+            </div>
+            <span className="threshold-desc">
+              Alert when insurance expires within this window (default: {DEFAULT_SETTINGS.insuranceWarningDays})
+            </span>
+          </div>
+          <div className="threshold-item">
+            <div className="threshold-header">
+              <span className="threshold-label">Maintenance lookahead</span>
+              <div className="threshold-input-wrap">
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={appSettings.maintenanceLookaheadDays}
+                  onChange={(e) => handleSettingChange('maintenanceLookaheadDays', Math.max(1, +e.target.value || DEFAULT_SETTINGS.maintenanceLookaheadDays))}
+                  aria-label="Maintenance lookahead days"
+                />
+                <span className="threshold-unit">days</span>
+              </div>
+            </div>
+            <span className="threshold-desc">
+              Show upcoming scheduled maintenance within this window (default: {DEFAULT_SETTINGS.maintenanceLookaheadDays})
+            </span>
+          </div>
+          <div className="threshold-item">
+            <div className="threshold-header">
+              <span className="threshold-label">Default rent grace period</span>
+              <div className="threshold-input-wrap">
+                <input
+                  type="number"
+                  min={0}
+                  max={30}
+                  value={appSettings.defaultGracePeriodDays}
+                  onChange={(e) => handleSettingChange('defaultGracePeriodDays', Math.max(0, +e.target.value || 0))}
+                  aria-label="Default grace period days"
+                />
+                <span className="threshold-unit">days</span>
+              </div>
+            </div>
+            <span className="threshold-desc">
+              Days after due date before rent is flagged late, when not set per-tenant (default: {DEFAULT_SETTINGS.defaultGracePeriodDays})
+            </span>
+          </div>
+        </div>
+        <button type="button" className="btn small" onClick={handleResetSettings} style={{ marginTop: '0.5rem' }}>
+          Reset to defaults
+        </button>
+      </section>
+
+      <section className="card section-card">
         <h2>Data summary</h2>
         <div className="data-summary-grid">
-          <div className="data-summary-item"><Home size={16} className="data-summary-icon" /><span className="data-summary-count">{properties.length}</span><span className="data-summary-label">Properties</span></div>
-          <div className="data-summary-item"><DoorOpen size={16} className="data-summary-icon" /><span className="data-summary-count">{units.length}</span><span className="data-summary-label">Units</span></div>
-          <div className="data-summary-item"><User size={16} className="data-summary-icon" /><span className="data-summary-count">{tenants.length}</span><span className="data-summary-label">Tenants</span></div>
-          <div className="data-summary-item"><DollarSign size={16} className="data-summary-icon" /><span className="data-summary-count">{payments.length}</span><span className="data-summary-label">Payments</span></div>
-          <div className="data-summary-item"><Receipt size={16} className="data-summary-icon" /><span className="data-summary-count">{expenses.length}</span><span className="data-summary-label">Expenses</span></div>
-          <div className="data-summary-item"><Wrench size={16} className="data-summary-icon" /><span className="data-summary-count">{maintenanceRequests.length}</span><span className="data-summary-label">Maintenance</span></div>
-          <div className="data-summary-item"><Users size={16} className="data-summary-icon" /><span className="data-summary-count">{vendors.length}</span><span className="data-summary-label">Vendors</span></div>
-          <div className="data-summary-item"><FileText size={16} className="data-summary-icon" /><span className="data-summary-count">{activityLogs.length}</span><span className="data-summary-label">Notes</span></div>
-          <div className="data-summary-item"><MessageSquare size={16} className="data-summary-icon" /><span className="data-summary-count">{communicationLogs.length}</span><span className="data-summary-label">Communications</span></div>
+          <div className="data-summary-item"><Home size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{properties.length}</span><span className="data-summary-label">Properties</span></div>
+          <div className="data-summary-item"><DoorOpen size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{units.length}</span><span className="data-summary-label">Units</span></div>
+          <div className="data-summary-item"><User size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{tenants.length}</span><span className="data-summary-label">Tenants</span></div>
+          <div className="data-summary-item"><DollarSign size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{payments.length}</span><span className="data-summary-label">Payments</span></div>
+          <div className="data-summary-item"><Receipt size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{expenses.length}</span><span className="data-summary-label">Expenses</span></div>
+          <div className="data-summary-item"><Wrench size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{maintenanceRequests.length}</span><span className="data-summary-label">Maintenance</span></div>
+          <div className="data-summary-item"><Users size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{vendors.length}</span><span className="data-summary-label">Vendors</span></div>
+          <div className="data-summary-item"><FileText size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{activityLogs.length}</span><span className="data-summary-label">Notes</span></div>
+          <div className="data-summary-item"><MessageSquare size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{communicationLogs.length}</span><span className="data-summary-label">Communications</span></div>
         </div>
         <p className="muted" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>{totalRecords} total records</p>
       </section>
@@ -153,13 +260,14 @@ export default function Settings() {
                 accept=".json"
                 onChange={handleImport}
                 style={{ display: 'none' }}
+                aria-label="Import backup file"
               />
             </label>
           </div>
         </div>
       </section>
 
-      <section className="card section-card danger-zone">
+      <section className="card section-card danger-zone" aria-label="Danger zone">
         <h2>Danger zone</h2>
         <p className="section-desc">
           Permanently delete all data. This cannot be undone. Export a backup first.

@@ -6,12 +6,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Database API
   dbLoad: () => ipcRenderer.invoke('db:load'),
   dbSave: (state) => ipcRenderer.invoke('db:save', state),
+  dbBatch: (operations) => ipcRenderer.invoke('db:batch', operations),
 
   // Auto-update API
   onUpdateStatus: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('update-status', handler);
-    // Return cleanup function
     return () => ipcRenderer.removeListener('update-status', handler);
   },
   startDownload: () => ipcRenderer.invoke('start-download'),

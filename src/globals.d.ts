@@ -24,11 +24,23 @@ interface AppStateData {
   communicationLogs: import('./types').CommunicationLog[];
 }
 
+interface DbOperation {
+  type: 'upsert' | 'delete' | 'deleteWhere' | 'clearField';
+  table: string;
+  data?: Record<string, unknown> | Record<string, unknown>[];
+  ids?: string | string[];
+  column?: string;
+  value?: string;
+  field?: string;
+  where?: { column: string; value: string };
+}
+
 interface ElectronAPI {
   platform: string;
   // Database
   dbLoad: () => Promise<AppStateData | null>;
   dbSave: (state: AppStateData) => Promise<boolean>;
+  dbBatch: (operations: DbOperation[]) => Promise<boolean>;
   // Auto-update
   onUpdateStatus: (callback: (data: UpdateStatusEvent) => void) => () => void;
   startDownload: () => Promise<void>;
