@@ -68,8 +68,9 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.png",
-      "signingHashAlgorithms": ["sha256"],
-      "sign": null
+      "signtoolOptions": {
+        "signingHashAlgorithms": ["sha256"]
+      }
     },
     "artifactName": "LandLordPal-Setup-${version}.${ext}",
     "nsis": {
