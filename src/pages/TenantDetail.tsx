@@ -14,27 +14,18 @@ import { useToast } from '../context/ToastContext'
 export default function TenantDetail() {
   const { id } = useParams<{ id: string }>()
   const { tenants, properties, units, payments, communicationLogs } = useStore()
-
   const toast = useToast()
 
   const tenant = tenants.find((t) => t.id === id)
-  if (!tenant) {
-    return (
-      <div className="page">
-        <p>Tenant not found.</p>
-        <Link to="/properties">Back to properties</Link>
-      </div>
-    )
-  }
-
-  const property = properties.find((p) => p.id === tenant.propertyId)
-  const unit = units.find((u) => u.id === tenant.unitId)
   const settings = loadSettings()
-  const tenantPayments = payments.filter((p) => p.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date))
-  const tenantComms = communicationLogs.filter((c) => c.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date))
-  const leaseStatus = getLeaseStatus(tenant.leaseEnd)
+
+  const tenantPayments = useMemo(
+    () => (tenant ? payments.filter((p) => p.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date)) : []),
+    [payments, tenant],
+  )
 
   const paymentStats = useMemo(() => {
+    if (!tenant) return { total: 0, count: 0, lateCount: 0, avgPayment: 0, monthlyMap: new Map<string, number>() }
     const total = tenantPayments.reduce((s, p) => s + p.amount, 0)
     const count = tenantPayments.length
     const graceDays = tenant.gracePeriodDays ?? settings.defaultGracePeriodDays
@@ -50,7 +41,21 @@ export default function TenantDetail() {
     }
 
     return { total, count, lateCount, avgPayment: count > 0 ? total / count : 0, monthlyMap }
-  }, [tenantPayments, tenant.gracePeriodDays])
+  }, [tenantPayments, tenant, settings.defaultGracePeriodDays])
+
+  if (!tenant) {
+    return (
+      <div className="page">
+        <p>Tenant not found.</p>
+        <Link to="/properties">Back to properties</Link>
+      </div>
+    )
+  }
+
+  const property = properties.find((p) => p.id === tenant.propertyId)
+  const unit = units.find((u) => u.id === tenant.unitId)
+  const tenantComms = communicationLogs.filter((c) => c.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date))
+  const leaseStatus = getLeaseStatus(tenant.leaseEnd)
 
   const statusBadge = leaseStatus === 'expired'
     ? <span className="badge expired">Lease expired</span>

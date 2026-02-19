@@ -47,6 +47,8 @@ interface ElectronAPI {
   docPickFile: () => Promise<{ filename: string; originalName: string; size: number; mimeType: string } | null>;
   docDeleteFile: (filename: string) => Promise<boolean>;
   docOpenFile: (filename: string) => Promise<boolean>;
+  // Security
+  getEncryptionKeyError: () => Promise<string | null>;
   // Auto-update
   onUpdateStatus: (callback: (data: UpdateStatusEvent) => void) => () => void;
   startDownload: () => Promise<void>;

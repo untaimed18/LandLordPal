@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   docDeleteFile: (filename) => ipcRenderer.invoke('doc:delete-file', filename),
   docOpenFile: (filename) => ipcRenderer.invoke('doc:open-file', filename),
 
+  // Security
+  getEncryptionKeyError: () => ipcRenderer.invoke('encryption-key-error'),
+
   // Auto-update API
   onUpdateStatus: (callback) => {
     const handler = (_event, data) => callback(data);

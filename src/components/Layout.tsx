@@ -47,14 +47,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { properties, units, tenants, vendors, maintenanceRequests } = useStore()
   const settings = loadSettings()
 
-  // Listen for save errors from the store and surface them as toasts
   useEffect(() => {
-    const handler = (e: Event) => {
+    const saveHandler = (e: Event) => {
       const detail = (e as CustomEvent<{ message: string }>).detail
       toast(`Failed to save data: ${detail.message}`, 'error')
     }
-    window.addEventListener('landlordpal:save-error', handler)
-    return () => window.removeEventListener('landlordpal:save-error', handler)
+    const encHandler = (e: Event) => {
+      const detail = (e as CustomEvent<{ message: string }>).detail
+      toast(
+        `Warning: Encryption key could not be loaded (${detail.message}). Sensitive data (emails, phone numbers) is being stored without encryption. Please restart the app to resolve this.`,
+        'error',
+      )
+    }
+    window.addEventListener('landlordpal:save-error', saveHandler)
+    window.addEventListener('landlordpal:encryption-warning', encHandler)
+    return () => {
+      window.removeEventListener('landlordpal:save-error', saveHandler)
+      window.removeEventListener('landlordpal:encryption-warning', encHandler)
+    }
   }, [toast])
 
   const notificationCount = (() => {

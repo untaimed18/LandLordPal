@@ -257,10 +257,11 @@ function notify(): void {
 
 // Full state replace (used for backup restore / data clear)
 export function importState(data: Record<string, unknown>): void {
-  // Clean up existing document files before replacing state
   const api = requireElectronAPI();
   for (const doc of state.documents) {
-    api.docDeleteFile(doc.filename);
+    api.docDeleteFile(doc.filename).catch((err: unknown) => {
+      logger.warn('Failed to delete document file during import:', doc.filename, err);
+    });
   }
   state = parseStateData(data);
   persistFullReplace(state);
@@ -375,7 +376,9 @@ export function deleteProperty(id: string): void {
     return false;
   });
   for (const doc of orphanedDocs) {
-    requireElectronAPI().docDeleteFile(doc.filename);
+    requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
+      logger.warn('Failed to delete document file:', doc.filename, err);
+    });
   }
   const orphanedDocIds = orphanedDocs.map((d) => d.id);
   const documents = state.documents.filter((d) => !orphanedDocIds.includes(d.id));
@@ -432,7 +435,9 @@ export function deleteUnit(id: string): void {
     return false;
   });
   for (const doc of orphanedDocs) {
-    requireElectronAPI().docDeleteFile(doc.filename);
+    requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
+      logger.warn('Failed to delete document file:', doc.filename, err);
+    });
   }
   const orphanedDocIds = orphanedDocs.map((d) => d.id);
   const documents = state.documents.filter((d) => !orphanedDocIds.includes(d.id));
@@ -505,7 +510,9 @@ export function deleteTenant(id: string): void {
   // Clean up documents for this tenant
   const tenantDocs = state.documents.filter((d) => d.entityType === 'tenant' && d.entityId === id);
   for (const doc of tenantDocs) {
-    requireElectronAPI().docDeleteFile(doc.filename);
+    requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
+      logger.warn('Failed to delete document file:', doc.filename, err);
+    });
   }
   const tenantDocIds = tenantDocs.map((d) => d.id);
   if (tenantDocIds.length > 0) {
@@ -527,7 +534,9 @@ export const updateExpense = expenseCrud.update;
 export function deleteExpense(id: string): void {
   const expenseDocs = state.documents.filter((d) => d.entityType === 'expense' && d.entityId === id);
   for (const doc of expenseDocs) {
-    requireElectronAPI().docDeleteFile(doc.filename);
+    requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
+      logger.warn('Failed to delete document file:', doc.filename, err);
+    });
   }
   const expenseDocIds = expenseDocs.map((d) => d.id);
   const ops: DbOperation[] = [{ type: 'delete', table: 'expenses', ids: [id] }];
@@ -580,7 +589,9 @@ export function deleteVendor(id: string): void {
 
   const vendorDocs = state.documents.filter((d) => d.entityType === 'vendor' && d.entityId === id);
   for (const doc of vendorDocs) {
-    requireElectronAPI().docDeleteFile(doc.filename);
+    requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
+      logger.warn('Failed to delete document file:', doc.filename, err);
+    });
   }
   const vendorDocIds = vendorDocs.map((d) => d.id);
   const documents = state.documents.filter((d) => !vendorDocIds.includes(d.id));
@@ -631,7 +642,9 @@ export async function addDocument(
 export function deleteDocument(id: string): void {
   const doc = state.documents.find((d) => d.id === id);
   if (doc) {
-    requireElectronAPI().docDeleteFile(doc.filename);
+    requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
+      logger.warn('Failed to delete document file:', doc.filename, err);
+    });
   }
   state = { ...state, documents: state.documents.filter((d) => d.id !== id) };
   persistBatch([{ type: 'delete', table: 'documents', ids: [id] }]);
@@ -641,6 +654,13 @@ export function deleteDocument(id: string): void {
 export function openDocument(id: string): void {
   const doc = state.documents.find((d) => d.id === id);
   if (doc) {
-    requireElectronAPI().docOpenFile(doc.filename);
+    requireElectronAPI().docOpenFile(doc.filename).catch((err: unknown) => {
+      logger.warn('Failed to open document file:', doc.filename, err);
+      window.dispatchEvent(
+        new CustomEvent('landlordpal:save-error', {
+          detail: { message: `Could not open file "${doc.originalName}". It may have been moved or deleted.` },
+        })
+      );
+    });
   }
 }

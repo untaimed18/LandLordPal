@@ -38,7 +38,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <AlertTriangle size={40} className="error-boundary-icon" />
             <h2>Something went wrong</h2>
             <p className="error-boundary-message">
-              An unexpected error occurred. Your data is safe — it&apos;s stored in your browser.
+              An unexpected error occurred. Your data is safe — it&apos;s stored securely on this device.
             </p>
             {this.state.error && (
               <details className="error-boundary-details">

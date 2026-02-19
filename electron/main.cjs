@@ -1,7 +1,7 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
-const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath } = require('./database.cjs');
+const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, getEncryptionKeyError } = require('./database.cjs');
 const { dialog, shell } = require('electron');
 const log = require('./logger.cjs');
 
@@ -18,8 +18,32 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
+
+  // Content Security Policy
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'",
+        ],
+      },
+    });
+  });
+
+  // Prevent navigation to external URLs
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const currentURL = mainWindow.webContents.getURL();
+    if (url !== currentURL) {
+      event.preventDefault();
+    }
+  });
+
+  // Block new-window requests
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -111,9 +135,13 @@ function setupAutoUpdater() {
 
 // ─── Database IPC handlers ───────────────────────────────────────────────────
 
-function setupDatabase() {
+async function setupDatabase() {
   const userDataPath = app.getPath('userData');
-  initDatabase(userDataPath);
+  await initDatabase(userDataPath);
+
+  ipcMain.handle('encryption-key-error', () => {
+    return getEncryptionKeyError();
+  });
 
   ipcMain.handle('db:load', () => {
     try {
@@ -190,8 +218,8 @@ function setupDatabase() {
 
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
-app.whenReady().then(() => {
-  setupDatabase();
+app.whenReady().then(async () => {
+  await setupDatabase();
   createWindow();
   setupAutoUpdater();
 });

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { addActivityLog, deleteTenant } from '../../store'
+import { addActivityLog, deleteTenant, takeSnapshot, restoreSnapshot } from '../../store'
 import { useToast } from '../../context/ToastContext'
+import { useConfirm } from '../../context/ConfirmContext'
 import { nowISO } from '../../lib/id'
 import { formatMoney } from '../../lib/format'
 import type { Tenant } from '../../types'
@@ -12,12 +13,22 @@ interface Props {
 
 export default function MoveOutForm({ tenant, onClose }: Props) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [moveOutDate, setMoveOutDate] = useState(nowISO())
   const [moveOutNotes, setMoveOutNotes] = useState('')
   const [depositReturned, setDepositReturned] = useState(tenant.deposit ?? 0)
   const [depositDeductions, setDepositDeductions] = useState('')
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    const ok = await confirm({
+      title: 'Confirm move-out',
+      message: `This will permanently remove "${tenant.name}" and all their payment history from the system. This cannot be undone without a backup.`,
+      confirmText: 'Complete move-out',
+      danger: true,
+    })
+    if (!ok) return
+
+    const snapshot = takeSnapshot()
     addActivityLog({
       entityType: 'unit',
       entityId: tenant.unitId,
@@ -26,7 +37,16 @@ export default function MoveOutForm({ tenant, onClose }: Props) {
     })
     deleteTenant(tenant.id)
     onClose()
-    toast('Tenant moved out and unit marked available')
+    toast('Tenant moved out and unit marked available', {
+      type: 'success',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          restoreSnapshot(snapshot)
+          toast('Move-out undone')
+        },
+      },
+    })
   }
 
   return (

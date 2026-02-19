@@ -1,17 +1,14 @@
-let _isProd;
+const electronLog = require('electron-log/main');
 
-function isProd() {
-  if (_isProd === undefined) {
-    try { _isProd = require('electron').app.isPackaged; } catch { _isProd = false; }
-  }
-  return _isProd;
-}
+electronLog.initialize();
 
-const noop = () => {};
+electronLog.transports.file.level = 'info';
+electronLog.transports.file.maxSize = 5 * 1024 * 1024; // 5 MB
+electronLog.transports.console.level = 'debug';
 
 module.exports = {
-  debug(...args) { if (!isProd()) console.debug('[debug]', ...args); },
-  info(...args) { if (!isProd()) console.info('[info]', ...args); },
-  warn: console.warn.bind(console, '[warn]'),
-  error: console.error.bind(console, '[error]'),
+  debug: electronLog.debug.bind(electronLog),
+  info: electronLog.info.bind(electronLog),
+  warn: electronLog.warn.bind(electronLog),
+  error: electronLog.error.bind(electronLog),
 };

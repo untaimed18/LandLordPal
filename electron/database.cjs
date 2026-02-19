@@ -15,6 +15,7 @@ const CURRENT_SCHEMA_VERSION = 4;
 const ENC_ALGORITHM = 'aes-256-gcm';
 const ENC_KEY_FILE = '.landlordpal-key';
 let encryptionKey = null;
+let encryptionKeyError = null;
 
 function loadEncryptionKey() {
   const keyPath = path.join(userDataDir, ENC_KEY_FILE);
@@ -34,9 +35,15 @@ function loadEncryptionKey() {
       log.info('Generated new encryption key');
     }
   } catch (err) {
-    log.error('Failed to manage encryption key:', err.message);
+    log.error('CRITICAL: Failed to manage encryption key:', err.message);
+    log.error('PII fields will NOT be encrypted. Resolve the issue and restart the app.');
     encryptionKey = null;
+    encryptionKeyError = err.message;
   }
+}
+
+function getEncryptionKeyError() {
+  return encryptionKeyError;
 }
 
 function encrypt(text) {
@@ -210,7 +217,7 @@ function setSchemaVersion(version) {
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
 
-function initDatabase(userDataPath) {
+async function initDatabase(userDataPath) {
   userDataDir = userDataPath;
   dbFilePath = path.join(userDataPath, 'landlordpal.db');
   log.info('Opening database at:', dbFilePath);
@@ -220,7 +227,7 @@ function initDatabase(userDataPath) {
 
   loadEncryptionKey();
   createTables();
-  migrateIfNeeded(userDataPath);
+  await migrateIfNeeded(userDataPath);
 
   db.pragma('foreign_keys = ON');
   prepareStatements();
@@ -248,7 +255,7 @@ function cleanupOldBackups(userDataPath) {
   }
 }
 
-function migrateIfNeeded(userDataPath) {
+async function migrateIfNeeded(userDataPath) {
   const currentVersion = getSchemaVersion();
 
   if (currentVersion >= CURRENT_SCHEMA_VERSION) {
@@ -262,20 +269,18 @@ function migrateIfNeeded(userDataPath) {
   try {
     const backupName = `landlordpal-backup-v${currentVersion}-${Date.now()}.db`;
     const backupPath = path.join(userDataPath, backupName);
-    db.backup(backupPath)
-      .then(() => log.info('Pre-migration backup saved:', backupPath))
-      .catch((err) => log.warn('Backup warning (non-fatal):', err.message));
-  } catch (err) {
     try {
+      await db.backup(backupPath);
+      log.info('Pre-migration backup saved:', backupPath);
+    } catch (backupErr) {
+      log.warn('Async backup failed, falling back to sync copy:', backupErr.message);
       if (fs.existsSync(dbFilePath)) {
-        const backupName = `landlordpal-backup-v${currentVersion}-${Date.now()}.db`;
-        const backupPath = path.join(userDataPath, backupName);
         fs.copyFileSync(dbFilePath, backupPath);
         log.info('Pre-migration backup saved (copy):', backupPath);
       }
-    } catch (copyErr) {
-      log.warn('Could not create pre-migration backup:', copyErr.message);
     }
+  } catch (err) {
+    log.warn('Could not create pre-migration backup:', err.message);
   }
 
   try {
@@ -843,4 +848,4 @@ function closeDatabase() {
   }
 }
 
-module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath };
+module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, getEncryptionKeyError };

@@ -6,7 +6,7 @@ import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
 import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../lib/settings'
 import { backupSchema } from '../lib/schemas'
-import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download } from 'lucide-react'
+import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download, RefreshCw } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
@@ -108,6 +108,21 @@ export default function Settings() {
     if (!ok2) return
     importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [], documents: [] })
     toast('All data cleared')
+  }
+
+  const [updateChecking, setUpdateChecking] = useState(false)
+
+  async function handleCheckForUpdates() {
+    if (!window.electronAPI?.checkForUpdates) return
+    setUpdateChecking(true)
+    try {
+      await window.electronAPI.checkForUpdates()
+      toast('Checking for updates…', 'info')
+    } catch {
+      toast('Could not check for updates', 'error')
+    } finally {
+      setTimeout(() => setUpdateChecking(false), 3000)
+    }
   }
 
   const totalRecords = properties.length + units.length + tenants.length + expenses.length + payments.length + maintenanceRequests.length + activityLogs.length + vendors.length + communicationLogs.length + documents.length
@@ -337,9 +352,18 @@ export default function Settings() {
 
       <section className="card section-card" style={{ marginTop: '1.5rem' }}>
         <h2>About</h2>
-        <p className="muted" style={{ fontSize: '0.85rem' }}>
+        <p className="muted" style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
           LandLord Pal v{APP_VERSION} · Property management for landlords
         </p>
+        <button
+          type="button"
+          className="btn small"
+          onClick={handleCheckForUpdates}
+          disabled={updateChecking}
+        >
+          <RefreshCw size={14} className={updateChecking ? 'spin' : ''} aria-hidden="true" style={{ marginRight: 6 }} />
+          {updateChecking ? 'Checking…' : 'Check for updates'}
+        </button>
       </section>
     </div>
   )
