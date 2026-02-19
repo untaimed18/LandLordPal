@@ -178,7 +178,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <footer className="footer" role="contentinfo">
         <span>LandLord Pal</span>
         <span className="footer-sep" aria-hidden="true">·</span>
-        <span>Data stored locally on this device</span>
+        <span>All data stored securely on this device</span>
       </footer>
 
       {searchOpen && (

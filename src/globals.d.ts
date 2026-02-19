@@ -27,7 +27,8 @@ interface AppStateData {
 interface DbOperation {
   type: 'upsert' | 'delete' | 'deleteWhere' | 'clearField';
   table: string;
-  data?: Record<string, unknown> | Record<string, unknown>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?: any;
   ids?: string | string[];
   column?: string;
   value?: string;

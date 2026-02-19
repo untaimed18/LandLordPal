@@ -8,7 +8,6 @@ import type {
   PropertySummary,
 } from '../types';
 
-const STORAGE_KEY = 'landlord-pal-data';
 
 // Parse as local date (noon avoids DST edge cases) so month comparison is correct in all timezones
 function isInMonth(dateStr: string, year: number, month: number): boolean {
@@ -112,8 +111,6 @@ export function getDashboardStats(
     ytdExpenses,
   };
 }
-
-export { STORAGE_KEY };
 
 // Lease status helper
 export type LeaseStatus = 'active' | 'expiring' | 'expired'

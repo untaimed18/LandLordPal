@@ -10,7 +10,6 @@ import type {
   CommunicationLog,
 } from './types';
 import { generateId, nowISO } from './lib/id';
-import { STORAGE_KEY } from './lib/calculations';
 import logger from './lib/logger';
 
 export interface AppState {
@@ -61,31 +60,11 @@ function emitSaveError(error: unknown): void {
 
 // ─── Persistence helpers ─────────────────────────────────────────────────────
 
-function hasElectronDB(): boolean {
-  return !!(window.electronAPI?.dbLoad && window.electronAPI?.dbSave);
-}
-
-function hasElectronBatch(): boolean {
-  return !!window.electronAPI?.dbBatch;
-}
-
-function loadFromLocalStorage(): AppState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState;
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return parseStateData(parsed);
-  } catch {
-    return defaultState;
+function requireElectronAPI(): ElectronAPI {
+  if (!window.electronAPI) {
+    throw new Error('LandLord Pal requires the Electron desktop environment.');
   }
-}
-
-function saveToLocalStorage(s: AppState): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-  } catch (e) {
-    emitSaveError(e);
-  }
+  return window.electronAPI;
 }
 
 function parseStateData(data: Record<string, unknown>): AppState {
@@ -105,23 +84,15 @@ function parseStateData(data: Record<string, unknown>): AppState {
 // ─── Incremental persistence via db:batch ────────────────────────────────────
 
 function persistBatch(ops: DbOperation[]): void {
-  if (hasElectronBatch()) {
-    window.electronAPI!.dbBatch(ops).then((ok) => {
-      if (!ok) emitSaveError(new Error('db:batch returned false'));
-    }).catch(emitSaveError);
-  } else {
-    saveToLocalStorage(state);
-  }
+  requireElectronAPI().dbBatch(ops).then((ok) => {
+    if (!ok) emitSaveError(new Error('db:batch returned false'));
+  }).catch(emitSaveError);
 }
 
 function persistFullReplace(s: AppState): void {
-  if (hasElectronDB()) {
-    window.electronAPI!.dbSave(s).then((ok) => {
-      if (!ok) emitSaveError(new Error('db:save returned false'));
-    }).catch(emitSaveError);
-  } else {
-    saveToLocalStorage(s);
-  }
+  requireElectronAPI().dbSave(s).then((ok) => {
+    if (!ok) emitSaveError(new Error('db:save returned false'));
+  }).catch(emitSaveError);
 }
 
 // ─── In-memory state + pub/sub ───────────────────────────────────────────────
@@ -134,21 +105,12 @@ let _initialized = false;
 export async function initStore(): Promise<void> {
   if (_initialized) return;
 
-  if (hasElectronDB()) {
-    try {
-      const data = await window.electronAPI!.dbLoad();
-      if (data) {
-        state = parseStateData(data as unknown as Record<string, unknown>);
-      }
-      logger.info('Store initialized from SQLite');
-    } catch (e) {
-      logger.error('Failed to load from SQLite, falling back to localStorage', e);
-      state = loadFromLocalStorage();
-    }
-  } else {
-    state = loadFromLocalStorage();
-    logger.info('Store initialized from localStorage (no Electron DB)');
+  const api = requireElectronAPI();
+  const data = await api.dbLoad();
+  if (data) {
+    state = parseStateData(data as unknown as Record<string, unknown>);
   }
+  logger.info('Store initialized from SQLite');
 
   _initialized = true;
   listeners.forEach((l) => l());

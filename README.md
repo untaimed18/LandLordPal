@@ -1,8 +1,8 @@
 # LandLord Pal
 
-A full-featured property management app for landlords. Track properties, units, tenants, rent payments, expenses, maintenance, and more -- with auto-calculated financial metrics and a clean, modern UI.
+A full-featured desktop property management app for landlords. Track properties, units, tenants, rent payments, expenses, maintenance, and more -- with auto-calculated financial metrics and a clean, modern UI.
 
-All data is stored locally on your device. No server, no account, no subscription.
+All data is stored securely on your device using SQLite with AES-256-GCM encryption for sensitive fields. No server, no account, no subscription.
 
 ## Features
 
@@ -10,7 +10,7 @@ All data is stored locally on your device. No server, no account, no subscriptio
 - Portfolio overview with expected rent, collected this month, expenses, net cash flow, occupancy rate, and YTD profit
 - Quick action buttons for common tasks
 - Late rent alerts with grace period and late fee tracking
-- Lease expiration warnings (90-day lookahead)
+- Lease expiration warnings (configurable lookahead)
 - Open maintenance request summary
 
 ### Properties & Units
@@ -63,6 +63,7 @@ All data is stored locally on your device. No server, no account, no subscriptio
 
 ### Settings
 - Light/dark theme toggle
+- Configurable notification thresholds (lease warning, insurance warning, maintenance lookahead, grace period)
 - Data summary with record counts
 - JSON backup and restore
 - App version display
@@ -73,6 +74,8 @@ All data is stored locally on your device. No server, no account, no subscriptio
 - Undo for deletions (via toast notification with undo button)
 - Error boundary with crash recovery
 - Auto-update system via GitHub Releases
+- Accessibility: ARIA labels, keyboard navigation, skip-to-content link, focus management
+- AES-256-GCM encryption for sensitive tenant and vendor PII (email, phone)
 
 ## Download
 
@@ -98,9 +101,6 @@ npm run electron:dev
 ## Build
 
 ```bash
-# Web production build
-npm run build
-
 # Windows installer (produces .exe in dist-electron/)
 npm run electron:build
 ```
@@ -120,6 +120,6 @@ Installed apps will detect the new release automatically on next launch.
 - Vite
 - React Router (HashRouter)
 - Lucide React icons
-- Local state with localStorage persistence
-- Electron + electron-builder (Windows packaging)
+- Electron (desktop-only) + electron-builder (Windows packaging)
+- better-sqlite3 with incremental saves and foreign key constraints
 - electron-updater (auto-updates via GitHub Releases)

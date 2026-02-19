@@ -95,7 +95,7 @@ export default function PropertyDetail() {
   const [propertyForm, setPropertyForm] = useState({ name: '', address: '', city: '', state: '', zip: '', propertyType: '' as string, sqft: 0, amenities: [] as string[], notes: '', purchasePrice: 0, purchaseDate: '', insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '' })
   const [newUnit, setNewUnit] = useState({ name: '', bedrooms: 1, bathrooms: 1, monthlyRent: 0, sqft: 0, deposit: 0, notes: '', available: true })
   const [newTenant, setNewTenant] = useState({ unitId: '', name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: 0, deposit: 0, gracePeriodDays: 5, lateFeeAmount: 0, notes: '' })
-  const [newPayment, setNewPayment] = useState({ tenantId: '', amount: 0, date: nowISO(), method: 'transfer' as const, notes: '' })
+  const [newPayment, setNewPayment] = useState<{ tenantId: string; amount: number; date: string; method: 'check' | 'transfer' | 'cash' | 'other'; notes: string }>({ tenantId: '', amount: 0, date: nowISO(), method: 'transfer', notes: '' })
 
   useEffect(() => {
     if (id) {
