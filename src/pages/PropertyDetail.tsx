@@ -26,7 +26,7 @@ import { formatMoney, formatDate, formatPhoneNumber } from '../lib/format'
 import { US_STATES } from '../lib/us-states'
 import Breadcrumbs from '../components/Breadcrumbs'
 import type { PropertyType } from '../types'
-import { User, Phone, Mail, CalendarDays, DollarSign, Clock, ShieldCheck, BedDouble, CreditCard } from 'lucide-react'
+import { User, Phone, Mail, CalendarDays, DollarSign, Clock, ShieldCheck, BedDouble, CreditCard, RefreshCw } from 'lucide-react'
 import PaymentHistoryModal from '../components/PaymentHistoryModal'
 import RecentPayments from '../components/RecentPayments'
 import PropertyExpenses from '../components/PropertyExpenses'
@@ -819,9 +819,14 @@ export default function PropertyDetail() {
             <label>Grace period (days) <input type="number" min={0} value={newTenant.gracePeriodDays || ''} onChange={(e) => setNewTenant((n) => ({ ...n, gracePeriodDays: +e.target.value }))} /></label>
             <label>Late fee <input type="number" min={0} step={0.01} value={newTenant.lateFeeAmount || ''} onChange={(e) => setNewTenant((n) => ({ ...n, lateFeeAmount: +e.target.value }))} /></label>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '0.5rem' }}>
+          <label className={`toggle-card${newTenant.autopay ? ' active' : ''}`}>
             <input type="checkbox" checked={newTenant.autopay} onChange={(e) => setNewTenant((n) => ({ ...n, autopay: e.target.checked }))} />
-            Tenant uses autopay
+            <span className="toggle-card-icon"><RefreshCw size={18} /></span>
+            <span className="toggle-card-text">
+              <span className="toggle-card-label">Autopay</span>
+              <span className="toggle-card-desc">Tenant pays automatically each month</span>
+            </span>
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
           </label>
           <label>Notes <textarea value={newTenant.notes} onChange={(e) => setNewTenant((n) => ({ ...n, notes: e.target.value }))} rows={2} /></label>
           <div className="form-actions">
@@ -877,9 +882,14 @@ export default function PropertyDetail() {
             <label>Grace period (days) <input type="number" min={0} value={newTenant.gracePeriodDays || ''} onChange={(e) => setNewTenant((n) => ({ ...n, gracePeriodDays: +e.target.value }))} /></label>
             <label>Late fee <input type="number" min={0} step={0.01} value={newTenant.lateFeeAmount || ''} onChange={(e) => setNewTenant((n) => ({ ...n, lateFeeAmount: +e.target.value }))} /></label>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '0.5rem' }}>
+          <label className={`toggle-card${newTenant.autopay ? ' active' : ''}`}>
             <input type="checkbox" checked={newTenant.autopay} onChange={(e) => setNewTenant((n) => ({ ...n, autopay: e.target.checked }))} />
-            Tenant uses autopay
+            <span className="toggle-card-icon"><RefreshCw size={18} /></span>
+            <span className="toggle-card-text">
+              <span className="toggle-card-label">Autopay</span>
+              <span className="toggle-card-desc">Tenant pays automatically each month</span>
+            </span>
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
           </label>
           <label>Notes <textarea value={newTenant.notes} onChange={(e) => setNewTenant((n) => ({ ...n, notes: e.target.value }))} rows={2} /></label>
           <div className="form-actions">

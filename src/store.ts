@@ -123,7 +123,54 @@ export async function initStore(): Promise<void> {
   logger.info('Store initialized from SQLite');
 
   _initialized = true;
+  processAutopayments();
   listeners.forEach((l) => l());
+}
+
+function processAutopayments(): void {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const firstOfMonth = `${monthPrefix}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const lastOfMonth = `${monthPrefix}-${String(lastDay).padStart(2, '0')}`;
+
+  const autopayTenants = state.tenants.filter((t) => t.autopay);
+  if (autopayTenants.length === 0) return;
+
+  const newPayments: Payment[] = [];
+  const ops: DbOperation[] = [];
+
+  for (const tenant of autopayTenants) {
+    const alreadyPaid = state.payments.some(
+      (p) => p.tenantId === tenant.id && p.date.startsWith(monthPrefix)
+    );
+    if (alreadyPaid) continue;
+
+    const payment: Payment = {
+      id: generateId(),
+      propertyId: tenant.propertyId,
+      unitId: tenant.unitId,
+      tenantId: tenant.id,
+      amount: tenant.monthlyRent,
+      date: firstOfMonth,
+      periodStart: firstOfMonth,
+      periodEnd: lastOfMonth,
+      method: 'transfer',
+      notes: 'Autopay',
+      createdAt: nowISO(),
+      updatedAt: nowISO(),
+    };
+    newPayments.push(payment);
+    ops.push({ type: 'upsert', table: 'payments', data: payment });
+  }
+
+  if (newPayments.length === 0) return;
+
+  state = { ...state, payments: [...state.payments, ...newPayments] };
+  persistBatch(ops);
+  logger.info(`Autopay: recorded ${newPayments.length} payment(s) for ${monthPrefix}`);
 }
 
 export function isStoreReady(): boolean {
