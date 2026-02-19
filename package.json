@@ -1,7 +1,7 @@
 {
   "name": "landlord-pal",
   "private": true,
-  "version": "1.3.2",
+  "version": "1.3.5",
   "description": "Property management app for landlords — track properties, tenants, rent, expenses, and more.",
   "author": "LandLord Pal",
   "type": "module",

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
-import { getRentRollForMonth } from '../lib/calculations'
+import { getRentRollForMonth, getTenantReliability } from '../lib/calculations'
+import { loadSettings } from '../lib/settings'
 import { addPayment } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
@@ -22,6 +23,7 @@ export default function RentIncome() {
   const { properties, units, tenants, payments } = useStore()
   const toast = useToast()
   const confirm = useConfirm()
+  const settings = loadSettings()
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
@@ -196,6 +198,7 @@ export default function RentIncome() {
                     <th>Expected</th>
                     <th>Paid</th>
                     <th>Status</th>
+                    <th>Reliability</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -224,6 +227,16 @@ export default function RentIncome() {
                         ) : (
                           <span className="badge overdue">Not paid</span>
                         )}
+                      </td>
+                      <td>
+                        {(() => {
+                          const rel = getTenantReliability(r.tenant, payments, settings.defaultGracePeriodDays)
+                          return (
+                            <span className={`reliability-badge-inline grade-${rel.grade}`} title={`${rel.label} — ${rel.score}/100`}>
+                              {rel.grade} · {rel.score}
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td>
                         {!r.paid && (

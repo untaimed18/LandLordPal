@@ -7,13 +7,15 @@ import {
   addActivityLog, takeSnapshot, restoreSnapshot,
 } from '../store'
 import DocumentAttachments from '../components/DocumentAttachments'
-import { getPropertySummary, getLeaseStatus } from '../lib/calculations'
+import { getPropertySummary, getLeaseStatus, getTenantReliability } from '../lib/calculations'
+import type { ReliabilityGrade } from '../lib/calculations'
+import { loadSettings } from '../lib/settings'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import Breadcrumbs from '../components/Breadcrumbs'
-import type { PropertyType } from '../types'
+import type { PropertyType, Tenant, Payment } from '../types'
 import { User, Phone, Mail, CalendarDays, DollarSign, Clock, ShieldCheck, BedDouble, CreditCard } from 'lucide-react'
 import PaymentHistoryModal from '../components/PaymentHistoryModal'
 import RecentPayments from '../components/RecentPayments'
@@ -113,6 +115,7 @@ export default function PropertyDetail() {
     return false
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const summary = getPropertySummary(prop, units, tenants, expenses, payments)
+  const settings = loadSettings()
 
   function openAddTenant(unitId: string, rent: number, deposit: number) {
     setEditingTenantId(null)
@@ -328,6 +331,7 @@ export default function PropertyDetail() {
                               </div>
                             </div>
                             {(() => { const s = getLeaseStatus(tenant.leaseEnd); if (s === 'expired') return <span className="badge expired">Lease expired</span>; if (s === 'expiring') return <span className="badge expiring">Expiring soon</span>; return <span className="badge active-lease">Active</span> })()}
+                            <ReliabilityBadge tenant={tenant} payments={propPayments} graceDays={settings.defaultGracePeriodDays} />
                           </div>
                           <div className="stc-details-grid">
                             <div className="stc-detail"><CalendarDays size={14} className="stc-detail-icon" /><div><span className="stc-detail-label">Lease period</span><span className="stc-detail-value">{formatDate(tenant.leaseStart)} — {formatDate(tenant.leaseEnd)}</span></div></div>
@@ -396,6 +400,7 @@ export default function PropertyDetail() {
                               <span className="muted block">Rent history: {tenant.rentHistory.map((r, i) => <span key={i}>{formatDate(r.date)}: {formatMoney(r.oldRent)} → {formatMoney(r.newRent)}{i < tenant.rentHistory!.length - 1 ? ', ' : ''}</span>)}</span>
                             )}
                             {(() => { const s = getLeaseStatus(tenant.leaseEnd); if (s === 'expired') return <span className="badge expired">Lease expired</span>; if (s === 'expiring') return <span className="badge expiring">Lease expiring</span>; return <span className="badge active-lease">Active</span> })()}
+                            <ReliabilityBadge tenant={tenant} payments={propPayments} graceDays={settings.defaultGracePeriodDays} />
                           </>
                         )}
                         {unit.available && !tenant && <span className="badge available">Available</span>}
@@ -477,5 +482,23 @@ export default function PropertyDetail() {
         return <PaymentHistoryModal tenant={t} payments={payments} onClose={() => setPaymentHistoryTenant(null)} />
       })()}
     </div>
+  )
+}
+
+const GRADE_COLORS: Record<ReliabilityGrade, string> = {
+  A: 'var(--positive)',
+  B: '#4CAF50',
+  C: '#FFC107',
+  D: '#FF9800',
+  F: 'var(--negative)',
+}
+
+function ReliabilityBadge({ tenant, payments, graceDays }: { tenant: Tenant; payments: Payment[]; graceDays: number }) {
+  const r = getTenantReliability(tenant, payments, graceDays)
+  return (
+    <span className="reliability-badge" style={{ borderColor: GRADE_COLORS[r.grade] }} title={`Reliability: ${r.score}/100 — ${r.label}`}>
+      <span className="reliability-grade" style={{ color: GRADE_COLORS[r.grade] }}>{r.grade}</span>
+      <span className="reliability-label">{r.score}</span>
+    </span>
   )
 }

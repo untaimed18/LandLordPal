@@ -4,9 +4,10 @@ import { useStore } from '../hooks/useStore'
 import { formatMoney } from '../lib/format'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { exportTablePdf, formatMoneyForPdf } from '../lib/pdfExport'
+import { getYoYTrends, getPropertyComparison } from '../lib/calculations'
 import { useToast } from '../context/ToastContext'
 import type { ExpenseCategory } from '../types'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -22,10 +23,10 @@ const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
-type ReportType = 'pnl' | 'expenses' | 'tax' | 'cashflow'
+type ReportType = 'pnl' | 'expenses' | 'tax' | 'cashflow' | 'yoy' | 'comparison'
 
 export default function Reports() {
-  const { properties, expenses, payments } = useStore()
+  const { properties, units, tenants, expenses, payments } = useStore()
   const toast = useToast()
   const printRef = useRef<HTMLDivElement>(null)
   const now = new Date()
@@ -102,6 +103,13 @@ export default function Reports() {
   const maxCashFlow = useMemo(() => {
     return Math.max(1, ...monthly.map((m) => Math.max(m.income, m.expenses, Math.abs(m.net))))
   }, [monthly])
+
+  const yoyTrends = useMemo(() => getYoYTrends(filteredPayments, filteredExpenses), [filteredPayments, filteredExpenses])
+
+  const propertyComparison = useMemo(
+    () => getPropertyComparison(properties, units, tenants, expenses, payments, year),
+    [properties, units, tenants, expenses, payments, year],
+  )
 
   const totalIncome = monthly.reduce((s, m) => s + m.income, 0)
   const totalExp = monthly.reduce((s, m) => s + m.expenses, 0)
@@ -218,6 +226,8 @@ export default function Reports() {
           { key: 'expenses' as const, label: 'Expense Breakdown' },
           { key: 'tax' as const, label: 'Tax Summary' },
           { key: 'cashflow' as const, label: 'Cash Flow' },
+          { key: 'yoy' as const, label: 'Year-over-Year' },
+          { key: 'comparison' as const, label: 'Property Comparison' },
         ]).map((tab) => (
           <button
             key={tab.key}
@@ -356,7 +366,98 @@ export default function Reports() {
           </div>
         </section>
       )}
+      {activeReport === 'yoy' && (
+        <section className="card section-card">
+          <h2>Year-over-Year Trends</h2>
+          {yoyTrends.length === 0 ? (
+            <p className="empty-state">Not enough data for year-over-year comparison.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Income</th>
+                    <th>Δ Income</th>
+                    <th>Expenses</th>
+                    <th>Δ Expenses</th>
+                    <th>NOI</th>
+                    <th>Δ NOI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {yoyTrends.map((t) => (
+                    <tr key={t.year}>
+                      <td><strong>{t.year}</strong></td>
+                      <td className="positive">{formatMoney(t.income)}</td>
+                      <td>{t.incomeGrowth != null ? <DeltaChip value={t.incomeGrowth} positiveIsGood /> : '—'}</td>
+                      <td className="negative">{formatMoney(t.expenses)}</td>
+                      <td>{t.expenseGrowth != null ? <DeltaChip value={t.expenseGrowth} positiveIsGood={false} /> : '—'}</td>
+                      <td className={t.noi >= 0 ? 'positive' : 'negative'}>{formatMoney(t.noi)}</td>
+                      <td>{t.noiGrowth != null ? <DeltaChip value={t.noiGrowth} positiveIsGood /> : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeReport === 'comparison' && (
+        <section className="card section-card">
+          <h2>Property Comparison — {year}</h2>
+          {propertyComparison.length === 0 ? (
+            <p className="empty-state">Add properties to compare performance.</p>
+          ) : (
+            <div className="property-comparison">
+              <ComparisonBar label="NOI" items={propertyComparison.map((c) => ({ name: c.property.name, value: c.noi }))} format="money" />
+              <ComparisonBar label="Occupancy" items={propertyComparison.map((c) => ({ name: c.property.name, value: c.occupancyRate }))} format="pct" />
+              <ComparisonBar label="Collection Rate" items={propertyComparison.map((c) => ({ name: c.property.name, value: c.collectionRate }))} format="pct" />
+              <ComparisonBar label="Expense Ratio" items={propertyComparison.map((c) => ({ name: c.property.name, value: c.expenseRatio ?? 0 }))} format="pct" />
+              <ComparisonBar label="Vacancy Loss" items={propertyComparison.map((c) => ({ name: c.property.name, value: c.vacancyLoss }))} format="money" />
+              {propertyComparison.some((c) => c.capRate != null) && (
+                <ComparisonBar label="Cap Rate" items={propertyComparison.map((c) => ({ name: c.property.name, value: c.capRate ?? 0 }))} format="pct" />
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
       </div>}
+    </div>
+  )
+}
+
+function DeltaChip({ value, positiveIsGood }: { value: number; positiveIsGood: boolean }) {
+  const good = positiveIsGood ? value >= 0 : value <= 0
+  return (
+    <span className={`delta-chip ${good ? 'positive' : 'negative'}`}>
+      {value >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+      {value >= 0 ? '+' : ''}{value.toFixed(1)}%
+    </span>
+  )
+}
+
+function ComparisonBar({ label, items, format }: { label: string; items: { name: string; value: number }[]; format: 'money' | 'pct' }) {
+  const maxAbs = Math.max(1, ...items.map((i) => Math.abs(i.value)))
+  return (
+    <div className="comparison-metric">
+      <h3 className="comparison-metric-label">{label}</h3>
+      {items.map((item) => (
+        <div key={item.name} className="comparison-row">
+          <span className="comparison-name">{item.name}</span>
+          <div className="comparison-bar-track">
+            <div
+              className={`comparison-bar-fill ${item.value >= 0 ? 'positive' : 'negative'}`}
+              style={{ width: `${(Math.abs(item.value) / maxAbs) * 100}%` }}
+            />
+          </div>
+          <span className="comparison-value">
+            {format === 'money' ? formatMoney(item.value) : `${item.value.toFixed(1)}%`}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { loadSettings } from '../lib/settings'
@@ -7,7 +7,11 @@ import {
   getPropertySummary,
   getRentRollForMonth,
   getLeasesEndingSoon,
+  getInvestmentMetrics,
+  getForecast,
+  getYoYTrends,
 } from '../lib/calculations'
+import type { Property, Unit, Tenant, Expense, Payment } from '../types'
 import { formatMoney, formatPct } from '../lib/format'
 import Sparkline from '../components/Sparkline'
 import {
@@ -30,6 +34,8 @@ import {
   MapPin,
   ArrowUpRight,
   ArrowDownRight,
+  Info,
+  Activity,
 } from 'lucide-react'
 
 export default function Dashboard() {
@@ -71,6 +77,23 @@ export default function Dashboard() {
     const graceDays = r.tenant.gracePeriodDays ?? settings.defaultGracePeriodDays
     return dayOfMonth > graceDays && (r.tenant.lateFeeAmount ?? 0) > 0
   })
+
+  const investmentMetrics = useMemo(
+    () => getInvestmentMetrics(properties, units, tenants, expenses, payments, now.getFullYear()),
+    [properties, units, tenants, expenses, payments],
+  )
+
+  const forecast = useMemo(
+    () => getForecast(tenants, expenses, payments),
+    [tenants, expenses, payments],
+  )
+
+  const yoyTrends = useMemo(
+    () => getYoYTrends(payments, expenses),
+    [payments, expenses],
+  )
+
+  const [tooltipId, setTooltipId] = useState<string | null>(null)
 
   const hasData = properties.length > 0
 
@@ -267,6 +290,149 @@ export default function Dashboard() {
             </section>
           )}
 
+          {(investmentMetrics.annualIncome > 0 || investmentMetrics.annualExpenses > 0) && (
+            <section className="card section-card dash-metrics-section" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ marginBottom: '1rem' }}>Investment Metrics — {now.getFullYear()}</h2>
+              <div className="metrics-grid">
+                <MetricCard
+                  label="Net Operating Income"
+                  value={formatMoney(investmentMetrics.noi)}
+                  positive={investmentMetrics.noi >= 0}
+                  tooltip="Annual rental income minus operating expenses (excluding mortgage)."
+                  id="noi"
+                  tooltipId={tooltipId}
+                  setTooltipId={setTooltipId}
+                />
+                {investmentMetrics.capRate != null && (
+                  <MetricCard
+                    label="Cap Rate"
+                    value={`${investmentMetrics.capRate.toFixed(1)}%`}
+                    positive={investmentMetrics.capRate > 0}
+                    tooltip="NOI / Purchase Price. Measures return independent of financing."
+                    id="caprate"
+                    tooltipId={tooltipId}
+                    setTooltipId={setTooltipId}
+                  />
+                )}
+                {investmentMetrics.cashOnCash != null && (
+                  <MetricCard
+                    label="Cash-on-Cash"
+                    value={`${investmentMetrics.cashOnCash.toFixed(1)}%`}
+                    positive={investmentMetrics.cashOnCash > 0}
+                    tooltip="(NOI − Mortgage) / Purchase Price. Factors in debt service."
+                    id="coc"
+                    tooltipId={tooltipId}
+                    setTooltipId={setTooltipId}
+                  />
+                )}
+                {investmentMetrics.expenseRatio != null && (
+                  <MetricCard
+                    label="Expense Ratio"
+                    value={`${investmentMetrics.expenseRatio.toFixed(1)}%`}
+                    positive={investmentMetrics.expenseRatio <= 45}
+                    tooltip="Total Expenses / Gross Income. Healthy is typically 35–45%."
+                    id="expratio"
+                    tooltipId={tooltipId}
+                    setTooltipId={setTooltipId}
+                  />
+                )}
+                {investmentMetrics.grm != null && (
+                  <MetricCard
+                    label="GRM"
+                    value={investmentMetrics.grm.toFixed(1)}
+                    tooltip="Gross Rent Multiplier: Purchase Price / Annual Rent. Lower = better value."
+                    id="grm"
+                    tooltipId={tooltipId}
+                    setTooltipId={setTooltipId}
+                  />
+                )}
+                {investmentMetrics.annualVacancyLoss > 0 && (
+                  <MetricCard
+                    label="Vacancy Loss"
+                    value={formatMoney(investmentMetrics.annualVacancyLoss)}
+                    positive={false}
+                    tooltip="Annual lost rent from vacant units at their listed rent."
+                    id="vacloss"
+                    tooltipId={tooltipId}
+                    setTooltipId={setTooltipId}
+                  />
+                )}
+              </div>
+              {yoyTrends.length >= 2 && (() => {
+                const latest = yoyTrends[yoyTrends.length - 1];
+                return (
+                  <div className="yoy-indicators">
+                    {latest.incomeGrowth != null && (
+                      <span className={`yoy-chip ${latest.incomeGrowth >= 0 ? 'positive' : 'negative'}`}>
+                        {latest.incomeGrowth >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                        Income {latest.incomeGrowth >= 0 ? '+' : ''}{latest.incomeGrowth.toFixed(1)}% YoY
+                      </span>
+                    )}
+                    {latest.expenseGrowth != null && (
+                      <span className={`yoy-chip ${latest.expenseGrowth <= 0 ? 'positive' : 'negative'}`}>
+                        {latest.expenseGrowth >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                        Expenses {latest.expenseGrowth >= 0 ? '+' : ''}{latest.expenseGrowth.toFixed(1)}% YoY
+                      </span>
+                    )}
+                    {latest.noiGrowth != null && (
+                      <span className={`yoy-chip ${latest.noiGrowth >= 0 ? 'positive' : 'negative'}`}>
+                        {latest.noiGrowth >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                        NOI {latest.noiGrowth >= 0 ? '+' : ''}{latest.noiGrowth.toFixed(1)}% YoY
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+            </section>
+          )}
+
+          {(forecast.projectedMonthlyIncome > 0 || forecast.projectedMonthlyExpenses > 0) && (
+            <section className="card section-card dash-forecast-section" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ marginBottom: '1rem' }}><Activity size={18} aria-hidden="true" style={{ marginRight: 6, verticalAlign: '-3px' }} />Forecast</h2>
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <span className="metric-label">Projected Income</span>
+                  <span className="metric-value positive">{formatMoney(forecast.projectedMonthlyIncome)}<small>/mo</small></span>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-label">Projected Expenses</span>
+                  <span className="metric-value negative">{formatMoney(forecast.projectedMonthlyExpenses)}<small>/mo</small></span>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-label">Projected NOI</span>
+                  <span className={`metric-value ${forecast.projectedMonthlyNOI >= 0 ? 'positive' : 'negative'}`}>
+                    {formatMoney(forecast.projectedMonthlyNOI)}<small>/mo</small>
+                  </span>
+                </div>
+                {forecast.actualVsProjectedIncome != null && (
+                  <div className="metric-card">
+                    <span className="metric-label">Actual vs Projected</span>
+                    <span className={`metric-value ${forecast.actualVsProjectedIncome >= 0 ? 'positive' : 'negative'}`}>
+                      {forecast.actualVsProjectedIncome >= 0 ? '+' : ''}{forecast.actualVsProjectedIncome.toFixed(1)}%
+                    </span>
+                    <span className="metric-sub">Income this month</span>
+                  </div>
+                )}
+              </div>
+              {forecast.leaseExpirationRisk.length > 0 && (
+                <div className="forecast-risk">
+                  <div className="forecast-risk-header">
+                    <AlertTriangle size={14} aria-hidden="true" />
+                    <span>{formatMoney(forecast.rentAtRisk)}/mo rent at risk — {forecast.leaseExpirationRisk.length} lease{forecast.leaseExpirationRisk.length !== 1 ? 's' : ''} expiring within 90 days</span>
+                  </div>
+                  <div className="forecast-risk-list">
+                    {forecast.leaseExpirationRisk.slice(0, 5).map((r) => (
+                      <Link key={r.tenant.id} to={`/properties/${r.tenant.propertyId}`} className="forecast-risk-item">
+                        <strong>{r.tenant.name}</strong>
+                        <span>{formatMoney(r.monthlyRent)}/mo · {r.daysLeft}d left</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           <nav className="dash-quick-actions" aria-label="Quick actions">
             <Link to="/rent" className="dash-qa">
               <Banknote size={18} aria-hidden="true" />
@@ -455,10 +621,95 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
+                <PropertyInvestmentMetrics propertyId={s.property.id} properties={properties} units={units} tenants={tenants} expenses={expenses} payments={payments} year={now.getFullYear()} />
               </Link>
             ))}
           </div>
         </section>
+      )}
+    </div>
+  )
+}
+
+function MetricCard({
+  label,
+  value,
+  positive,
+  tooltip,
+  id,
+  tooltipId,
+  setTooltipId,
+}: {
+  label: string
+  value: string
+  positive?: boolean
+  tooltip: string
+  id: string
+  tooltipId: string | null
+  setTooltipId: (id: string | null) => void
+}) {
+  return (
+    <div className="metric-card">
+      <span className="metric-label">
+        {label}
+        <button
+          type="button"
+          className="metric-info-btn"
+          aria-label={`Info about ${label}`}
+          onClick={() => setTooltipId(tooltipId === id ? null : id)}
+        >
+          <Info size={12} />
+        </button>
+      </span>
+      <span className={`metric-value ${positive === true ? 'positive' : positive === false ? 'negative' : ''}`}>
+        {value}
+      </span>
+      {tooltipId === id && (
+        <span className="metric-tooltip">{tooltip}</span>
+      )}
+    </div>
+  )
+}
+
+function PropertyInvestmentMetrics({
+  propertyId,
+  properties,
+  units,
+  tenants,
+  expenses,
+  payments,
+  year,
+}: {
+  propertyId: string
+  properties: Property[]
+  units: Unit[]
+  tenants: Tenant[]
+  expenses: Expense[]
+  payments: Payment[]
+  year: number
+}) {
+  const m = useMemo(
+    () => getInvestmentMetrics(properties, units, tenants, expenses, payments, year, propertyId),
+    [properties, units, tenants, expenses, payments, year, propertyId],
+  )
+  if (m.annualIncome === 0 && m.annualExpenses === 0) return null
+  return (
+    <div className="dash-prop-invest">
+      <div className="dash-prop-metric">
+        <span className="dash-prop-metric-label">NOI</span>
+        <span className={`dash-prop-metric-value ${m.noi >= 0 ? 'positive' : 'negative'}`}>{formatMoney(m.noi)}</span>
+      </div>
+      {m.capRate != null && (
+        <div className="dash-prop-metric">
+          <span className="dash-prop-metric-label">Cap Rate</span>
+          <span className="dash-prop-metric-value">{m.capRate.toFixed(1)}%</span>
+        </div>
+      )}
+      {m.expenseRatio != null && (
+        <div className="dash-prop-metric">
+          <span className="dash-prop-metric-label">Exp. Ratio</span>
+          <span className={`dash-prop-metric-value ${m.expenseRatio <= 45 ? 'positive' : 'negative'}`}>{m.expenseRatio.toFixed(0)}%</span>
+        </div>
       )}
     </div>
   )

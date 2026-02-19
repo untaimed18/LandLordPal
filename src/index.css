@@ -1898,6 +1898,330 @@ input:focus, select:focus, textarea:focus {
   text-decoration: underline;
 }
 
+/* ─── Investment Metrics ───────────────────────── */
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  position: relative;
+}
+
+.metric-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.metric-info-btn {
+  all: unset;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.6;
+  display: inline-flex;
+}
+.metric-info-btn:hover { opacity: 1; color: var(--accent); }
+
+.metric-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.metric-value small {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.metric-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.metric-tooltip {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+/* YoY chips */
+.yoy-indicators {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.yoy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+}
+.yoy-chip.positive { background: rgba(16,185,129,.12); color: var(--positive); }
+.yoy-chip.negative { background: rgba(239,68,68,.12); color: var(--negative); }
+
+/* Forecast */
+.forecast-risk {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.forecast-risk-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--warning-text, #b45309);
+  margin-bottom: 0.5rem;
+}
+
+.forecast-risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.forecast-risk-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  color: inherit;
+  text-decoration: none;
+}
+.forecast-risk-item:hover { background: var(--bg-secondary); }
+.forecast-risk-item span { color: var(--text-muted); }
+
+/* Per-property investment row */
+.dash-prop-invest {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+/* ─── Reliability Badge ───────────────────────── */
+
+.reliability-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1.5px solid;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.reliability-grade {
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+
+.reliability-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.reliability-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+.reliability-badge-inline.grade-A { background: rgba(16,185,129,.12); color: var(--positive); }
+.reliability-badge-inline.grade-B { background: rgba(76,175,80,.12); color: #4CAF50; }
+.reliability-badge-inline.grade-C { background: rgba(255,193,7,.15); color: #b8860b; }
+.reliability-badge-inline.grade-D { background: rgba(255,152,0,.15); color: #e65100; }
+.reliability-badge-inline.grade-F { background: rgba(239,68,68,.12); color: var(--negative); }
+
+/* ─── Reliability Meter (TenantDetail) ─────────── */
+
+.reliability-section h2 { margin-bottom: 0.75rem; }
+
+.reliability-meter-row {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 1.25rem;
+}
+
+.reliability-meter-wrap { flex: 1; }
+
+.reliability-meter-track {
+  height: 10px;
+  background: var(--bg-secondary);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.reliability-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+.reliability-meter-fill.grade-A { background: var(--positive); }
+.reliability-meter-fill.grade-B { background: #4CAF50; }
+.reliability-meter-fill.grade-C { background: #FFC107; }
+.reliability-meter-fill.grade-D { background: #FF9800; }
+.reliability-meter-fill.grade-F { background: var(--negative); }
+
+.reliability-meter-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.reliability-score-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+}
+
+.reliability-big-grade {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.reliability-big-grade.grade-A { color: var(--positive); }
+.reliability-big-grade.grade-B { color: #4CAF50; }
+.reliability-big-grade.grade-C { color: #FFC107; }
+.reliability-big-grade.grade-D { color: #FF9800; }
+.reliability-big-grade.grade-F { color: var(--negative); }
+
+.reliability-big-score {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.reliability-big-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.reliability-breakdown {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.reliability-factor {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+}
+
+.reliability-factor-label { color: var(--text-muted); }
+.reliability-factor-value { font-weight: 600; }
+
+/* ─── YoY Delta Chip ──────────────────────────── */
+
+.delta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+}
+.delta-chip.positive { background: rgba(16,185,129,.12); color: var(--positive); }
+.delta-chip.negative { background: rgba(239,68,68,.12); color: var(--negative); }
+
+/* ─── Property Comparison Charts ──────────────── */
+
+.property-comparison {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.comparison-metric { }
+
+.comparison-metric-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.comparison-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.comparison-name {
+  min-width: 120px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.comparison-bar-track {
+  flex: 1;
+  height: 18px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.comparison-bar-fill {
+  height: 100%;
+  border-radius: var(--radius);
+  transition: width 0.4s ease;
+}
+.comparison-bar-fill.positive { background: var(--accent); }
+.comparison-bar-fill.negative { background: var(--negative); }
+
+.comparison-value {
+  min-width: 80px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: right;
+}
+
 /* No-print utility */
 .no-print { }
 

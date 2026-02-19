@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
-import { getLeaseStatus } from '../lib/calculations'
+import { getLeaseStatus, getTenantReliability } from '../lib/calculations'
 import { formatMoney, formatDate } from '../lib/format'
 import Breadcrumbs from '../components/Breadcrumbs'
 import DocumentAttachments from '../components/DocumentAttachments'
@@ -42,6 +42,11 @@ export default function TenantDetail() {
 
     return { total, count, lateCount, avgPayment: count > 0 ? total / count : 0, monthlyMap }
   }, [tenantPayments, tenant, settings.defaultGracePeriodDays])
+
+  const reliability = useMemo(
+    () => (tenant ? getTenantReliability(tenant, payments, settings.defaultGracePeriodDays) : null),
+    [tenant, payments, settings.defaultGracePeriodDays],
+  )
 
   if (!tenant) {
     return (
@@ -121,6 +126,50 @@ export default function TenantDetail() {
           <span className="stat-value">{formatMoney(paymentStats.avgPayment)}</span>
         </div>
       </div>
+
+      {reliability && (
+        <section className="card section-card reliability-section" style={{ marginBottom: '1.5rem' }}>
+          <h2><ShieldCheck size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Reliability Score</h2>
+          <div className="reliability-meter-row">
+            <div className="reliability-meter-wrap">
+              <div className="reliability-meter-track">
+                <div
+                  className={`reliability-meter-fill grade-${reliability.grade}`}
+                  style={{ width: `${reliability.score}%` }}
+                />
+              </div>
+              <div className="reliability-meter-labels">
+                <span>0</span>
+                <span>50</span>
+                <span>100</span>
+              </div>
+            </div>
+            <div className="reliability-score-display">
+              <span className={`reliability-big-grade grade-${reliability.grade}`}>{reliability.grade}</span>
+              <span className="reliability-big-score">{reliability.score}</span>
+              <span className="reliability-big-label">{reliability.label}</span>
+            </div>
+          </div>
+          <div className="reliability-breakdown">
+            <div className="reliability-factor">
+              <span className="reliability-factor-label">On-time payments</span>
+              <span className="reliability-factor-value">{reliability.onTimeRate}%</span>
+            </div>
+            <div className="reliability-factor">
+              <span className="reliability-factor-label">Consistency</span>
+              <span className="reliability-factor-value">{reliability.consistencyScore}/100</span>
+            </div>
+            <div className="reliability-factor">
+              <span className="reliability-factor-label">Tenure</span>
+              <span className="reliability-factor-value">{reliability.tenureMonths} month{reliability.tenureMonths !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="reliability-factor">
+              <span className="reliability-factor-label">Late fees incurred</span>
+              <span className="reliability-factor-value">{reliability.latePayments} of {reliability.totalPayments}</span>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="card section-card" style={{ marginBottom: '1.5rem' }}>
         <h2><CalendarDays size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Lease Details</h2>
