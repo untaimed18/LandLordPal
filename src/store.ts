@@ -112,6 +112,22 @@ let state: AppState = defaultState;
 const listeners: Set<Listener> = new Set();
 let _initialized = false;
 
+let _lastProcessedMonth = '';
+
+function currentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function runMonthlyProcessors(): void {
+  const month = currentMonthKey();
+  if (month === _lastProcessedMonth) return;
+  _lastProcessedMonth = month;
+  processAutopayments();
+  processRecurringExpenses();
+  notify();
+}
+
 export async function initStore(): Promise<void> {
   if (_initialized) return;
 
@@ -123,9 +139,10 @@ export async function initStore(): Promise<void> {
   logger.info('Store initialized from SQLite');
 
   _initialized = true;
-  processAutopayments();
-  processRecurringExpenses();
-  listeners.forEach((l) => l());
+  runMonthlyProcessors();
+
+  // Re-check every 30 minutes so the app picks up a new month without restarting
+  setInterval(runMonthlyProcessors, 30 * 60 * 1000);
 }
 
 function processAutopayments(): void {
