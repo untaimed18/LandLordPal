@@ -13,6 +13,7 @@ import Reports from './pages/Reports'
 import Vendors from './pages/Vendors'
 import Settings from './pages/Settings'
 import Calendar from './pages/Calendar'
+import TenantDetail from './pages/TenantDetail'
 import NotFound from './pages/NotFound'
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/properties" element={<Properties />} />
             <Route path="/properties/:id" element={<PropertyDetail />} />
+            <Route path="/tenants/:id" element={<TenantDetail />} />
             <Route path="/rent" element={<RentIncome />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/maintenance" element={<Maintenance />} />

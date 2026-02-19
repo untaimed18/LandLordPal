@@ -46,6 +46,42 @@
   box-sizing: border-box;
 }
 
+/* Loading spinner */
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border, #e8e6e1);
+  border-top-color: var(--accent, #0d5c4a);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Skeleton placeholder */
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius);
+}
+.skeleton-line {
+  height: 1rem;
+  margin-bottom: 0.75rem;
+  border-radius: 4px;
+}
+.skeleton-line.short { width: 40%; }
+.skeleton-line.medium { width: 65%; }
+.skeleton-card {
+  height: 100px;
+  border-radius: var(--radius);
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
 /* Accessibility: screen-reader-only class */
 .sr-only {
   position: absolute;
@@ -1778,6 +1814,84 @@ input:focus, select:focus, textarea:focus {
 .pagination button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Dashboard trend chart */
+.dash-trend-section { padding: 1.25rem; }
+.dash-trend-chart {
+  display: flex;
+  gap: 0;
+  align-items: flex-end;
+  height: 140px;
+}
+.dash-trend-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+.dash-trend-bars {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  width: 100%;
+  justify-content: center;
+  height: 120px;
+}
+.dash-trend-bar {
+  width: 14px;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.3s ease;
+}
+.dash-trend-bar.income { background: var(--positive); opacity: 0.8; }
+.dash-trend-bar.expense { background: var(--negative); opacity: 0.8; }
+.dash-trend-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.dash-trend-legend {
+  display: flex;
+  gap: 1.25rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+.dash-trend-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.dash-trend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.dash-trend-dot.income { background: var(--positive); }
+.dash-trend-dot.expense { background: var(--negative); }
+
+/* Sparkline in hero cards */
+.dash-hero-card .sparkline {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  opacity: 0.6;
+}
+.dash-hero-card {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Tenant link styling */
+.tenant-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+.tenant-link:hover {
+  text-decoration: underline;
 }
 
 /* No-print utility */

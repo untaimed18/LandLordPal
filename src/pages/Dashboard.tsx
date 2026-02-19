@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { loadSettings } from '../lib/settings'
@@ -8,6 +9,7 @@ import {
   getLeasesEndingSoon,
 } from '../lib/calculations'
 import { formatMoney, formatPct } from '../lib/format'
+import Sparkline from '../components/Sparkline'
 import {
   Building2,
   Banknote,
@@ -82,6 +84,21 @@ export default function Dashboard() {
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+  const monthlyTrend = useMemo(() => {
+    const months: { label: string; income: number; expenses: number }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const income = payments.filter((p) => p.date.startsWith(prefix)).reduce((s, p) => s + p.amount, 0)
+      const exp = expenses.filter((e) => e.date.startsWith(prefix)).reduce((s, e) => s + e.amount, 0)
+      months.push({ label: monthNames[d.getMonth()], income, expenses: exp })
+    }
+    return months
+  }, [payments, expenses, now])
+
+  const incomeData = monthlyTrend.map((m) => m.income)
+  const expenseData = monthlyTrend.map((m) => m.expenses)
+
   return (
     <div className="dashboard">
       <div className="page-header">
@@ -154,6 +171,7 @@ export default function Dashboard() {
                   )}
                 </span>
               </div>
+              <Sparkline data={incomeData} color="var(--positive)" />
             </div>
             <div className="dash-hero-card">
               <div className="dash-hero-icon-wrap expense">
@@ -164,6 +182,7 @@ export default function Dashboard() {
                 <span className="dash-hero-value negative">{formatMoney(stats.expensesThisMonth)}</span>
                 <span className="dash-hero-sub">This month</span>
               </div>
+              <Sparkline data={expenseData} color="var(--negative)" />
             </div>
           </div>
 
@@ -220,6 +239,30 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+
+          {monthlyTrend.some((m) => m.income > 0 || m.expenses > 0) && (
+            <section className="card section-card dash-trend-section" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ marginBottom: '1rem' }}>6-Month Trend</h2>
+              <div className="dash-trend-chart">
+                {(() => {
+                  const maxVal = Math.max(...monthlyTrend.map((m) => Math.max(m.income, m.expenses)), 1)
+                  return monthlyTrend.map((m, i) => (
+                    <div key={i} className="dash-trend-col">
+                      <div className="dash-trend-bars">
+                        <div className="dash-trend-bar income" style={{ height: `${(m.income / maxVal) * 100}%` }} title={`Income: ${formatMoney(m.income)}`} />
+                        <div className="dash-trend-bar expense" style={{ height: `${(m.expenses / maxVal) * 100}%` }} title={`Expenses: ${formatMoney(m.expenses)}`} />
+                      </div>
+                      <span className="dash-trend-label">{m.label}</span>
+                    </div>
+                  ))
+                })()}
+              </div>
+              <div className="dash-trend-legend">
+                <span className="dash-trend-legend-item"><span className="dash-trend-dot income" />Income</span>
+                <span className="dash-trend-legend-item"><span className="dash-trend-dot expense" />Expenses</span>
+              </div>
+            </section>
+          )}
 
           <nav className="dash-quick-actions" aria-label="Quick actions">
             <Link to="/rent" className="dash-qa">

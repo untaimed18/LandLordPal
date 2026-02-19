@@ -22,8 +22,9 @@ if (!window.electronAPI) {
   )
 } else {
   root.render(
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted, #888)' }}>
-      Loading...
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '1rem', color: 'var(--text-muted, #888)' }}>
+      <div className="loading-spinner" />
+      <p style={{ fontSize: '0.95rem', fontWeight: 500 }}>Loading your data…</p>
     </div>,
   )
 

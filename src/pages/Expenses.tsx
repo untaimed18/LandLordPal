@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { addExpense, updateExpense, deleteExpense, takeSnapshot, restoreSnapshot } from '../store'
@@ -12,6 +12,8 @@ import { usePagination } from '../hooks/usePagination'
 import Pagination from '../components/Pagination'
 import { Receipt } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
+import { useFormValidation } from '../hooks/useFormValidation'
+import { expenseSchema } from '../lib/schemas'
 
 function formatAmountDisplay(value: number): string {
   if (!value) return ''
@@ -98,49 +100,6 @@ export default function Expenses() {
   })
   const pagination = usePagination(sortedExpenses)
 
-  // Auto-generate recurring expenses for all missed months up to the current month.
-  // Runs when expenses change so new recurring expenses get backfilled too.
-  useEffect(() => {
-    const recurring = expenses.filter((e) => e.recurring)
-    if (recurring.length === 0) return
-    const currentMonth = `${currentYear}-${String(currentMonthIdx + 1).padStart(2, '0')}`
-    let generatedCount = 0
-    const existingKeys = new Set(
-      expenses.map((e) => `${e.propertyId}|${e.category}|${e.description}|${e.date.slice(0, 7)}`)
-    )
-    for (const re of recurring) {
-      const reYear = Number(re.date.slice(0, 4))
-      const reMonthIdx = Number(re.date.slice(5, 7)) - 1
-      let y = reYear
-      let m = reMonthIdx + 1
-      if (m > 11) { m = 0; y++ }
-      while (y < currentYear || (y === currentYear && m <= currentMonthIdx)) {
-        const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`
-        if (monthKey > currentMonth) break
-        const sigKey = `${re.propertyId}|${re.category}|${re.description}|${monthKey}`
-        if (!existingKeys.has(sigKey)) {
-          addExpense({
-            propertyId: re.propertyId,
-            unitId: re.unitId,
-            category: re.category,
-            amount: re.amount,
-            date: `${monthKey}-01`,
-            description: re.description,
-            recurring: true,
-            vendorId: re.vendorId,
-          })
-          existingKeys.add(sigKey)
-          generatedCount++
-        }
-        m++
-        if (m > 11) { m = 0; y++ }
-      }
-    }
-    if (generatedCount > 0) {
-      toast(`Auto-generated ${generatedCount} recurring expense${generatedCount > 1 ? 's' : ''} for missed months`, 'info')
-    }
-  }, [expenses, toast, currentYear, currentMonthIdx])
-
   const propUnitsForForm = form.propertyId ? units.filter((u) => u.propertyId === form.propertyId) : []
 
   function openEdit(ex: (typeof expenses)[0]) {
@@ -157,6 +116,8 @@ export default function Expenses() {
     setShowForm(true)
   }
 
+  const { errors: formErrors, validate: validateExpense, clearError } = useFormValidation(expenseSchema)
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.propertyId) return
@@ -169,6 +130,7 @@ export default function Expenses() {
       description: form.description || form.category,
       recurring: form.recurring,
     }
+    if (!validateExpense(data)) return
     if (editingId) {
       updateExpense(editingId, data)
       setEditingId(null)
@@ -288,17 +250,18 @@ export default function Expenses() {
                 ))}
               </select>
             </label>
-            <label>Amount * <input type="text" inputMode="decimal" required value={form.amount ? formatAmountDisplay(form.amount) : ''} onChange={(e) => setForm((f) => ({ ...f, amount: parseAmountInput(e.target.value) }))} placeholder="1,200.00" /></label>
-            <label>Date * <input type="date" required value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} /></label>
+            <label className={formErrors.amount ? 'form-field-error' : ''}>Amount * <input type="text" inputMode="decimal" required value={form.amount ? formatAmountDisplay(form.amount) : ''} onChange={(e) => { setForm((f) => ({ ...f, amount: parseAmountInput(e.target.value) })); clearError('amount') }} placeholder="1,200.00" />{formErrors.amount && <span className="field-error" role="alert">{formErrors.amount}</span>}</label>
+            <label className={formErrors.date ? 'form-field-error' : ''}>Date * <input type="date" required value={form.date} onChange={(e) => { setForm((f) => ({ ...f, date: e.target.value })); clearError('date') }} />{formErrors.date && <span className="field-error" role="alert">{formErrors.date}</span>}</label>
           </div>
-          <label>
+          <label className={formErrors.description ? 'form-field-error' : ''}>
             Description *
             <input
               required
               value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              onChange={(e) => { setForm((f) => ({ ...f, description: e.target.value })); clearError('description') }}
               placeholder="e.g. Plumbing repair"
             />
+            {formErrors.description && <span className="field-error" role="alert">{formErrors.description}</span>}
           </label>
           <label className="checkbox-label" style={{ marginTop: '0.75rem' }}>
             <input type="checkbox" checked={form.recurring} onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked }))} />
@@ -334,9 +297,11 @@ export default function Expenses() {
 
       <div className="table-wrap">
         {expenses.length === 0 && properties.length > 0 ? (
-          <div className="empty-state-card card" style={{ maxWidth: 400, margin: '1rem auto' }}>
-            <p className="empty-state-title">No expenses yet</p>
-            <p className="empty-state-text">Click "+ Add expense" above to start tracking costs.</p>
+          <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
+            <div className="empty-icon"><Receipt size={32} /></div>
+            <p className="empty-state-title">No expenses recorded</p>
+            <p className="empty-state-text">Start tracking mortgage payments, repairs, insurance, and other property costs. Click "+ Add expense" above to get started.</p>
+            <button type="button" className="btn primary" onClick={() => { setEditingId(null); setForm({ ...form, category: 'other', amount: 0, date: nowISO(), description: '', recurring: false }); setShowForm(true) }}>+ Add your first expense</button>
           </div>
         ) : expenses.length === 0 ? null : (
           <table className="data-table">

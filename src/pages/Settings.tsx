@@ -6,7 +6,8 @@ import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
 import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../lib/settings'
 import { backupSchema } from '../lib/schemas'
-import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip } from 'lucide-react'
+import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download } from 'lucide-react'
+import { toCSV, downloadCSV } from '../lib/csv'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
 
@@ -248,6 +249,55 @@ export default function Settings() {
           <div className="data-summary-item"><Paperclip size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{documents.length}</span><span className="data-summary-label">Documents</span></div>
         </div>
         <p className="muted" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>{totalRecords} total records</p>
+      </section>
+
+      <section className="card section-card">
+        <h2><Download size={18} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Export individual tables (CSV)</h2>
+        <p className="section-desc">Download any table as a CSV file for spreadsheets or tax preparation.</p>
+        <div className="settings-actions" style={{ flexWrap: 'wrap' }}>
+          {properties.length > 0 && <button type="button" className="btn small" onClick={() => {
+            downloadCSV(`properties-${nowISO()}.csv`, toCSV(
+              ['Name', 'Address', 'City', 'State', 'ZIP', 'Type', 'SqFt', 'Purchase Price', 'Purchase Date'],
+              properties.map((p) => [p.name, p.address, p.city, p.state, p.zip, p.propertyType ?? '', p.sqft ?? '', p.purchasePrice ?? '', p.purchaseDate ?? ''])
+            )); toast('Properties exported', 'info')
+          }}>Properties ({properties.length})</button>}
+          {units.length > 0 && <button type="button" className="btn small" onClick={() => {
+            downloadCSV(`units-${nowISO()}.csv`, toCSV(
+              ['Property', 'Name', 'Beds', 'Baths', 'SqFt', 'Rent', 'Deposit', 'Available'],
+              units.map((u) => [properties.find((p) => p.id === u.propertyId)?.name ?? '', u.name, u.bedrooms, u.bathrooms, u.sqft ?? '', u.monthlyRent, u.deposit ?? '', u.available ? 'Yes' : 'No'])
+            )); toast('Units exported', 'info')
+          }}>Units ({units.length})</button>}
+          {tenants.length > 0 && <button type="button" className="btn small" onClick={() => {
+            downloadCSV(`tenants-${nowISO()}.csv`, toCSV(
+              ['Name', 'Email', 'Phone', 'Property', 'Unit', 'Lease Start', 'Lease End', 'Rent', 'Deposit', 'Autopay'],
+              tenants.map((t) => [t.name, t.email ?? '', t.phone ?? '', properties.find((p) => p.id === t.propertyId)?.name ?? '', units.find((u) => u.id === t.unitId)?.name ?? '', t.leaseStart, t.leaseEnd, t.monthlyRent, t.deposit ?? '', t.autopay ? 'Yes' : 'No'])
+            )); toast('Tenants exported', 'info')
+          }}>Tenants ({tenants.length})</button>}
+          {payments.length > 0 && <button type="button" className="btn small" onClick={() => {
+            downloadCSV(`payments-${nowISO()}.csv`, toCSV(
+              ['Date', 'Tenant', 'Property', 'Amount', 'Method', 'Period Start', 'Period End', 'Notes'],
+              payments.map((p) => [p.date, tenants.find((t) => t.id === p.tenantId)?.name ?? '', properties.find((pr) => pr.id === p.propertyId)?.name ?? '', p.amount, p.method ?? '', p.periodStart, p.periodEnd, p.notes ?? ''])
+            )); toast('Payments exported', 'info')
+          }}>Payments ({payments.length})</button>}
+          {expenses.length > 0 && <button type="button" className="btn small" onClick={() => {
+            downloadCSV(`expenses-${nowISO()}.csv`, toCSV(
+              ['Date', 'Property', 'Category', 'Description', 'Amount', 'Recurring'],
+              expenses.map((e) => [e.date, properties.find((p) => p.id === e.propertyId)?.name ?? '', e.category, e.description, e.amount, e.recurring ? 'Yes' : 'No'])
+            )); toast('Expenses exported', 'info')
+          }}>Expenses ({expenses.length})</button>}
+          {maintenanceRequests.length > 0 && <button type="button" className="btn small" onClick={() => {
+            downloadCSV(`maintenance-${nowISO()}.csv`, toCSV(
+              ['Title', 'Property', 'Priority', 'Status', 'Category', 'Cost', 'Scheduled', 'Created'],
+              maintenanceRequests.map((m) => [m.title, properties.find((p) => p.id === m.propertyId)?.name ?? '', m.priority, m.status, m.category, m.cost ?? '', m.scheduledDate ?? '', m.createdAt.slice(0, 10)])
+            )); toast('Maintenance exported', 'info')
+          }}>Maintenance ({maintenanceRequests.length})</button>}
+          {vendors.length > 0 && <button type="button" className="btn small" onClick={() => {
+            downloadCSV(`vendors-${nowISO()}.csv`, toCSV(
+              ['Name', 'Phone', 'Email', 'Specialty', 'Notes'],
+              vendors.map((v) => [v.name, v.phone ?? '', v.email ?? '', v.specialty ?? '', v.notes ?? ''])
+            )); toast('Vendors exported', 'info')
+          }}>Vendors ({vendors.length})</button>}
+        </div>
       </section>
 
       <section className="card section-card">

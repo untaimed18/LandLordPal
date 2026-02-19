@@ -6,7 +6,7 @@ import { useConfirm } from '../context/ConfirmContext'
 import { formatPhoneNumber, formatMoney } from '../lib/format'
 import { vendorSchema, extractErrors } from '../lib/schemas'
 import type { ValidationErrors } from '../lib/schemas'
-import { Phone, Mail } from 'lucide-react'
+import { Phone, Mail, Users } from 'lucide-react'
 
 const SPECIALTIES = [
   'Plumbing',
@@ -115,8 +115,10 @@ export default function Vendors() {
 
       {vendors.length === 0 ? (
         <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
-          <p className="empty-state-title">No vendors yet</p>
-          <p className="empty-state-text">Add plumbers, electricians, and other contractors you work with regularly.</p>
+          <div className="empty-icon"><Users size={32} /></div>
+          <p className="empty-state-title">No vendors or contractors yet</p>
+          <p className="empty-state-text">Keep a directory of plumbers, electricians, handymen, and other contractors you work with. Link them to maintenance requests and expenses for easy tracking.</p>
+          <button type="button" className="btn primary" onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(true) }}>+ Add your first vendor</button>
         </div>
       ) : (
         <div className="vendor-grid">

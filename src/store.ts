@@ -124,6 +124,7 @@ export async function initStore(): Promise<void> {
 
   _initialized = true;
   processAutopayments();
+  processRecurringExpenses();
   listeners.forEach((l) => l());
 }
 
@@ -173,6 +174,60 @@ function processAutopayments(): void {
   logger.info(`Autopay: recorded ${newPayments.length} payment(s) for ${monthPrefix}`);
 }
 
+function processRecurringExpenses(): void {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonthIdx = now.getMonth();
+  const currentMonth = `${currentYear}-${String(currentMonthIdx + 1).padStart(2, '0')}`;
+  const recurring = state.expenses.filter((e) => e.recurring);
+  if (recurring.length === 0) return;
+
+  const existingKeys = new Set(
+    state.expenses.map((e) => `${e.propertyId}|${e.category}|${e.description}|${e.date.slice(0, 7)}`)
+  );
+
+  const newExpenses: Expense[] = [];
+  const ops: DbOperation[] = [];
+
+  for (const re of recurring) {
+    const reYear = Number(re.date.slice(0, 4));
+    const reMonthIdx = Number(re.date.slice(5, 7)) - 1;
+    let y = reYear;
+    let m = reMonthIdx + 1;
+    if (m > 11) { m = 0; y++; }
+
+    while (y < currentYear || (y === currentYear && m <= currentMonthIdx)) {
+      const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+      if (monthKey > currentMonth) break;
+      const sigKey = `${re.propertyId}|${re.category}|${re.description}|${monthKey}`;
+      if (!existingKeys.has(sigKey)) {
+        const expense: Expense = {
+          id: generateId(),
+          propertyId: re.propertyId,
+          unitId: re.unitId,
+          category: re.category,
+          amount: re.amount,
+          date: `${monthKey}-01`,
+          description: re.description,
+          recurring: true,
+          vendorId: re.vendorId,
+          ...ts(),
+        };
+        newExpenses.push(expense);
+        ops.push({ type: 'upsert', table: 'expenses', data: expense });
+        existingKeys.add(sigKey);
+      }
+      m++;
+      if (m > 11) { m = 0; y++; }
+    }
+  }
+
+  if (newExpenses.length === 0) return;
+  state = { ...state, expenses: [...state.expenses, ...newExpenses] };
+  persistBatch(ops);
+  logger.info(`Recurring expenses: generated ${newExpenses.length} expense(s) for missed months`);
+}
+
 export function isStoreReady(): boolean {
   return _initialized;
 }
@@ -214,25 +269,74 @@ export function importState(data: Record<string, unknown>): void {
 
 const ts = () => ({ createdAt: nowISO(), updatedAt: nowISO() });
 
+// ─── Generic CRUD factory ─────────────────────────────────────────────────────
+
+type HasId = { id: string };
+type HasTimestamps = { createdAt: string; updatedAt: string };
+
+function createCrud<T extends HasId & HasTimestamps>(
+  key: keyof AppState,
+  table: string,
+) {
+  function getList(): T[] { return state[key] as unknown as T[]; }
+
+  function add(input: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): T {
+    const item = { ...input, id: generateId(), ...ts() } as T;
+    state = { ...state, [key]: [...getList(), item] };
+    persistBatch([{ type: 'upsert', table, data: item }]);
+    notify();
+    return item;
+  }
+
+  function update(id: string, input: Partial<Omit<T, 'id'>>): void {
+    const list = getList().map((item) =>
+      item.id === id ? { ...item, ...input, updatedAt: nowISO() } : item
+    );
+    const updated = list.find((item) => item.id === id);
+    state = { ...state, [key]: list };
+    if (updated) persistBatch([{ type: 'upsert', table, data: updated }]);
+    notify();
+  }
+
+  function remove(id: string): void {
+    state = { ...state, [key]: getList().filter((item) => item.id !== id) };
+    persistBatch([{ type: 'delete', table, ids: [id] }]);
+    notify();
+  }
+
+  return { add, update, remove };
+}
+
+type HasCreatedAt = { id: string; createdAt: string };
+
+function createLogCrud<T extends HasCreatedAt>(
+  key: keyof AppState,
+  table: string,
+) {
+  function getList(): T[] { return state[key] as unknown as T[]; }
+
+  function add(input: Omit<T, 'id' | 'createdAt'>): T {
+    const item = { ...input, id: generateId(), createdAt: nowISO() } as T;
+    state = { ...state, [key]: [...getList(), item] };
+    persistBatch([{ type: 'upsert', table, data: item }]);
+    notify();
+    return item;
+  }
+
+  function remove(id: string): void {
+    state = { ...state, [key]: getList().filter((item) => item.id !== id) };
+    persistBatch([{ type: 'delete', table, ids: [id] }]);
+    notify();
+  }
+
+  return { add, remove };
+}
+
 // ─── Properties ──────────────────────────────────────────────────────────────
 
-export function addProperty(input: Omit<Property, 'id' | 'createdAt' | 'updatedAt'>): Property {
-  const property: Property = { ...input, id: generateId(), ...ts() };
-  state = { ...state, properties: [...state.properties, property] };
-  persistBatch([{ type: 'upsert', table: 'properties', data: property }]);
-  notify();
-  return property;
-}
-
-export function updateProperty(id: string, input: Partial<Omit<Property, 'id'>>): void {
-  const properties = state.properties.map((p) =>
-    p.id === id ? { ...p, ...input, updatedAt: nowISO() } : p
-  );
-  const updated = properties.find((p) => p.id === id);
-  state = { ...state, properties };
-  if (updated) persistBatch([{ type: 'upsert', table: 'properties', data: updated }]);
-  notify();
-}
+const propertyCrud = createCrud<Property>('properties', 'properties');
+export const addProperty = propertyCrud.add;
+export const updateProperty = propertyCrud.update;
 
 export function deleteProperty(id: string): void {
   const properties = state.properties.filter((p) => p.id !== id);
@@ -294,23 +398,9 @@ export function deleteProperty(id: string): void {
 
 // ─── Units ───────────────────────────────────────────────────────────────────
 
-export function addUnit(input: Omit<Unit, 'id' | 'createdAt' | 'updatedAt'>): Unit {
-  const unit: Unit = { ...input, id: generateId(), ...ts() };
-  state = { ...state, units: [...state.units, unit] };
-  persistBatch([{ type: 'upsert', table: 'units', data: unit }]);
-  notify();
-  return unit;
-}
-
-export function updateUnit(id: string, input: Partial<Omit<Unit, 'id'>>): void {
-  const units = state.units.map((u) =>
-    u.id === id ? { ...u, ...input, updatedAt: nowISO() } : u
-  );
-  const updated = units.find((u) => u.id === id);
-  state = { ...state, units };
-  if (updated) persistBatch([{ type: 'upsert', table: 'units', data: updated }]);
-  notify();
-}
+const unitCrud = createCrud<Unit>('units', 'units');
+export const addUnit = unitCrud.add;
+export const updateUnit = unitCrud.update;
 
 export function deleteUnit(id: string): void {
   const units = state.units.filter((u) => u.id !== id);
@@ -365,13 +455,8 @@ export function deleteUnit(id: string): void {
 
 // ─── Tenants ─────────────────────────────────────────────────────────────────
 
-export function addTenant(input: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'>): Tenant {
-  const tenant: Tenant = { ...input, id: generateId(), ...ts() };
-  state = { ...state, tenants: [...state.tenants, tenant] };
-  persistBatch([{ type: 'upsert', table: 'tenants', data: tenant }]);
-  notify();
-  return tenant;
-}
+const tenantCrud = createCrud<Tenant>('tenants', 'tenants');
+export const addTenant = tenantCrud.add;
 
 export function updateTenant(id: string, input: Partial<Omit<Tenant, 'id'>>): void {
   const tenants = state.tenants.map((t) => {
@@ -435,23 +520,9 @@ export function deleteTenant(id: string): void {
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
 
-export function addExpense(input: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Expense {
-  const expense: Expense = { ...input, id: generateId(), ...ts() };
-  state = { ...state, expenses: [...state.expenses, expense] };
-  persistBatch([{ type: 'upsert', table: 'expenses', data: expense }]);
-  notify();
-  return expense;
-}
-
-export function updateExpense(id: string, input: Partial<Omit<Expense, 'id'>>): void {
-  const expenses = state.expenses.map((e) =>
-    e.id === id ? { ...e, ...input, updatedAt: nowISO() } : e
-  );
-  const updated = expenses.find((e) => e.id === id);
-  state = { ...state, expenses };
-  if (updated) persistBatch([{ type: 'upsert', table: 'expenses', data: updated }]);
-  notify();
-}
+const expenseCrud = createCrud<Expense>('expenses', 'expenses');
+export const addExpense = expenseCrud.add;
+export const updateExpense = expenseCrud.update;
 
 export function deleteExpense(id: string): void {
   const expenseDocs = state.documents.filter((d) => d.entityType === 'expense' && d.entityId === id);
@@ -474,91 +545,29 @@ export function deleteExpense(id: string): void {
 
 // ─── Payments ────────────────────────────────────────────────────────────────
 
-export function addPayment(input: Omit<Payment, 'id' | 'createdAt' | 'updatedAt'>): Payment {
-  const payment: Payment = { ...input, id: generateId(), ...ts() };
-  state = { ...state, payments: [...state.payments, payment] };
-  persistBatch([{ type: 'upsert', table: 'payments', data: payment }]);
-  notify();
-  return payment;
-}
-
-export function updatePayment(id: string, input: Partial<Omit<Payment, 'id'>>): void {
-  const payments = state.payments.map((p) =>
-    p.id === id ? { ...p, ...input, updatedAt: nowISO() } : p
-  );
-  const updated = payments.find((p) => p.id === id);
-  state = { ...state, payments };
-  if (updated) persistBatch([{ type: 'upsert', table: 'payments', data: updated }]);
-  notify();
-}
-
-export function deletePayment(id: string): void {
-  state = { ...state, payments: state.payments.filter((p) => p.id !== id) };
-  persistBatch([{ type: 'delete', table: 'payments', ids: [id] }]);
-  notify();
-}
+const paymentCrud = createCrud<Payment>('payments', 'payments');
+export const addPayment = paymentCrud.add;
+export const updatePayment = paymentCrud.update;
+export const deletePayment = paymentCrud.remove;
 
 // ─── Maintenance Requests ────────────────────────────────────────────────────
 
-export function addMaintenanceRequest(input: Omit<MaintenanceRequest, 'id' | 'createdAt' | 'updatedAt'>): MaintenanceRequest {
-  const req: MaintenanceRequest = { ...input, id: generateId(), ...ts() };
-  state = { ...state, maintenanceRequests: [...state.maintenanceRequests, req] };
-  persistBatch([{ type: 'upsert', table: 'maintenanceRequests', data: req }]);
-  notify();
-  return req;
-}
-
-export function updateMaintenanceRequest(id: string, input: Partial<Omit<MaintenanceRequest, 'id'>>): void {
-  const maintenanceRequests = state.maintenanceRequests.map((m) =>
-    m.id === id ? { ...m, ...input, updatedAt: nowISO() } : m
-  );
-  const updated = maintenanceRequests.find((m) => m.id === id);
-  state = { ...state, maintenanceRequests };
-  if (updated) persistBatch([{ type: 'upsert', table: 'maintenanceRequests', data: updated }]);
-  notify();
-}
-
-export function deleteMaintenanceRequest(id: string): void {
-  state = { ...state, maintenanceRequests: state.maintenanceRequests.filter((m) => m.id !== id) };
-  persistBatch([{ type: 'delete', table: 'maintenanceRequests', ids: [id] }]);
-  notify();
-}
+const maintenanceCrud = createCrud<MaintenanceRequest>('maintenanceRequests', 'maintenanceRequests');
+export const addMaintenanceRequest = maintenanceCrud.add;
+export const updateMaintenanceRequest = maintenanceCrud.update;
+export const deleteMaintenanceRequest = maintenanceCrud.remove;
 
 // ─── Activity Logs ───────────────────────────────────────────────────────────
 
-export function addActivityLog(input: Omit<ActivityLog, 'id' | 'createdAt'>): ActivityLog {
-  const log: ActivityLog = { ...input, id: generateId(), createdAt: nowISO() };
-  state = { ...state, activityLogs: [...state.activityLogs, log] };
-  persistBatch([{ type: 'upsert', table: 'activityLogs', data: log }]);
-  notify();
-  return log;
-}
-
-export function deleteActivityLog(id: string): void {
-  state = { ...state, activityLogs: state.activityLogs.filter((a) => a.id !== id) };
-  persistBatch([{ type: 'delete', table: 'activityLogs', ids: [id] }]);
-  notify();
-}
+const activityCrud = createLogCrud<ActivityLog>('activityLogs', 'activityLogs');
+export const addActivityLog = activityCrud.add;
+export const deleteActivityLog = activityCrud.remove;
 
 // ─── Vendors ─────────────────────────────────────────────────────────────────
 
-export function addVendor(input: Omit<Vendor, 'id' | 'createdAt' | 'updatedAt'>): Vendor {
-  const vendor: Vendor = { ...input, id: generateId(), ...ts() };
-  state = { ...state, vendors: [...state.vendors, vendor] };
-  persistBatch([{ type: 'upsert', table: 'vendors', data: vendor }]);
-  notify();
-  return vendor;
-}
-
-export function updateVendor(id: string, input: Partial<Omit<Vendor, 'id'>>): void {
-  const vendors = state.vendors.map((v) =>
-    v.id === id ? { ...v, ...input, updatedAt: nowISO() } : v
-  );
-  const updated = vendors.find((v) => v.id === id);
-  state = { ...state, vendors };
-  if (updated) persistBatch([{ type: 'upsert', table: 'vendors', data: updated }]);
-  notify();
-}
+const vendorCrud = createCrud<Vendor>('vendors', 'vendors');
+export const addVendor = vendorCrud.add;
+export const updateVendor = vendorCrud.update;
 
 export function deleteVendor(id: string): void {
   const vendors = state.vendors.filter((v) => v.id !== id);
@@ -591,19 +600,9 @@ export function deleteVendor(id: string): void {
 
 // ─── Communication Logs ──────────────────────────────────────────────────────
 
-export function addCommunicationLog(input: Omit<CommunicationLog, 'id' | 'createdAt'>): CommunicationLog {
-  const log: CommunicationLog = { ...input, id: generateId(), createdAt: nowISO() };
-  state = { ...state, communicationLogs: [...state.communicationLogs, log] };
-  persistBatch([{ type: 'upsert', table: 'communicationLogs', data: log }]);
-  notify();
-  return log;
-}
-
-export function deleteCommunicationLog(id: string): void {
-  state = { ...state, communicationLogs: state.communicationLogs.filter((c) => c.id !== id) };
-  persistBatch([{ type: 'delete', table: 'communicationLogs', ids: [id] }]);
-  notify();
-}
+const commCrud = createLogCrud<CommunicationLog>('communicationLogs', 'communicationLogs');
+export const addCommunicationLog = commCrud.add;
+export const deleteCommunicationLog = commCrud.remove;
 
 // ─── Documents ────────────────────────────────────────────────────────────────
 

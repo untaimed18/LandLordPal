@@ -10,6 +10,8 @@ import type { MaintenancePriority, MaintenanceStatus, MaintenanceCategory, Maint
 import { usePagination } from '../hooks/usePagination'
 import Pagination from '../components/Pagination'
 import { Wrench } from 'lucide-react'
+import { useFormValidation } from '../hooks/useFormValidation'
+import { maintenanceSchema } from '../lib/schemas'
 
 const PRIORITIES: { value: MaintenancePriority; label: string }[] = [
   { value: 'low', label: 'Low' },
@@ -104,40 +106,32 @@ export default function Maintenance() {
     setShowForm(true)
   }
 
+  const { errors: formErrors, validate: validateMaintenance, clearError } = useFormValidation(maintenanceSchema)
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.propertyId) return
+    const payload = {
+      propertyId: form.propertyId,
+      unitId: form.unitId || undefined,
+      tenantId: form.tenantId || undefined,
+      title: form.title,
+      description: form.description,
+      priority: form.priority,
+      status: editingId ? (maintenanceRequests.find((r) => r.id === editingId)?.status ?? 'open') : 'open',
+      category: form.category,
+      cost: form.cost || undefined,
+      scheduledDate: form.scheduledDate || undefined,
+      recurrence: form.recurrence !== 'none' ? form.recurrence : undefined,
+      notes: form.notes || undefined,
+    }
+    if (!validateMaintenance(payload)) return
     if (editingId) {
-      updateMaintenanceRequest(editingId, {
-        propertyId: form.propertyId,
-        unitId: form.unitId || undefined,
-        tenantId: form.tenantId || undefined,
-        title: form.title,
-        description: form.description,
-        priority: form.priority,
-        category: form.category,
-        cost: form.cost || undefined,
-        scheduledDate: form.scheduledDate || undefined,
-        recurrence: form.recurrence !== 'none' ? form.recurrence : undefined,
-        notes: form.notes || undefined,
-      })
+      updateMaintenanceRequest(editingId, payload)
       setEditingId(null)
       toast('Request updated')
     } else {
-      addMaintenanceRequest({
-        propertyId: form.propertyId,
-        unitId: form.unitId || undefined,
-        tenantId: form.tenantId || undefined,
-        title: form.title,
-        description: form.description,
-        priority: form.priority,
-        status: 'open',
-        category: form.category,
-        cost: form.cost || undefined,
-        scheduledDate: form.scheduledDate || undefined,
-        recurrence: form.recurrence !== 'none' ? form.recurrence : undefined,
-        notes: form.notes || undefined,
-      })
+      addMaintenanceRequest(payload)
       toast('Request created')
     }
     setForm(emptyForm)
@@ -216,8 +210,8 @@ export default function Maintenance() {
               {RECURRENCES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select></label>
           </div>
-          <label>Title * <input required value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="e.g. Leaky faucet in kitchen" /></label>
-          <label style={{ marginTop: '0.75rem' }}>Description <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={3} placeholder="Details about the issue..." /></label>
+          <label className={formErrors.title ? 'form-field-error' : ''}>Title * <input required value={form.title} onChange={(e) => { setForm((f) => ({ ...f, title: e.target.value })); clearError('title') }} placeholder="e.g. Leaky faucet in kitchen" />{formErrors.title && <span className="field-error" role="alert">{formErrors.title}</span>}</label>
+          <label className={formErrors.description ? 'form-field-error' : ''} style={{ marginTop: '0.75rem' }}>Description * <textarea value={form.description} onChange={(e) => { setForm((f) => ({ ...f, description: e.target.value })); clearError('description') }} rows={3} placeholder="Details about the issue..." />{formErrors.description && <span className="field-error" role="alert">{formErrors.description}</span>}</label>
           <label style={{ marginTop: '0.75rem' }}>Notes <input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Internal notes" /></label>
           <div className="form-actions">
             <button type="submit" className="btn primary">{editingId ? 'Save changes' : 'Create request'}</button>
@@ -247,8 +241,22 @@ export default function Maintenance() {
         </div>
       )}
 
-      {filtered.length === 0 && maintenanceRequests.length > 0 && (
-        <p className="empty-state">No requests match the current filters.</p>
+      {maintenanceRequests.length > 0 && filtered.length === 0 && (
+        <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
+          <div className="empty-icon"><Wrench size={32} /></div>
+          <p className="empty-state-title">No matching requests</p>
+          <p className="empty-state-text">Try adjusting your status or property filters to see more results.</p>
+          <button type="button" className="btn" onClick={() => { setFilterStatus(''); setFilterProperty('') }}>Clear all filters</button>
+        </div>
+      )}
+
+      {maintenanceRequests.length === 0 && properties.length > 0 && !showForm && (
+        <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
+          <div className="empty-icon"><Wrench size={32} /></div>
+          <p className="empty-state-title">No maintenance requests</p>
+          <p className="empty-state-text">When a repair or maintenance issue comes up, create a request here to track it through completion.</p>
+          <button type="button" className="btn primary" onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(true) }}>+ Create your first request</button>
+        </div>
       )}
 
       {filtered.length > 0 && (
