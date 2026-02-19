@@ -71,22 +71,7 @@ export default function PropertyEditForm({ property, onClose }: Props) {
       notes: form.notes || undefined,
     }
     if (!validate(payload)) return
-    updateProperty(property.id, {
-      name: form.name,
-      address: form.address,
-      city: form.city,
-      state: form.state,
-      zip: form.zip,
-      propertyType: (form.propertyType as PropertyType) || undefined,
-      sqft: form.sqft || undefined,
-      amenities: form.amenities.length > 0 ? form.amenities : undefined,
-      purchasePrice: form.purchasePrice || undefined,
-      purchaseDate: form.purchaseDate || undefined,
-      insuranceProvider: form.insuranceProvider || undefined,
-      insurancePolicyNumber: form.insurancePolicyNumber || undefined,
-      insuranceExpiry: form.insuranceExpiry || undefined,
-      notes: form.notes || undefined,
-    })
+    updateProperty(property.id, payload)
     onClose()
     toast('Property updated')
   }

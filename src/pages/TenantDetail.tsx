@@ -5,6 +5,7 @@ import { getLeaseStatus } from '../lib/calculations'
 import { formatMoney, formatDate } from '../lib/format'
 import Breadcrumbs from '../components/Breadcrumbs'
 import DocumentAttachments from '../components/DocumentAttachments'
+import { loadSettings } from '../lib/settings'
 import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { nowISO } from '../lib/id'
@@ -28,6 +29,7 @@ export default function TenantDetail() {
 
   const property = properties.find((p) => p.id === tenant.propertyId)
   const unit = units.find((u) => u.id === tenant.unitId)
+  const settings = loadSettings()
   const tenantPayments = payments.filter((p) => p.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date))
   const tenantComms = communicationLogs.filter((c) => c.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date))
   const leaseStatus = getLeaseStatus(tenant.leaseEnd)
@@ -35,9 +37,10 @@ export default function TenantDetail() {
   const paymentStats = useMemo(() => {
     const total = tenantPayments.reduce((s, p) => s + p.amount, 0)
     const count = tenantPayments.length
+    const graceDays = tenant.gracePeriodDays ?? settings.defaultGracePeriodDays
     const lateCount = tenantPayments.filter((p) => {
       const day = parseInt(p.date.split('-')[2], 10)
-      return day > (tenant.gracePeriodDays ?? 5)
+      return day > graceDays
     }).length
 
     const monthlyMap = new Map<string, number>()

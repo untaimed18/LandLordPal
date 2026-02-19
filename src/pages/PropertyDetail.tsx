@@ -83,7 +83,9 @@ export default function PropertyDetail() {
       const propUnitsLocal = units.filter((u) => u.propertyId === id)
       const firstAvailable = propUnitsLocal.find((u) => !tenants.some((t) => t.unitId === u.id))
       if (firstAvailable) {
-        openAddTenant(firstAvailable.id, firstAvailable.monthlyRent, firstAvailable.deposit ?? 0)
+        setEditingTenantId(null)
+        setTenantFormUnitId(firstAvailable.id)
+        setTenantFormData({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '' })
         setSearchParams({}, { replace: true })
       }
     }

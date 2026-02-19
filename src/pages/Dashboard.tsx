@@ -84,17 +84,20 @@ export default function Dashboard() {
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth()
+
   const monthlyTrend = useMemo(() => {
     const months: { label: string; income: number; expenses: number }[] = []
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const d = new Date(currentYear, currentMonth - i, 1)
       const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const income = payments.filter((p) => p.date.startsWith(prefix)).reduce((s, p) => s + p.amount, 0)
       const exp = expenses.filter((e) => e.date.startsWith(prefix)).reduce((s, e) => s + e.amount, 0)
       months.push({ label: monthNames[d.getMonth()], income, expenses: exp })
     }
     return months
-  }, [payments, expenses, now])
+  }, [payments, expenses, currentYear, currentMonth])
 
   const incomeData = monthlyTrend.map((m) => m.income)
   const expenseData = monthlyTrend.map((m) => m.expenses)
