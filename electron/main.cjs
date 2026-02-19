@@ -157,6 +157,11 @@ async function setupDatabase() {
 
   ipcMain.handle('db:save', (_event, state) => {
     try {
+      const counts = Object.entries(state || {})
+        .filter(([, v]) => Array.isArray(v))
+        .map(([k, v]) => `${k}: ${v.length}`)
+        .join(', ');
+      log.info('db:save called —', counts);
       replaceAll(state);
       return true;
     } catch (err) {

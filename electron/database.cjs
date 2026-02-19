@@ -748,22 +748,47 @@ function loadAll() {
 // ─── Save all (full replace — used only for import/restore) ──────────────────
 
 function replaceAll(state) {
+  if (!state || typeof state !== 'object') {
+    log.error('replaceAll: refusing to write — state is null or not an object');
+    return;
+  }
+
+  const tableKeyMap = {
+    properties: 'properties', units: 'units', tenants: 'tenants',
+    expenses: 'expenses', payments: 'payments',
+    maintenance_requests: 'maintenanceRequests',
+    activity_logs: 'activityLogs', vendors: 'vendors',
+    communication_logs: 'communicationLogs',
+    documents: 'documents',
+  };
+
+  // Safety check: count total incoming records to prevent writing an empty/corrupt state
+  // over a non-empty database (which would wipe all data)
+  let incomingCount = 0;
+  for (const jsKey of Object.values(tableKeyMap)) {
+    const items = state[jsKey];
+    if (Array.isArray(items)) incomingCount += items.length;
+  }
+
+  let existingCount = 0;
+  for (const sqlTable of Object.keys(TABLE_COLUMNS)) {
+    try {
+      const row = db.prepare(`SELECT COUNT(*) AS cnt FROM ${sqlTable}`).get();
+      existingCount += row.cnt;
+    } catch { /* table may not exist yet */ }
+  }
+
+  if (incomingCount === 0 && existingCount > 0) {
+    log.error(`replaceAll: refusing to write — incoming state is empty but database has ${existingCount} records. This would wipe all data.`);
+    return;
+  }
+
   const run = db.transaction(() => {
-    // Disable FK temporarily for bulk delete+insert
     db.pragma('foreign_keys = OFF');
 
     for (const sqlTable of Object.keys(TABLE_COLUMNS)) {
       db.prepare(`DELETE FROM ${sqlTable}`).run();
     }
-
-    const tableKeyMap = {
-      properties: 'properties', units: 'units', tenants: 'tenants',
-      expenses: 'expenses', payments: 'payments',
-      maintenance_requests: 'maintenanceRequests',
-      activity_logs: 'activityLogs', vendors: 'vendors',
-      communication_logs: 'communicationLogs',
-      documents: 'documents',
-    };
 
     for (const [sqlTable, jsKey] of Object.entries(tableKeyMap)) {
       const items = state[jsKey] || [];
