@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { getPropertySummary } from '../lib/calculations'
@@ -64,8 +64,9 @@ export default function Properties() {
     notes: '',
   })
 
-  const summaries = properties.map((p) =>
-    getPropertySummary(p, units, tenants, expenses, payments)
+  const summaries = useMemo(() =>
+    properties.map((p) => getPropertySummary(p, units, tenants, expenses, payments)),
+    [properties, units, tenants, expenses, payments]
   )
 
   function openEdit(property: (typeof properties)[0]) {

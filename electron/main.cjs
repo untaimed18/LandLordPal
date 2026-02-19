@@ -1,7 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
-const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase } = require('./database.cjs');
+const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath } = require('./database.cjs');
+const { dialog, shell } = require('electron');
 const log = require('./logger.cjs');
 
 let mainWindow = null;
@@ -144,6 +145,46 @@ function setupDatabase() {
       log.error('db:batch failed:', err.message);
       return false;
     }
+  });
+
+  ipcMain.handle('doc:pick-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'Documents', extensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'jpg', 'jpeg', 'png', 'gif', 'webp'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const sourcePath = result.filePaths[0];
+    const originalName = require('path').basename(sourcePath);
+    const mimeTypes = {
+      '.pdf': 'application/pdf', '.doc': 'application/msword', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.csv': 'text/csv', '.txt': 'text/plain',
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp',
+    };
+    const ext = require('path').extname(sourcePath).toLowerCase();
+    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+    try {
+      const { filename, size } = copyFileToDocuments(sourcePath);
+      return { filename, originalName, size, mimeType };
+    } catch (err) {
+      log.error('doc:pick-file failed:', err.message);
+      return null;
+    }
+  });
+
+  ipcMain.handle('doc:delete-file', (_event, filename) => {
+    deleteDocumentFile(filename);
+    return true;
+  });
+
+  ipcMain.handle('doc:open-file', (_event, filename) => {
+    const filePath = getDocumentPath(filename);
+    if (!filePath) return false;
+    shell.openPath(filePath);
+    return true;
   });
 }
 

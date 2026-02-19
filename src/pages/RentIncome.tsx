@@ -8,6 +8,7 @@ import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate, formatMonthYear } from '../lib/format'
 import { nowISO } from '../lib/id'
 import { toCSV, downloadCSV } from '../lib/csv'
+import { RefreshCw } from 'lucide-react'
 
 function startOfMonth(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
@@ -42,6 +43,35 @@ export default function RentIncome() {
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({ value: i, label: new Date(2000, i, 1).toLocaleString('en-US', { month: 'long' }) }))
   const yearOptions = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i)
+
+  const unpaidAutopay = rentRoll.filter((r) => !r.paid && r.tenant.autopay)
+
+  async function handleRecordAllAutopay() {
+    if (unpaidAutopay.length === 0) return
+    const ok = await confirm({
+      title: 'Record autopay payments',
+      message: `Record ${unpaidAutopay.length} autopay payment${unpaidAutopay.length !== 1 ? 's' : ''} for the full rent amount?`,
+      confirmText: 'Record all',
+    })
+    if (!ok) return
+    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
+    const dateStr = isCurrentMonth ? nowISO() : `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const d = new Date(dateStr + 'T12:00:00')
+    for (const r of unpaidAutopay) {
+      addPayment({
+        propertyId: r.property.id,
+        unitId: r.unit.id,
+        tenantId: r.tenant.id,
+        amount: r.expectedRent,
+        date: dateStr,
+        periodStart: startOfMonth(d),
+        periodEnd: endOfMonth(d),
+        method: 'transfer',
+        notes: 'Autopay',
+      })
+    }
+    toast(`${unpaidAutopay.length} autopay payment${unpaidAutopay.length !== 1 ? 's' : ''} recorded`)
+  }
 
   async function handleRecordPayment(e: React.FormEvent) {
     e.preventDefault()
@@ -82,6 +112,11 @@ export default function RentIncome() {
           <h1>Rent & income</h1>
           <p className="page-desc">See who has paid this month and record rent payments.</p>
         </div>
+        {unpaidAutopay.length > 0 && (
+          <button type="button" className="btn primary" onClick={handleRecordAllAutopay}>
+            <RefreshCw size={14} /> Record {unpaidAutopay.length} autopay
+          </button>
+        )}
         {rentRoll.length > 0 && (
           <button
             type="button"
@@ -169,6 +204,7 @@ export default function RentIncome() {
                     <tr key={r.tenant.id}>
                       <td>
                         <strong>{r.tenant.name}</strong>
+                        {r.tenant.autopay && <span className="autopay-badge"><RefreshCw size={10} /> Autopay</span>}
                         {r.tenant.phone && <span className="muted block">{r.tenant.phone}</span>}
                       </td>
                       <td>

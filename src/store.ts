@@ -8,6 +8,7 @@ import type {
   ActivityLog,
   Vendor,
   CommunicationLog,
+  Document,
 } from './types';
 import { generateId, nowISO } from './lib/id';
 import logger from './lib/logger';
@@ -22,6 +23,7 @@ export interface AppState {
   activityLogs: ActivityLog[];
   vendors: Vendor[];
   communicationLogs: CommunicationLog[];
+  documents: Document[];
 }
 
 const defaultState: AppState = {
@@ -34,6 +36,7 @@ const defaultState: AppState = {
   activityLogs: [],
   vendors: [],
   communicationLogs: [],
+  documents: [],
 };
 
 function isArray(x: unknown): x is unknown[] {
@@ -49,6 +52,10 @@ function filterValidItems<T>(arr: unknown[]): T[] {
 }
 
 // ─── Save-error event bus ────────────────────────────────────────────────────
+
+function emitSaveSuccess(): void {
+  window.dispatchEvent(new CustomEvent('landlordpal:save-success'));
+}
 
 function emitSaveError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
@@ -78,6 +85,7 @@ function parseStateData(data: Record<string, unknown>): AppState {
     activityLogs: isArray(data.activityLogs) ? filterValidItems<ActivityLog>(data.activityLogs) : [],
     vendors: isArray(data.vendors) ? filterValidItems<Vendor>(data.vendors) : [],
     communicationLogs: isArray(data.communicationLogs) ? filterValidItems<CommunicationLog>(data.communicationLogs) : [],
+    documents: isArray(data.documents) ? filterValidItems<Document>(data.documents) : [],
   };
 }
 
@@ -86,12 +94,14 @@ function parseStateData(data: Record<string, unknown>): AppState {
 function persistBatch(ops: DbOperation[]): void {
   requireElectronAPI().dbBatch(ops).then((ok) => {
     if (!ok) emitSaveError(new Error('db:batch returned false'));
+    else emitSaveSuccess();
   }).catch(emitSaveError);
 }
 
 function persistFullReplace(s: AppState): void {
   requireElectronAPI().dbSave(s).then((ok) => {
     if (!ok) emitSaveError(new Error('db:save returned false'));
+    else emitSaveSuccess();
   }).catch(emitSaveError);
 }
 
@@ -145,6 +155,11 @@ function notify(): void {
 
 // Full state replace (used for backup restore / data clear)
 export function importState(data: Record<string, unknown>): void {
+  // Clean up existing document files before replacing state
+  const api = requireElectronAPI();
+  for (const doc of state.documents) {
+    api.docDeleteFile(doc.filename);
+  }
   state = parseStateData(data);
   persistFullReplace(state);
   notify();
@@ -199,7 +214,22 @@ export function deleteProperty(id: string): void {
     })
     .map((a) => a.id);
 
-  state = { ...state, properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, communicationLogs };
+  // Clean up documents for the property and all its children
+  const deletedUnitIds = new Set(state.units.filter((u) => u.propertyId === id).map((u) => u.id));
+  const deletedTenantIds2 = new Set(state.tenants.filter((t) => t.propertyId === id).map((t) => t.id));
+  const orphanedDocs = state.documents.filter((d) => {
+    if (d.entityType === 'property' && d.entityId === id) return true;
+    if (d.entityType === 'unit' && deletedUnitIds.has(d.entityId)) return true;
+    if (d.entityType === 'tenant' && deletedTenantIds2.has(d.entityId)) return true;
+    return false;
+  });
+  for (const doc of orphanedDocs) {
+    requireElectronAPI().docDeleteFile(doc.filename);
+  }
+  const orphanedDocIds = orphanedDocs.map((d) => d.id);
+  const documents = state.documents.filter((d) => !orphanedDocIds.includes(d.id));
+
+  state = { ...state, properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, communicationLogs, documents };
 
   const ops: DbOperation[] = [
     { type: 'delete', table: 'properties', ids: [id] },
@@ -207,6 +237,9 @@ export function deleteProperty(id: string): void {
   ];
   if (orphanedLogIds.length > 0) {
     ops.push({ type: 'delete', table: 'activityLogs', ids: orphanedLogIds });
+  }
+  if (orphanedDocIds.length > 0) {
+    ops.push({ type: 'delete', table: 'documents', ids: orphanedDocIds });
   }
   persistBatch(ops);
   notify();
@@ -255,7 +288,19 @@ export function deleteUnit(id: string): void {
     })
     .map((a) => a.id);
 
-  state = { ...state, units, tenants, payments, maintenanceRequests, expenses, activityLogs };
+  // Clean up documents for this unit and its tenants
+  const orphanedDocs = state.documents.filter((d) => {
+    if (d.entityType === 'unit' && d.entityId === id) return true;
+    if (d.entityType === 'tenant' && deletedTenantIds.has(d.entityId)) return true;
+    return false;
+  });
+  for (const doc of orphanedDocs) {
+    requireElectronAPI().docDeleteFile(doc.filename);
+  }
+  const orphanedDocIds = orphanedDocs.map((d) => d.id);
+  const documents = state.documents.filter((d) => !orphanedDocIds.includes(d.id));
+
+  state = { ...state, units, tenants, payments, maintenanceRequests, expenses, activityLogs, documents };
 
   const ops: DbOperation[] = [
     { type: 'delete', table: 'units', ids: [id] },
@@ -263,6 +308,9 @@ export function deleteUnit(id: string): void {
   ];
   if (orphanedLogIds.length > 0) {
     ops.push({ type: 'delete', table: 'activityLogs', ids: orphanedLogIds });
+  }
+  if (orphanedDocIds.length > 0) {
+    ops.push({ type: 'delete', table: 'documents', ids: orphanedDocIds });
   }
   persistBatch(ops);
   notify();
@@ -321,7 +369,19 @@ export function deleteTenant(id: string): void {
     ops.push({ type: 'delete', table: 'activityLogs', ids: orphanedLogIds });
   }
   const communicationLogs = state.communicationLogs.filter((c) => c.tenantId !== id);
-  state = { ...state, tenants, payments, units, activityLogs, communicationLogs };
+
+  // Clean up documents for this tenant
+  const tenantDocs = state.documents.filter((d) => d.entityType === 'tenant' && d.entityId === id);
+  for (const doc of tenantDocs) {
+    requireElectronAPI().docDeleteFile(doc.filename);
+  }
+  const tenantDocIds = tenantDocs.map((d) => d.id);
+  if (tenantDocIds.length > 0) {
+    ops.push({ type: 'delete', table: 'documents', ids: tenantDocIds });
+  }
+  const documents = state.documents.filter((d) => !tenantDocIds.includes(d.id));
+
+  state = { ...state, tenants, payments, units, activityLogs, communicationLogs, documents };
   persistBatch(ops);
   notify();
 }
@@ -347,8 +407,21 @@ export function updateExpense(id: string, input: Partial<Omit<Expense, 'id'>>): 
 }
 
 export function deleteExpense(id: string): void {
-  state = { ...state, expenses: state.expenses.filter((e) => e.id !== id) };
-  persistBatch([{ type: 'delete', table: 'expenses', ids: [id] }]);
+  const expenseDocs = state.documents.filter((d) => d.entityType === 'expense' && d.entityId === id);
+  for (const doc of expenseDocs) {
+    requireElectronAPI().docDeleteFile(doc.filename);
+  }
+  const expenseDocIds = expenseDocs.map((d) => d.id);
+  const ops: DbOperation[] = [{ type: 'delete', table: 'expenses', ids: [id] }];
+  if (expenseDocIds.length > 0) {
+    ops.push({ type: 'delete', table: 'documents', ids: expenseDocIds });
+  }
+  state = {
+    ...state,
+    expenses: state.expenses.filter((e) => e.id !== id),
+    documents: state.documents.filter((d) => !expenseDocIds.includes(d.id)),
+  };
+  persistBatch(ops);
   notify();
 }
 
@@ -448,12 +521,24 @@ export function deleteVendor(id: string): void {
   const expenses = state.expenses.map((e) =>
     e.vendorId === id ? { ...e, vendorId: undefined, updatedAt: nowISO() } : e
   );
-  state = { ...state, vendors, maintenanceRequests, expenses };
 
-  persistBatch([
+  const vendorDocs = state.documents.filter((d) => d.entityType === 'vendor' && d.entityId === id);
+  for (const doc of vendorDocs) {
+    requireElectronAPI().docDeleteFile(doc.filename);
+  }
+  const vendorDocIds = vendorDocs.map((d) => d.id);
+  const documents = state.documents.filter((d) => !vendorDocIds.includes(d.id));
+
+  state = { ...state, vendors, maintenanceRequests, expenses, documents };
+
+  const ops: DbOperation[] = [
     { type: 'delete', table: 'vendors', ids: [id] },
     // FK SET NULL handles: maintenance_requests.vendorId, expenses.vendorId
-  ]);
+  ];
+  if (vendorDocIds.length > 0) {
+    ops.push({ type: 'delete', table: 'documents', ids: vendorDocIds });
+  }
+  persistBatch(ops);
   notify();
 }
 
@@ -471,4 +556,45 @@ export function deleteCommunicationLog(id: string): void {
   state = { ...state, communicationLogs: state.communicationLogs.filter((c) => c.id !== id) };
   persistBatch([{ type: 'delete', table: 'communicationLogs', ids: [id] }]);
   notify();
+}
+
+// ─── Documents ────────────────────────────────────────────────────────────────
+
+export async function addDocument(
+  entityType: Document['entityType'],
+  entityId: string,
+): Promise<Document | null> {
+  const result = await requireElectronAPI().docPickFile();
+  if (!result) return null;
+  const doc: Document = {
+    id: generateId(),
+    entityType,
+    entityId,
+    filename: result.filename,
+    originalName: result.originalName,
+    size: result.size,
+    mimeType: result.mimeType,
+    createdAt: nowISO(),
+  };
+  state = { ...state, documents: [...state.documents, doc] };
+  persistBatch([{ type: 'upsert', table: 'documents', data: doc }]);
+  notify();
+  return doc;
+}
+
+export function deleteDocument(id: string): void {
+  const doc = state.documents.find((d) => d.id === id);
+  if (doc) {
+    requireElectronAPI().docDeleteFile(doc.filename);
+  }
+  state = { ...state, documents: state.documents.filter((d) => d.id !== id) };
+  persistBatch([{ type: 'delete', table: 'documents', ids: [id] }]);
+  notify();
+}
+
+export function openDocument(id: string): void {
+  const doc = state.documents.find((d) => d.id === id);
+  if (doc) {
+    requireElectronAPI().docOpenFile(doc.filename);
+  }
 }

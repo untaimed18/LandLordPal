@@ -22,6 +22,7 @@ interface AppStateData {
   activityLogs: import('./types').ActivityLog[];
   vendors: import('./types').Vendor[];
   communicationLogs: import('./types').CommunicationLog[];
+  documents: import('./types').Document[];
 }
 
 interface DbOperation {
@@ -42,6 +43,10 @@ interface ElectronAPI {
   dbLoad: () => Promise<AppStateData | null>;
   dbSave: (state: AppStateData) => Promise<boolean>;
   dbBatch: (operations: DbOperation[]) => Promise<boolean>;
+  // Documents
+  docPickFile: () => Promise<{ filename: string; originalName: string; size: number; mimeType: string } | null>;
+  docDeleteFile: (filename: string) => Promise<boolean>;
+  docOpenFile: (filename: string) => Promise<boolean>;
   // Auto-update
   onUpdateStatus: (callback: (data: UpdateStatusEvent) => void) => () => void;
   startDownload: () => Promise<void>;

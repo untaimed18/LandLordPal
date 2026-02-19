@@ -3,7 +3,9 @@ import { useStore } from '../hooks/useStore'
 import { addVendor, updateVendor, deleteVendor, takeSnapshot, restoreSnapshot } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
-import { formatPhoneNumber } from '../lib/format'
+import { formatPhoneNumber, formatMoney } from '../lib/format'
+import { vendorSchema, extractErrors } from '../lib/schemas'
+import type { ValidationErrors } from '../lib/schemas'
 import { Phone, Mail } from 'lucide-react'
 
 const SPECIALTIES = [
@@ -31,6 +33,7 @@ export default function Vendors() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
+  const [formErrors, setFormErrors] = useState<ValidationErrors>({})
 
   function openEdit(v: (typeof vendors)[0]) {
     setEditingId(v.id)
@@ -40,24 +43,25 @@ export default function Vendors() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const data = {
+      name: form.name,
+      phone: form.phone || undefined,
+      email: form.email || undefined,
+      specialty: form.specialty || undefined,
+      notes: form.notes || undefined,
+    }
+    const result = vendorSchema.safeParse(data)
+    if (!result.success) {
+      setFormErrors(extractErrors(result.error))
+      return
+    }
+    setFormErrors({})
     if (editingId) {
-      updateVendor(editingId, {
-        name: form.name,
-        phone: form.phone || undefined,
-        email: form.email || undefined,
-        specialty: form.specialty || undefined,
-        notes: form.notes || undefined,
-      })
+      updateVendor(editingId, data)
       setEditingId(null)
       toast('Vendor updated')
     } else {
-      addVendor({
-        name: form.name,
-        phone: form.phone || undefined,
-        email: form.email || undefined,
-        specialty: form.specialty || undefined,
-        notes: form.notes || undefined,
-      })
+      addVendor(data)
       toast('Vendor added')
     }
     setForm(emptyForm)
@@ -94,9 +98,9 @@ export default function Vendors() {
         <form className="card form-card" onSubmit={handleSubmit}>
           <h3>{editingId ? 'Edit vendor' : 'New vendor'}</h3>
           <div className="form-grid">
-            <label>Name * <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Mike's Plumbing" /></label>
-            <label>Phone <input type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: formatPhoneNumber(e.target.value) }))} placeholder="(555) 123-4567" /></label>
-            <label>Email <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></label>
+            <label className={formErrors.name ? 'form-field-error' : ''}>Name * <input required value={form.name} onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setFormErrors((p) => { const n = { ...p }; delete n.name; return n }) }} placeholder="e.g. Mike's Plumbing" />{formErrors.name && <span className="field-error" role="alert">{formErrors.name}</span>}</label>
+            <label className={formErrors.phone ? 'form-field-error' : ''}>Phone <input type="tel" value={form.phone} onChange={(e) => { setForm((f) => ({ ...f, phone: formatPhoneNumber(e.target.value) })); setFormErrors((p) => { const n = { ...p }; delete n.phone; return n }) }} placeholder="(555) 123-4567" />{formErrors.phone && <span className="field-error" role="alert">{formErrors.phone}</span>}</label>
+            <label className={formErrors.email ? 'form-field-error' : ''}>Email <input type="email" value={form.email} onChange={(e) => { setForm((f) => ({ ...f, email: e.target.value })); setFormErrors((p) => { const n = { ...p }; delete n.email; return n }) }} />{formErrors.email && <span className="field-error" role="alert">{formErrors.email}</span>}</label>
             <label>Specialty <select value={form.specialty} onChange={(e) => setForm((f) => ({ ...f, specialty: e.target.value }))}>
               <option value="">Select...</option>
               {SPECIALTIES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -132,7 +136,7 @@ export default function Vendors() {
                 {v.notes && <p className="muted vendor-notes">{v.notes}</p>}
                 <div className="vendor-stats muted">
                   {jobCount > 0 && <span>{jobCount} maintenance job{jobCount !== 1 ? 's' : ''}</span>}
-                  {expenseTotal > 0 && <span>Total spent: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(expenseTotal)}</span>}
+                  {expenseTotal > 0 && <span>Total spent: {formatMoney(expenseTotal)}</span>}
                 </div>
                 <div className="vendor-actions">
                   <button type="button" className="btn small" onClick={() => openEdit(v)}>Edit</button>

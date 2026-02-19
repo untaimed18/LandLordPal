@@ -1,8 +1,12 @@
+import { useState } from 'react'
 import type { ActivityLog as ActivityLogType, Property, Unit, Tenant } from '../types'
 import { deleteActivityLog } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatDate } from '../lib/format'
+import Pagination from './Pagination'
+
+const PAGE_SIZE = 15
 
 interface Props {
   property: Property
@@ -15,6 +19,10 @@ interface Props {
 export default function ActivityLogSection({ property, units, tenants, activityLogs, onAddNote }: Props) {
   const toast = useToast()
   const confirm = useConfirm()
+  const [page, setPage] = useState(1)
+
+  const totalPages = Math.max(1, Math.ceil(activityLogs.length / PAGE_SIZE))
+  const paginated = activityLogs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   if (activityLogs.length === 0) {
     return (
@@ -31,11 +39,11 @@ export default function ActivityLogSection({ property, units, tenants, activityL
   return (
     <section className="card section-card" aria-label="Activity log">
       <div className="section-card-header">
-        <h2>Activity log</h2>
+        <h2>Activity log ({activityLogs.length})</h2>
         <button type="button" className="btn small" onClick={onAddNote}>Add note</button>
       </div>
       <div className="activity-timeline">
-        {activityLogs.slice(0, 20).map((log) => {
+        {paginated.map((log) => {
           let entityLabel = ''
           if (log.entityType === 'property') entityLabel = property.name
           else if (log.entityType === 'unit') entityLabel = units.find((u) => u.id === log.entityId)?.name ?? 'Unit'
@@ -60,6 +68,7 @@ export default function ActivityLogSection({ property, units, tenants, activityL
           )
         })}
       </div>
+      <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
     </section>
   )
 }

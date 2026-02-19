@@ -16,6 +16,7 @@ import {
   takeSnapshot,
   restoreSnapshot,
 } from '../store'
+import DocumentAttachments from '../components/DocumentAttachments'
 import { getPropertySummary, getLeaseStatus } from '../lib/calculations'
 import { useNavigate } from 'react-router-dom'
 import { nowISO } from '../lib/id'
@@ -94,7 +95,7 @@ export default function PropertyDetail() {
 
   const [propertyForm, setPropertyForm] = useState({ name: '', address: '', city: '', state: '', zip: '', propertyType: '' as string, sqft: 0, amenities: [] as string[], notes: '', purchasePrice: 0, purchaseDate: '', insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '' })
   const [newUnit, setNewUnit] = useState({ name: '', bedrooms: 1, bathrooms: 1, monthlyRent: 0, sqft: 0, deposit: 0, notes: '', available: true })
-  const [newTenant, setNewTenant] = useState({ unitId: '', name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: 0, deposit: 0, gracePeriodDays: 5, lateFeeAmount: 0, notes: '' })
+  const [newTenant, setNewTenant] = useState({ unitId: '', name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: 0, deposit: 0, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '' })
   const [newPayment, setNewPayment] = useState<{ tenantId: string; amount: number; date: string; method: 'check' | 'transfer' | 'cash' | 'other'; notes: string }>({ tenantId: '', amount: 0, date: nowISO(), method: 'transfer', notes: '' })
 
   useEffect(() => {
@@ -117,7 +118,7 @@ export default function PropertyDetail() {
       const firstAvailable = propUnitsLocal.find((u) => !tenants.some((t) => t.unitId === u.id))
       if (firstAvailable) {
         setTenantForm(firstAvailable.id)
-        setNewTenant({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, notes: '' })
+        setNewTenant({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '' })
         setSearchParams({}, { replace: true })
       }
     }
@@ -300,11 +301,12 @@ export default function PropertyDetail() {
       deposit: newTenant.deposit || undefined,
       gracePeriodDays: newTenant.gracePeriodDays || undefined,
       lateFeeAmount: newTenant.lateFeeAmount || undefined,
+      autopay: newTenant.autopay,
       notes: newTenant.notes || undefined,
       moveInDate: newTenant.leaseStart,
     })
     updateUnit(newTenant.unitId, { available: false })
-    setNewTenant({ unitId: '', name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: unit?.monthlyRent ?? 0, deposit: unit?.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, notes: '' })
+    setNewTenant({ unitId: '', name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: unit?.monthlyRent ?? 0, deposit: unit?.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '' })
     setTenantForm(null)
     toast('Tenant added')
   }
@@ -631,7 +633,7 @@ export default function PropertyDetail() {
                             <button type="button" className="btn small primary" onClick={() => { setPaymentForm(tenant.id); setNewPayment({ tenantId: tenant.id, amount: tenant.monthlyRent, date: nowISO(), method: 'transfer', notes: '' }) }}>
                               <CreditCard size={14} /> Record payment
                             </button>
-                            <button type="button" className="btn small" onClick={() => { setTenantForm(null); setEditingTenantId(tenant.id); setNewTenant({ unitId: tenant.unitId, name: tenant.name, email: tenant.email ?? '', phone: tenant.phone ?? '', leaseStart: tenant.leaseStart, leaseEnd: tenant.leaseEnd, monthlyRent: tenant.monthlyRent, deposit: tenant.deposit ?? 0, gracePeriodDays: tenant.gracePeriodDays ?? 5, lateFeeAmount: tenant.lateFeeAmount ?? 0, notes: tenant.notes ?? '' }); }}>Edit tenant</button>
+                            <button type="button" className="btn small" onClick={() => { setTenantForm(null); setEditingTenantId(tenant.id); setNewTenant({ unitId: tenant.unitId, name: tenant.name, email: tenant.email ?? '', phone: tenant.phone ?? '', leaseStart: tenant.leaseStart, leaseEnd: tenant.leaseEnd, monthlyRent: tenant.monthlyRent, deposit: tenant.deposit ?? 0, gracePeriodDays: tenant.gracePeriodDays ?? 5, lateFeeAmount: tenant.lateFeeAmount ?? 0, autopay: tenant.autopay ?? false, notes: tenant.notes ?? '' }); }}>Edit tenant</button>
                             <button type="button" className="btn small" onClick={() => setPaymentHistoryTenant(tenant.id)}>Payment history</button>
                             <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'tenant', id: tenant.id })}>Add note</button>
                             <button type="button" className="btn small" onClick={() => { setShowMoveOut(tenant.id); setMoveOutDate(nowISO()); setMoveOutNotes(''); setDepositReturned(tenant.deposit ?? 0); setDepositDeductions(''); }}>Move out</button>
@@ -674,7 +676,7 @@ export default function PropertyDetail() {
                               </div>
                             </div>
                             <div className="stc-actions">
-                              <button type="button" className="btn primary" onClick={() => { setEditingTenantId(null); setTenantForm(unit.id); setNewTenant({ unitId: unit.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: unit.monthlyRent, deposit: unit.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, notes: '' }); }}>
+                              <button type="button" className="btn primary" onClick={() => { setEditingTenantId(null); setTenantForm(unit.id); setNewTenant({ unitId: unit.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: unit.monthlyRent, deposit: unit.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '' }); }}>
                                 <User size={14} /> Add tenant
                               </button>
                             </div>
@@ -704,6 +706,7 @@ export default function PropertyDetail() {
                               {tenant.deposit != null && tenant.deposit > 0 && <> · Deposit held: {formatMoney(tenant.deposit)}</>}
                               {tenant.gracePeriodDays != null && tenant.gracePeriodDays > 0 && <> · Grace: {tenant.gracePeriodDays}d</>}
                               {tenant.lateFeeAmount != null && tenant.lateFeeAmount > 0 && <> · Late fee: {formatMoney(tenant.lateFeeAmount)}</>}
+                              {tenant.autopay && <> · <span className="autopay-badge">Autopay</span></>}
                             </span>
                             {tenant.notes && <span className="muted block">Note: {tenant.notes}</span>}
                             {tenant.rentHistory && tenant.rentHistory.length > 0 && (
@@ -734,7 +737,7 @@ export default function PropertyDetail() {
                             onClick={() => {
                               setEditingTenantId(null)
                               setTenantForm(unit.id)
-                              setNewTenant({ unitId: unit.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: unit.monthlyRent, deposit: unit.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, notes: '' })
+                              setNewTenant({ unitId: unit.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: unit.monthlyRent, deposit: unit.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '' })
                             }}
                           >
                             Add tenant
@@ -752,7 +755,7 @@ export default function PropertyDetail() {
                             >
                               Record payment
                             </button>
-                            <button type="button" className="btn small" onClick={() => { setTenantForm(null); setEditingTenantId(tenant.id); setNewTenant({ unitId: tenant.unitId, name: tenant.name, email: tenant.email ?? '', phone: tenant.phone ?? '', leaseStart: tenant.leaseStart, leaseEnd: tenant.leaseEnd, monthlyRent: tenant.monthlyRent, deposit: tenant.deposit ?? 0, gracePeriodDays: tenant.gracePeriodDays ?? 5, lateFeeAmount: tenant.lateFeeAmount ?? 0, notes: tenant.notes ?? '' }); }}>Edit tenant</button>
+                            <button type="button" className="btn small" onClick={() => { setTenantForm(null); setEditingTenantId(tenant.id); setNewTenant({ unitId: tenant.unitId, name: tenant.name, email: tenant.email ?? '', phone: tenant.phone ?? '', leaseStart: tenant.leaseStart, leaseEnd: tenant.leaseEnd, monthlyRent: tenant.monthlyRent, deposit: tenant.deposit ?? 0, gracePeriodDays: tenant.gracePeriodDays ?? 5, lateFeeAmount: tenant.lateFeeAmount ?? 0, autopay: tenant.autopay ?? false, notes: tenant.notes ?? '' }); }}>Edit tenant</button>
                             <button type="button" className="btn small" onClick={() => setPaymentHistoryTenant(tenant.id)}>Payment history</button>
                             <button type="button" className="btn small" onClick={() => setNoteEntity({ type: 'tenant', id: tenant.id })}>Add note</button>
                             <button type="button" className="btn small" onClick={() => { setShowMoveOut(tenant.id); setMoveOutDate(nowISO()); setMoveOutNotes(''); setDepositReturned(tenant.deposit ?? 0); setDepositDeductions(''); }}>Move out</button>
@@ -816,6 +819,10 @@ export default function PropertyDetail() {
             <label>Grace period (days) <input type="number" min={0} value={newTenant.gracePeriodDays || ''} onChange={(e) => setNewTenant((n) => ({ ...n, gracePeriodDays: +e.target.value }))} /></label>
             <label>Late fee <input type="number" min={0} step={0.01} value={newTenant.lateFeeAmount || ''} onChange={(e) => setNewTenant((n) => ({ ...n, lateFeeAmount: +e.target.value }))} /></label>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '0.5rem' }}>
+            <input type="checkbox" checked={newTenant.autopay} onChange={(e) => setNewTenant((n) => ({ ...n, autopay: e.target.checked }))} />
+            Tenant uses autopay
+          </label>
           <label>Notes <textarea value={newTenant.notes} onChange={(e) => setNewTenant((n) => ({ ...n, notes: e.target.value }))} rows={2} /></label>
           <div className="form-actions">
             <button type="submit" className="btn primary">Save tenant</button>
@@ -851,6 +858,7 @@ export default function PropertyDetail() {
               deposit: newTenant.deposit || undefined,
               gracePeriodDays: newTenant.gracePeriodDays || undefined,
               lateFeeAmount: newTenant.lateFeeAmount || undefined,
+              autopay: newTenant.autopay,
               notes: newTenant.notes || undefined,
             })
             setEditingTenantId(null)
@@ -869,6 +877,10 @@ export default function PropertyDetail() {
             <label>Grace period (days) <input type="number" min={0} value={newTenant.gracePeriodDays || ''} onChange={(e) => setNewTenant((n) => ({ ...n, gracePeriodDays: +e.target.value }))} /></label>
             <label>Late fee <input type="number" min={0} step={0.01} value={newTenant.lateFeeAmount || ''} onChange={(e) => setNewTenant((n) => ({ ...n, lateFeeAmount: +e.target.value }))} /></label>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '0.5rem' }}>
+            <input type="checkbox" checked={newTenant.autopay} onChange={(e) => setNewTenant((n) => ({ ...n, autopay: e.target.checked }))} />
+            Tenant uses autopay
+          </label>
           <label>Notes <textarea value={newTenant.notes} onChange={(e) => setNewTenant((n) => ({ ...n, notes: e.target.value }))} rows={2} /></label>
           <div className="form-actions">
             <button type="submit" className="btn primary">Save changes</button>
@@ -922,6 +934,10 @@ export default function PropertyDetail() {
         activityLogs={propLogs}
         onAddNote={() => setNoteEntity({ type: 'property', id: prop.id })}
       />
+
+      <section className="card section-card">
+        <DocumentAttachments entityType="property" entityId={prop.id} />
+      </section>
 
       {paymentHistoryTenant && (() => {
         const t = tenants.find((x) => x.id === paymentHistoryTenant)

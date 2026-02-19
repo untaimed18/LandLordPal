@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { formatMoney } from '../lib/format'
 import { toCSV, downloadCSV } from '../lib/csv'
+import { exportTablePdf, formatMoneyForPdf } from '../lib/pdfExport'
 import { useToast } from '../context/ToastContext'
 import type { ExpenseCategory } from '../types'
 import { BarChart3 } from 'lucide-react'
@@ -136,6 +137,37 @@ export default function Reports() {
     toast('Print dialog opened — save as PDF to export', 'info')
   }
 
+  function exportPnLPdf() {
+    const propName = propertyFilter ? properties.find((p) => p.id === propertyFilter)?.name : 'All Properties'
+    exportTablePdf({
+      title: `Profit & Loss — ${year}`,
+      subtitle: propName,
+      headers: ['Month', 'Income', 'Expenses', 'Net'],
+      rows: monthly.map((m) => [MONTHS[m.month], formatMoneyForPdf(m.income), formatMoneyForPdf(m.expenses), formatMoneyForPdf(m.net)]),
+      totals: ['Total', formatMoneyForPdf(totalIncome), formatMoneyForPdf(totalExp), formatMoneyForPdf(totalIncome - totalExp)],
+      filename: `pnl-${year}.pdf`,
+    })
+    toast('PDF exported', 'info')
+  }
+
+  function exportTaxPdf() {
+    const rows: (string | number)[] [] = [['Gross Rental Income', formatMoneyForPdf(taxSummary.totalIncome)]]
+    CATEGORIES.forEach((c) => {
+      const amt = taxSummary.byCategory[c.value] ?? 0
+      if (amt > 0) rows.push([`  ${c.label}`, formatMoneyForPdf(amt)])
+    })
+    rows.push(['Total Expenses', formatMoneyForPdf(taxSummary.totalExpenses)])
+    exportTablePdf({
+      title: `Tax Summary — ${year}`,
+      subtitle: 'Schedule E (Rental Income)',
+      headers: ['Item', 'Amount'],
+      rows,
+      totals: ['Net Rental Income', formatMoneyForPdf(taxSummary.netIncome)],
+      filename: `tax-summary-${year}.pdf`,
+    })
+    toast('PDF exported', 'info')
+  }
+
   const hasData = payments.length > 0 || expenses.length > 0
 
   return (
@@ -202,7 +234,10 @@ export default function Reports() {
         <section className="card section-card">
           <div className="section-card-header">
             <h2>Profit & Loss — {year}</h2>
-            <button type="button" className="btn small" onClick={exportPnL}>Export CSV</button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn small" onClick={exportPnL}>Export CSV</button>
+              <button type="button" className="btn small" onClick={exportPnLPdf}>Export PDF</button>
+            </div>
           </div>
           <div className="table-wrap">
             <table className="data-table">
@@ -257,7 +292,10 @@ export default function Reports() {
         <section className="card section-card">
           <div className="section-card-header">
             <h2>Tax Summary — {year}</h2>
-            <button type="button" className="btn small" onClick={exportTax}>Export CSV</button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn small" onClick={exportTax}>Export CSV</button>
+              <button type="button" className="btn small" onClick={exportTaxPdf}>Export PDF</button>
+            </div>
           </div>
           <div className="tax-summary-report">
             <div className="tax-row header-row">

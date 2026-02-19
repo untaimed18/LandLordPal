@@ -5,6 +5,9 @@ import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
 import { formatDate } from '../lib/format'
+import Pagination from './Pagination'
+
+const PAGE_SIZE = 15
 
 const COMM_TYPES: { value: CommunicationType; label: string }[] = [
   { value: 'call', label: 'Phone Call' },
@@ -27,9 +30,14 @@ export default function CommunicationLogSection({ propertyId, tenants, communica
   const [commForm, setCommForm] = useState(false)
   const [newComm, setNewComm] = useState({ type: 'call' as CommunicationType, date: nowISO(), subject: '', notes: '' })
 
+  const [page, setPage] = useState(1)
+
   const propComms = communicationLogs
     .filter((c) => c.propertyId === propertyId)
     .sort((a, b) => b.date.localeCompare(a.date))
+
+  const totalPages = Math.max(1, Math.ceil(propComms.length / PAGE_SIZE))
+  const paginated = propComms.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <section className="card section-card" aria-label="Communication log">
@@ -76,20 +84,23 @@ export default function CommunicationLogSection({ propertyId, tenants, communica
       {propComms.length === 0 ? (
         <p className="empty-state">No communications logged yet.{tenants.length === 0 ? ' Add a tenant first.' : ''}</p>
       ) : (
-        <div className="activity-timeline">
-          {propComms.slice(0, 20).map((c) => {
-            const t = tenants.find((x) => x.id === c.tenantId)
-            return (
-              <div key={c.id} className="activity-item">
-                <span className="activity-date">{formatDate(c.date)}</span>
-                <span className="badge small">{COMM_TYPES.find((ct) => ct.value === c.type)?.label ?? c.type}</span>
-                <strong>{t?.name ?? 'Unknown'}</strong>
-                <span className="activity-note">{c.subject}{c.notes ? ` — ${c.notes}` : ''}</span>
-                <button type="button" className="btn-icon small" onClick={async () => { if (await confirm({ title: 'Delete communication', message: 'Delete this entry?', confirmText: 'Delete', danger: true })) { deleteCommunicationLog(c.id); toast('Entry deleted') } }} aria-label="Delete communication entry">×</button>
-              </div>
-            )
-          })}
-        </div>
+        <>
+          <div className="activity-timeline">
+            {paginated.map((c) => {
+              const t = tenants.find((x) => x.id === c.tenantId)
+              return (
+                <div key={c.id} className="activity-item">
+                  <span className="activity-date">{formatDate(c.date)}</span>
+                  <span className="badge small">{COMM_TYPES.find((ct) => ct.value === c.type)?.label ?? c.type}</span>
+                  <strong>{t?.name ?? 'Unknown'}</strong>
+                  <span className="activity-note">{c.subject}{c.notes ? ` — ${c.notes}` : ''}</span>
+                  <button type="button" className="btn-icon small" onClick={async () => { if (await confirm({ title: 'Delete communication', message: 'Delete this entry?', confirmText: 'Delete', danger: true })) { deleteCommunicationLog(c.id); toast('Entry deleted') } }} aria-label="Delete communication entry">×</button>
+                </div>
+              )
+            })}
+          </div>
+          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
       )}
     </section>
   )

@@ -5,7 +5,8 @@ import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
 import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../lib/settings'
-import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell } from 'lucide-react'
+import { backupSchema } from '../lib/schemas'
+import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip } from 'lucide-react'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
 
@@ -21,7 +22,7 @@ function setThemeClass(theme: 'light' | 'dark') {
 export default function Settings() {
   const toast = useToast()
   const confirm = useConfirm()
-  const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, vendors, communicationLogs } = useStore()
+  const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, vendors, communicationLogs, documents } = useStore()
   const fileInput = useRef<HTMLInputElement>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(getTheme)
   const [appSettings, setAppSettings] = useState<AppSettings>(() => loadSettings())
@@ -64,16 +65,22 @@ export default function Settings() {
     const reader = new FileReader()
     reader.onload = async () => {
       try {
-        const data = JSON.parse(reader.result as string)
-        if (!data || typeof data !== 'object') throw new Error('Invalid data')
+        const raw = JSON.parse(reader.result as string)
+        const parsed = backupSchema.safeParse(raw)
+        if (!parsed.success) {
+          const issues = parsed.error.issues.slice(0, 3).map((i) => i.message).join('; ')
+          toast(`Invalid backup file: ${issues}`, 'error')
+          return
+        }
+        const recordCount = Object.values(parsed.data).reduce((s, arr) => s + arr.length, 0)
         const ok = await confirm({
           title: 'Import backup',
-          message: 'Importing a backup will replace ALL current data. This cannot be undone.',
+          message: `Importing will replace ALL current data with ${recordCount} records from the backup. This cannot be undone.`,
           confirmText: 'Import',
           danger: true,
         })
         if (!ok) return
-        importState(data)
+        importState(parsed.data as Record<string, unknown>)
         toast('Backup restored successfully')
       } catch {
         toast('Invalid backup file. Please select a valid LandLord Pal backup.', 'error')
@@ -98,11 +105,11 @@ export default function Settings() {
       danger: true,
     })
     if (!ok2) return
-    importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [] })
+    importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [], documents: [] })
     toast('All data cleared')
   }
 
-  const totalRecords = properties.length + units.length + tenants.length + expenses.length + payments.length + maintenanceRequests.length + activityLogs.length + vendors.length + communicationLogs.length
+  const totalRecords = properties.length + units.length + tenants.length + expenses.length + payments.length + maintenanceRequests.length + activityLogs.length + vendors.length + communicationLogs.length + documents.length
 
   return (
     <div className="page settings-page">
@@ -238,6 +245,7 @@ export default function Settings() {
           <div className="data-summary-item"><Users size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{vendors.length}</span><span className="data-summary-label">Vendors</span></div>
           <div className="data-summary-item"><FileText size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{activityLogs.length}</span><span className="data-summary-label">Notes</span></div>
           <div className="data-summary-item"><MessageSquare size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{communicationLogs.length}</span><span className="data-summary-label">Communications</span></div>
+          <div className="data-summary-item"><Paperclip size={16} className="data-summary-icon" aria-hidden="true" /><span className="data-summary-count">{documents.length}</span><span className="data-summary-label">Documents</span></div>
         </div>
         <p className="muted" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>{totalRecords} total records</p>
       </section>

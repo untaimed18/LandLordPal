@@ -1565,6 +1565,130 @@ input:focus, select:focus, textarea:focus {
 .cal-scheduled { border-left-color: var(--accent); }
 .cal-scheduled .cal-event-icon { color: var(--accent); }
 
+/* Save indicator */
+.save-indicator {
+  position: fixed;
+  bottom: 60px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  z-index: 1000;
+  animation: save-fade-in 0.2s ease;
+  pointer-events: none;
+}
+.save-indicator-success {
+  background: var(--positive);
+  color: white;
+}
+.save-indicator-error {
+  background: var(--negative);
+  color: white;
+}
+@keyframes save-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Form validation errors */
+.form-field-error input,
+.form-field-error select,
+.form-field-error textarea {
+  border-color: var(--negative) !important;
+  box-shadow: 0 0 0 2px rgba(var(--negative-rgb, 239, 68, 68), 0.15);
+}
+.field-error {
+  display: block;
+  color: var(--negative);
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* Document attachments */
+.documents-section { margin-top: 1rem; }
+.doc-list { display: flex; flex-direction: column; gap: 6px; margin-top: 0.5rem; }
+.doc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.doc-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-item-size { color: var(--text-muted); font-size: 0.78rem; }
+.doc-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  transition: all 0.15s;
+}
+.doc-upload-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+}
+
+/* Recurring payment badge */
+.autopay-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--positive);
+  background: rgba(var(--positive-rgb, 16, 185, 129), 0.1);
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+
+/* Pagination component */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 1rem;
+}
+.pagination button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pagination button:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+.pagination button.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.pagination button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* No-print utility */
 .no-print { }
 

@@ -8,7 +8,7 @@ let db = null;
 let dbFilePath = null;
 let userDataDir = null;
 
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 // ─── Encryption ──────────────────────────────────────────────────────────────
 
@@ -83,18 +83,20 @@ const TABLE_NAME_MAP = {
   activityLogs: 'activity_logs',
   vendors: 'vendors',
   communicationLogs: 'communication_logs',
+  documents: 'documents',
 };
 
 const TABLE_COLUMNS = {
   properties: ['id', 'name', 'address', 'city', 'state', 'zip', 'propertyType', 'sqft', 'amenities', 'purchasePrice', 'purchaseDate', 'insuranceProvider', 'insurancePolicyNumber', 'insuranceExpiry', 'notes', 'createdAt', 'updatedAt'],
   units: ['id', 'propertyId', 'name', 'bedrooms', 'bathrooms', 'sqft', 'monthlyRent', 'deposit', 'available', 'notes', 'createdAt', 'updatedAt'],
-  tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositReturned', 'depositDeductions', 'gracePeriodDays', 'lateFeeAmount', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'rentHistory', 'createdAt', 'updatedAt'],
+  tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositReturned', 'depositDeductions', 'gracePeriodDays', 'lateFeeAmount', 'autopay', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'rentHistory', 'createdAt', 'updatedAt'],
   expenses: ['id', 'propertyId', 'unitId', 'category', 'amount', 'date', 'description', 'recurring', 'vendorId', 'createdAt', 'updatedAt'],
   payments: ['id', 'tenantId', 'unitId', 'propertyId', 'amount', 'date', 'periodStart', 'periodEnd', 'method', 'notes', 'lateFee', 'createdAt', 'updatedAt'],
   maintenance_requests: ['id', 'propertyId', 'unitId', 'tenantId', 'title', 'description', 'priority', 'status', 'category', 'vendorId', 'cost', 'scheduledDate', 'recurrence', 'resolvedAt', 'notes', 'createdAt', 'updatedAt'],
   activity_logs: ['id', 'entityType', 'entityId', 'note', 'date', 'createdAt'],
   vendors: ['id', 'name', 'phone', 'email', 'specialty', 'notes', 'createdAt', 'updatedAt'],
   communication_logs: ['id', 'tenantId', 'propertyId', 'type', 'date', 'subject', 'notes', 'createdAt'],
+  documents: ['id', 'entityType', 'entityId', 'filename', 'originalName', 'size', 'mimeType', 'createdAt'],
 };
 
 // JS object -> DB row serializers
@@ -123,6 +125,7 @@ const serializers = {
     deposit: t.deposit ?? null, depositReturned: t.depositReturned ?? null,
     depositDeductions: t.depositDeductions ?? null,
     gracePeriodDays: t.gracePeriodDays ?? null, lateFeeAmount: t.lateFeeAmount ?? null,
+    autopay: t.autopay ? 1 : 0,
     moveInDate: t.moveInDate ?? null, moveOutDate: t.moveOutDate ?? null,
     moveInNotes: t.moveInNotes ?? null, moveOutNotes: t.moveOutNotes ?? null,
     notes: t.notes ?? null,
@@ -164,6 +167,11 @@ const serializers = {
     id: c.id, tenantId: c.tenantId, propertyId: c.propertyId,
     type: c.type, date: c.date, subject: c.subject,
     notes: c.notes ?? null, createdAt: c.createdAt,
+  }),
+  documents: (d) => ({
+    id: d.id, entityType: d.entityType, entityId: d.entityId,
+    filename: d.filename, originalName: d.originalName,
+    size: d.size, mimeType: d.mimeType, createdAt: d.createdAt,
   }),
 };
 
@@ -275,6 +283,7 @@ function migrateIfNeeded(userDataPath) {
       if (currentVersion < 1) runMigrationV1();
       if (currentVersion < 2) runMigrationV2();
       if (currentVersion < 3) runMigrationV3();
+      if (currentVersion < 4) runMigrationV4();
       setSchemaVersion(CURRENT_SCHEMA_VERSION);
     });
     migrate();
@@ -451,6 +460,73 @@ function runMigrationV3() {
   }
 }
 
+function runMigrationV4() {
+  log.info('  Running migration v4: documents table + tenant autopay');
+  const addCol = (table, col, type) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch { /* already exists */ }
+  };
+  addCol('tenants', 'autopay', 'INTEGER DEFAULT 0');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS documents (
+      id TEXT PRIMARY KEY,
+      entityType TEXT NOT NULL,
+      entityId TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      originalName TEXT NOT NULL,
+      size INTEGER NOT NULL DEFAULT 0,
+      mimeType TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+  `);
+}
+
+// ─── File management for document attachments ─────────────────────────────────
+
+function getDocumentsDir() {
+  const dir = path.join(userDataDir, 'documents');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function copyFileToDocuments(sourcePath) {
+  const ext = path.extname(sourcePath);
+  const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
+  const destPath = path.join(getDocumentsDir(), filename);
+  fs.copyFileSync(sourcePath, destPath);
+  const stats = fs.statSync(destPath);
+  return { filename, size: stats.size };
+}
+
+function isSafeFilename(filename) {
+  return typeof filename === 'string'
+    && filename.length > 0
+    && !filename.includes('/')
+    && !filename.includes('\\')
+    && !filename.includes('..');
+}
+
+function deleteDocumentFile(filename) {
+  if (!isSafeFilename(filename)) {
+    log.warn('Rejected unsafe document filename:', filename);
+    return;
+  }
+  const filePath = path.join(getDocumentsDir(), filename);
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (err) {
+    log.warn('Failed to delete document file:', err.message);
+  }
+}
+
+function getDocumentPath(filename) {
+  if (!isSafeFilename(filename)) {
+    log.warn('Rejected unsafe document filename:', filename);
+    return null;
+  }
+  return path.join(getDocumentsDir(), filename);
+}
+
 // ─── Create tables (fresh DB only — IF NOT EXISTS) ───────────────────────────
 
 function createTables() {
@@ -480,6 +556,7 @@ function createTables() {
       monthlyRent REAL NOT NULL DEFAULT 0, deposit REAL,
       depositReturned REAL, depositDeductions TEXT,
       gracePeriodDays INTEGER, lateFeeAmount REAL,
+      autopay INTEGER DEFAULT 0,
       moveInDate TEXT, moveOutDate TEXT, moveInNotes TEXT, moveOutNotes TEXT,
       notes TEXT, rentHistory TEXT,
       createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
@@ -532,6 +609,16 @@ function createTables() {
       name TEXT NOT NULL, phone TEXT, email TEXT, specialty TEXT, notes TEXT,
       createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS documents (
+      id TEXT PRIMARY KEY,
+      entityType TEXT NOT NULL,
+      entityId TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      originalName TEXT NOT NULL,
+      size INTEGER NOT NULL DEFAULT 0,
+      mimeType TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
   `);
 }
 
@@ -563,6 +650,7 @@ function rowToTenant(row) {
     ...row,
     email: decrypt(row.email) || undefined,
     phone: decrypt(row.phone) || undefined,
+    autopay: !!row.autopay,
     rentHistory: safeJsonParse(row.rentHistory, undefined),
   };
 }
@@ -605,6 +693,8 @@ function rowToCommunicationLog(row) {
 
 function rowToActivityLog(row) { return row; }
 
+function rowToDocument(row) { return row; }
+
 function rowToVendor(row) {
   return {
     ...row,
@@ -625,6 +715,7 @@ const ROW_CONVERTERS = {
   activity_logs: rowToActivityLog,
   vendors: rowToVendor,
   communication_logs: rowToCommunicationLog,
+  documents: rowToDocument,
 };
 
 // JS key -> serializer key uses the SQL table name for maintenance_requests, activity_logs, communication_logs
@@ -645,6 +736,7 @@ function loadAll() {
     activityLogs: db.prepare('SELECT * FROM activity_logs').all().map(rowToActivityLog),
     vendors: db.prepare('SELECT * FROM vendors').all().map(rowToVendor),
     communicationLogs: db.prepare('SELECT * FROM communication_logs').all().map(rowToCommunicationLog),
+    documents: db.prepare('SELECT * FROM documents').all().map(rowToDocument),
   };
 }
 
@@ -665,6 +757,7 @@ function replaceAll(state) {
       maintenance_requests: 'maintenanceRequests',
       activity_logs: 'activityLogs', vendors: 'vendors',
       communication_logs: 'communicationLogs',
+      documents: 'documents',
     };
 
     for (const [sqlTable, jsKey] of Object.entries(tableKeyMap)) {
@@ -711,11 +804,21 @@ function executeBatch(operations) {
           break;
         }
         case 'deleteWhere': {
+          const cols = TABLE_COLUMNS[sqlTable];
+          if (!cols || !cols.includes(op.column)) {
+            log.warn(`deleteWhere: invalid column "${op.column}" for table ${sqlTable}`);
+            break;
+          }
           db.prepare(`DELETE FROM ${sqlTable} WHERE "${op.column}" = ?`).run(op.value);
           break;
         }
         case 'clearField': {
-          const hasUpdatedAt = TABLE_COLUMNS[sqlTable]?.includes('updatedAt');
+          const tableCols = TABLE_COLUMNS[sqlTable];
+          if (!tableCols || !tableCols.includes(op.field) || !tableCols.includes(op.where.column)) {
+            log.warn(`clearField: invalid column for table ${sqlTable}`);
+            break;
+          }
+          const hasUpdatedAt = tableCols.includes('updatedAt');
           if (hasUpdatedAt) {
             const now = new Date().toISOString().slice(0, 10);
             db.prepare(`UPDATE ${sqlTable} SET "${op.field}" = NULL, updatedAt = ? WHERE "${op.where.column}" = ?`).run(now, op.where.value);
@@ -740,4 +843,4 @@ function closeDatabase() {
   }
 }
 
-module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase };
+module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath };

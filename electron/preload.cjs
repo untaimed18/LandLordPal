@@ -8,6 +8,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbSave: (state) => ipcRenderer.invoke('db:save', state),
   dbBatch: (operations) => ipcRenderer.invoke('db:batch', operations),
 
+  // Document attachments
+  docPickFile: () => ipcRenderer.invoke('doc:pick-file'),
+  docDeleteFile: (filename) => ipcRenderer.invoke('doc:delete-file', filename),
+  docOpenFile: (filename) => ipcRenderer.invoke('doc:open-file', filename),
+
   // Auto-update API
   onUpdateStatus: (callback) => {
     const handler = (_event, data) => callback(data);

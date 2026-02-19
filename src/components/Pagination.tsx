@@ -1,15 +1,31 @@
 import type { PaginationResult } from '../hooks/usePagination'
 
-interface Props<T> {
-  pagination: PaginationResult<T>
+interface DirectProps {
+  currentPage: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  pagination?: never
 }
 
-export default function Pagination<T>({ pagination: p }: Props<T>) {
-  if (p.total <= p.pageSize && p.totalPages <= 1) return null
+interface HookProps {
+  pagination: PaginationResult<unknown>
+  currentPage?: never
+  totalPages?: never
+  onPageChange?: never
+}
+
+type PaginationProps = DirectProps | HookProps
+
+export default function Pagination(props: PaginationProps) {
+  const currentPage = 'pagination' in props && props.pagination ? props.pagination.page : props.currentPage!
+  const totalPages = 'pagination' in props && props.pagination ? props.pagination.totalPages : props.totalPages!
+  const onPageChange = 'pagination' in props && props.pagination ? props.pagination.setPage : props.onPageChange!
+
+  if (totalPages <= 1) return null
 
   const pages: (number | '...')[] = []
-  for (let i = 1; i <= p.totalPages; i++) {
-    if (i === 1 || i === p.totalPages || Math.abs(i - p.page) <= 1) {
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || Math.abs(i - currentPage) <= 1) {
       pages.push(i)
     } else if (pages[pages.length - 1] !== '...') {
       pages.push('...')
@@ -17,55 +33,28 @@ export default function Pagination<T>({ pagination: p }: Props<T>) {
   }
 
   return (
-    <div className="pagination">
-      <span className="pagination-info">
-        {p.startIndex}–{p.endIndex} of {p.total}
-      </span>
-      <div className="pagination-controls">
-        <button
-          type="button"
-          className="btn-sm"
-          disabled={p.page <= 1}
-          onClick={() => p.setPage(p.page - 1)}
-          aria-label="Previous page"
-        >
-          ‹
-        </button>
-        {pages.map((pg, i) =>
-          pg === '...' ? (
-            <span key={`e${i}`} className="pagination-ellipsis">…</span>
-          ) : (
-            <button
-              key={pg}
-              type="button"
-              className={`btn-sm ${pg === p.page ? 'active' : ''}`}
-              onClick={() => p.setPage(pg)}
-            >
-              {pg}
-            </button>
-          )
-        )}
-        <button
-          type="button"
-          className="btn-sm"
-          disabled={p.page >= p.totalPages}
-          onClick={() => p.setPage(p.page + 1)}
-          aria-label="Next page"
-        >
-          ›
-        </button>
-      </div>
-      <select
-        className="pagination-size"
-        value={p.pageSize}
-        onChange={(e) => p.setPageSize(Number(e.target.value))}
-        aria-label="Page size"
-      >
-        <option value={10}>10 / page</option>
-        <option value={25}>25 / page</option>
-        <option value={50}>50 / page</option>
-        <option value={100}>100 / page</option>
-      </select>
-    </div>
+    <nav className="pagination" aria-label="Pagination">
+      <button type="button" disabled={currentPage === 1} onClick={() => onPageChange(currentPage - 1)} aria-label="Previous page">
+        &lsaquo;
+      </button>
+      {pages.map((p, i) =>
+        p === '...' ? (
+          <span key={`ellipsis-${i}`} style={{ padding: '0 4px', color: 'var(--text-muted)' }}>&hellip;</span>
+        ) : (
+          <button
+            key={p}
+            type="button"
+            className={currentPage === p ? 'active' : ''}
+            onClick={() => onPageChange(p)}
+            aria-current={currentPage === p ? 'page' : undefined}
+          >
+            {p}
+          </button>
+        )
+      )}
+      <button type="button" disabled={currentPage === totalPages} onClick={() => onPageChange(currentPage + 1)} aria-label="Next page">
+        &rsaquo;
+      </button>
+    </nav>
   )
 }

@@ -65,6 +65,7 @@ export interface Tenant {
   depositDeductions?: string;
   gracePeriodDays?: number;
   lateFeeAmount?: number;
+  autopay?: boolean;
   moveInDate?: string;
   moveOutDate?: string;
   moveInNotes?: string;
@@ -179,6 +180,18 @@ export interface Vendor {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Document attachment
+export interface Document {
+  id: Id;
+  entityType: 'property' | 'unit' | 'tenant' | 'expense' | 'vendor';
+  entityId: Id;
+  filename: string;
+  originalName: string;
+  size: number;
+  mimeType: string;
+  createdAt: string;
 }
 
 // Computed / display types

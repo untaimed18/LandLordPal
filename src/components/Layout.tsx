@@ -4,6 +4,7 @@ import { useStore } from '../hooks/useStore'
 import { useToast } from '../context/ToastContext'
 import { loadSettings } from '../lib/settings'
 import UpdateNotification from './UpdateNotification'
+import SaveIndicator from './SaveIndicator'
 import {
   LayoutDashboard,
   Banknote,
@@ -175,6 +176,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <UpdateNotification />
+      <SaveIndicator />
       <footer className="footer" role="contentinfo">
         <span>LandLord Pal</span>
         <span className="footer-sep" aria-hidden="true">·</span>
