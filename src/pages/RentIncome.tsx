@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { getRentRollForMonth, getTenantReliability } from '../lib/calculations'
 import { loadSettings } from '../lib/settings'
-import { addPayment } from '../store'
+import { addPayment, updateTenant } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate, formatMonthYear } from '../lib/format'
@@ -30,6 +30,10 @@ export default function RentIncome() {
   const [paymentModal, setPaymentModal] = useState<{ tenantId: string; amount: number } | null>(null)
   const [paymentDate, setPaymentDate] = useState(nowISO())
   const [paymentMethod, setPaymentMethod] = useState<'check' | 'transfer' | 'cash' | 'other'>('transfer')
+  const [showBulkRent, setShowBulkRent] = useState(false)
+  const [bulkRentPct, setBulkRentPct] = useState(3)
+  const [bulkRentFlat, setBulkRentFlat] = useState(0)
+  const [bulkRentMode, setBulkRentMode] = useState<'pct' | 'flat'>('pct')
 
   useEffect(() => {
     if (!paymentModal) return
@@ -107,6 +111,35 @@ export default function RentIncome() {
     setPaymentModal(null)
   }
 
+  async function handleBulkRentAdjust() {
+    const adjustments = tenants.map((t) => {
+      const newRent = bulkRentMode === 'pct'
+        ? Math.round(t.monthlyRent * (1 + bulkRentPct / 100))
+        : t.monthlyRent + bulkRentFlat
+      return { id: t.id, oldRent: t.monthlyRent, newRent }
+    }).filter((a) => a.newRent !== a.oldRent && a.newRent > 0)
+
+    if (adjustments.length === 0) { toast('No adjustments to make', 'info'); return }
+
+    const desc = bulkRentMode === 'pct' ? `${bulkRentPct}% increase` : `$${bulkRentFlat} increase`
+    const ok = await confirm({
+      title: `Adjust rent for ${adjustments.length} tenants?`,
+      message: `Apply a ${desc} to all current tenants. This will update their monthly rent amounts.`,
+      confirmText: `Adjust ${adjustments.length} rents`,
+    })
+    if (!ok) return
+
+    try {
+      for (const a of adjustments) {
+        await updateTenant(a.id, { monthlyRent: a.newRent })
+      }
+      toast(`Rent adjusted for ${adjustments.length} tenants`)
+      setShowBulkRent(false)
+    } catch {
+      toast('Bulk rent adjustment failed partway through', 'error')
+    }
+  }
+
   return (
     <div className="page rent-income-page">
       <div className="page-header">
@@ -117,6 +150,11 @@ export default function RentIncome() {
         {unpaidAutopay.length > 0 && (
           <button type="button" className="btn primary" onClick={handleRecordAllAutopay}>
             <RefreshCw size={14} /> Record {unpaidAutopay.length} autopay
+          </button>
+        )}
+        {tenants.length > 0 && (
+          <button type="button" className="btn" onClick={() => setShowBulkRent(true)}>
+            Bulk Rent Adjust
           </button>
         )}
         {rentRoll.length > 0 && (
@@ -290,6 +328,43 @@ export default function RentIncome() {
                 <button type="button" className="btn" onClick={() => setPaymentModal(null)}>Cancel</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showBulkRent && (
+        <div className="modal-overlay" onClick={() => setShowBulkRent(false)}>
+          <div className="modal card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Bulk Rent Adjustment</h3>
+              <button type="button" className="btn-icon" onClick={() => setShowBulkRent(false)} aria-label="Close">×</button>
+            </div>
+            <p className="muted" style={{ marginBottom: '1rem' }}>Adjust rent for all current tenants at once. This is useful for annual rent increases.</p>
+            <div className="form-grid">
+              <label>Mode
+                <select value={bulkRentMode} onChange={(e) => setBulkRentMode(e.target.value as 'pct' | 'flat')}>
+                  <option value="pct">Percentage increase</option>
+                  <option value="flat">Flat amount increase</option>
+                </select>
+              </label>
+              {bulkRentMode === 'pct' ? (
+                <label>Increase (%) <input type="number" min={-50} max={50} step={0.5} value={bulkRentPct} onChange={(e) => setBulkRentPct(+e.target.value)} /></label>
+              ) : (
+                <label>Increase ($) <input type="number" min={-5000} max={5000} step={1} value={bulkRentFlat} onChange={(e) => setBulkRentFlat(+e.target.value)} /></label>
+              )}
+            </div>
+            <div style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
+              <strong>Preview:</strong> {tenants.length} tenant{tenants.length !== 1 ? 's' : ''} affected.
+              {tenants.slice(0, 5).map((t) => {
+                const newRent = bulkRentMode === 'pct' ? Math.round(t.monthlyRent * (1 + bulkRentPct / 100)) : t.monthlyRent + bulkRentFlat
+                return <div key={t.id} className="muted">{t.name}: {formatMoney(t.monthlyRent)} → {formatMoney(newRent)}</div>
+              })}
+              {tenants.length > 5 && <div className="muted">...and {tenants.length - 5} more</div>}
+            </div>
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
+              <button type="button" className="btn primary" onClick={handleBulkRentAdjust}>Apply Adjustment</button>
+              <button type="button" className="btn" onClick={() => setShowBulkRent(false)}>Cancel</button>
+            </div>
           </div>
         </div>
       )}

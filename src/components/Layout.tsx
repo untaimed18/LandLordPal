@@ -137,6 +137,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -149,6 +150,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       if (e.key === 'Escape') {
         setSearchOpen(false)
         setSearchQuery('')
+        setShowShortcuts(false)
+      }
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement) && !(e.target instanceof HTMLSelectElement)) {
+        e.preventDefault()
+        setShowShortcuts((v) => !v)
       }
     }
     window.addEventListener('keydown', handler)
@@ -285,6 +291,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showShortcuts && (
+        <div className="search-overlay" onClick={() => setShowShortcuts(false)} role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+          <div className="search-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, padding: '1.5rem' }}>
+            <h2 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>Keyboard Shortcuts</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.5rem 1.5rem' }}>
+              <kbd style={{ background: 'var(--bg-sub)', padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', fontSize: '0.85rem' }}>Ctrl+K</kbd><span>Search</span>
+              <kbd style={{ background: 'var(--bg-sub)', padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', fontSize: '0.85rem' }}>Ctrl+Z</kbd><span>Undo</span>
+              <kbd style={{ background: 'var(--bg-sub)', padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', fontSize: '0.85rem' }}>Ctrl+Y</kbd><span>Redo</span>
+              <kbd style={{ background: 'var(--bg-sub)', padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', fontSize: '0.85rem' }}>Ctrl+Shift+Z</kbd><span>Redo (alt)</span>
+              <kbd style={{ background: 'var(--bg-sub)', padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', fontSize: '0.85rem' }}>?</kbd><span>Toggle this panel</span>
+              <kbd style={{ background: 'var(--bg-sub)', padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', fontSize: '0.85rem' }}>Escape</kbd><span>Close modals / panels</span>
+            </div>
+            <button type="button" className="btn small" onClick={() => setShowShortcuts(false)} style={{ marginTop: '1.25rem' }}>Close</button>
           </div>
         </div>
       )}

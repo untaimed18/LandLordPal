@@ -15,6 +15,9 @@ import {
   getYoYTrends,
   getPropertyComparison,
   getForecast,
+  getVacancyAnalysis,
+  getMortgageAmortization,
+  getMaintenanceCostTrends,
 } from '../lib/calculations'
 import type { Property, Unit, Tenant, Expense, Payment } from '../types'
 
@@ -425,5 +428,83 @@ describe('getForecast', () => {
     const f = getForecast([tenant], [], [])
     expect(f.leaseExpirationRisk).toHaveLength(0)
     expect(f.rentAtRisk).toBe(0)
+  })
+})
+
+// ─── Vacancy Analysis ─────────────────────────────────────────────────────────
+
+describe('getVacancyAnalysis', () => {
+  it('identifies vacant units', () => {
+    const property = makeProperty()
+    const unit1 = makeUnit({ id: 'u1', available: false })
+    const unit2 = makeUnit({ id: 'u2', available: true, monthlyRent: 800 })
+    const tenant = makeTenant({ unitId: 'u1' })
+    const result = getVacancyAnalysis([property], [unit1, unit2], [tenant])
+    expect(result.vacantUnits).toHaveLength(1)
+    expect(result.vacantUnits[0].unit.id).toBe('u2')
+    expect(result.totalMonthlyLoss).toBe(800)
+  })
+
+  it('returns 100% occupancy when all units are occupied', () => {
+    const property = makeProperty()
+    const unit = makeUnit()
+    const tenant = makeTenant()
+    const result = getVacancyAnalysis([property], [unit], [tenant])
+    expect(result.vacantUnits).toHaveLength(0)
+    expect(result.occupancyRate).toBe(1)
+  })
+
+  it('handles no units', () => {
+    const result = getVacancyAnalysis([], [], [])
+    expect(result.vacantUnits).toHaveLength(0)
+    expect(result.occupancyRate).toBe(1)
+  })
+})
+
+// ─── Mortgage Amortization ────────────────────────────────────────────────────
+
+describe('getMortgageAmortization', () => {
+  it('generates amortization schedule', () => {
+    const schedule = getMortgageAmortization(100000, 6, 30)
+    expect(schedule.length).toBe(360)
+    expect(schedule[0].balance).toBeLessThan(100000)
+    expect(schedule[schedule.length - 1].balance).toBe(0)
+  })
+
+  it('returns empty for zero balance', () => {
+    expect(getMortgageAmortization(0, 6, 30)).toEqual([])
+  })
+
+  it('returns empty for zero rate', () => {
+    expect(getMortgageAmortization(100000, 0, 30)).toEqual([])
+  })
+
+  it('first payment has more interest than principal', () => {
+    const schedule = getMortgageAmortization(200000, 7, 30)
+    expect(schedule[0].interest).toBeGreaterThan(schedule[0].principal)
+  })
+})
+
+// ─── Maintenance Cost Trends ──────────────────────────────────────────────────
+
+describe('getMaintenanceCostTrends', () => {
+  it('aggregates costs by month', () => {
+    const now = new Date()
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const requests = [
+      { category: 'plumbing', cost: 300, resolvedAt: `${thisMonth}-05`, createdAt: `${thisMonth}-01` },
+      { category: 'electrical', cost: 200, resolvedAt: `${thisMonth}-10`, createdAt: `${thisMonth}-02` },
+    ]
+    const trends = getMaintenanceCostTrends(requests, 3)
+    const currentMonthTrend = trends.find((t) => t.period === thisMonth)
+    expect(currentMonthTrend).toBeDefined()
+    expect(currentMonthTrend!.total).toBe(500)
+    expect(currentMonthTrend!.byCategory['plumbing']).toBe(300)
+  })
+
+  it('returns zeros for months with no costs', () => {
+    const trends = getMaintenanceCostTrends([], 3)
+    expect(trends.length).toBe(3)
+    expect(trends.every((t) => t.total === 0)).toBe(true)
   })
 })

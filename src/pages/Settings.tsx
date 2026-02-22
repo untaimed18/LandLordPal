@@ -411,6 +411,25 @@ export default function Settings() {
               Days after due date before rent is flagged late, when not set per-tenant (default: {DEFAULT_SETTINGS.defaultGracePeriodDays})
             </span>
           </div>
+          <div className="threshold-item">
+            <div className="threshold-header">
+              <span className="threshold-label">Rent reminder window</span>
+              <div className="threshold-input-wrap">
+                <input
+                  type="number"
+                  min={0}
+                  max={15}
+                  value={appSettings.rentReminderDays}
+                  onChange={(e) => handleSettingChange('rentReminderDays', Math.max(0, +e.target.value || 0))}
+                  aria-label="Rent reminder days"
+                />
+                <span className="threshold-unit">days</span>
+              </div>
+            </div>
+            <span className="threshold-desc">
+              Show rent reminders on the dashboard this many days before the 1st (default: {DEFAULT_SETTINGS.rentReminderDays}). Set to 0 to disable.
+            </span>
+          </div>
         </div>
         <button type="button" className="btn small" onClick={handleResetSettings} style={{ marginTop: '0.5rem' }}>
           Reset to defaults

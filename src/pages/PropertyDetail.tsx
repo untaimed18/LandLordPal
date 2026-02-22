@@ -233,6 +233,9 @@ export default function PropertyDetail() {
               {prop.purchasePrice != null && prop.purchasePrice > 0 && (
                 <p className="muted">Purchased for {formatMoney(prop.purchasePrice)}{prop.purchaseDate ? ` on ${formatDate(prop.purchaseDate)}` : ''}</p>
               )}
+              {prop.mortgageBalance != null && prop.mortgageBalance > 0 && (
+                <p className="muted">Mortgage: {formatMoney(prop.mortgageBalance)} at {prop.mortgageRate ?? 0}% · {formatMoney(prop.mortgageMonthlyPayment ?? 0)}/mo</p>
+              )}
               {prop.amenities && prop.amenities.length > 0 && (
                 <div className="amenity-chips" style={{ marginTop: '0.25rem' }}>
                   {prop.amenities.map((a) => <span key={a} className="amenity-chip active">{a}</span>)}

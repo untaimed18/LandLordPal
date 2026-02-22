@@ -47,6 +47,11 @@ export default function PropertyEditForm({ property, onClose }: Props) {
     notes: property.notes ?? '',
     purchasePrice: property.purchasePrice ?? 0,
     purchaseDate: property.purchaseDate ?? '',
+    mortgageBalance: property.mortgageBalance ?? 0,
+    mortgageRate: property.mortgageRate ?? 0,
+    mortgageTermYears: property.mortgageTermYears ?? 30,
+    mortgageMonthlyPayment: property.mortgageMonthlyPayment ?? 0,
+    mortgageStartDate: property.mortgageStartDate ?? '',
     insuranceProvider: property.insuranceProvider ?? '',
     insurancePolicyNumber: property.insurancePolicyNumber ?? '',
     insuranceExpiry: property.insuranceExpiry ?? '',
@@ -65,6 +70,11 @@ export default function PropertyEditForm({ property, onClose }: Props) {
       amenities: form.amenities.length > 0 ? form.amenities : undefined,
       purchasePrice: form.purchasePrice || undefined,
       purchaseDate: form.purchaseDate || undefined,
+      mortgageBalance: form.mortgageBalance || undefined,
+      mortgageRate: form.mortgageRate || undefined,
+      mortgageTermYears: form.mortgageTermYears || undefined,
+      mortgageMonthlyPayment: form.mortgageMonthlyPayment || undefined,
+      mortgageStartDate: form.mortgageStartDate || undefined,
       insuranceProvider: form.insuranceProvider || undefined,
       insurancePolicyNumber: form.insurancePolicyNumber || undefined,
       insuranceExpiry: form.insuranceExpiry || undefined,
@@ -105,6 +115,16 @@ export default function PropertyEditForm({ property, onClose }: Props) {
           ))}
         </div>
       </div>
+      <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
+        <legend>Mortgage</legend>
+        <div className="form-grid">
+          <label>Loan Balance <input type="number" min={0} step={1} value={form.mortgageBalance || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageBalance: +e.target.value || 0 }))} /></label>
+          <label>Annual Rate (%) <input type="number" min={0} max={20} step={0.125} value={form.mortgageRate || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageRate: +e.target.value || 0 }))} /></label>
+          <label>Term (years) <input type="number" min={1} max={50} value={form.mortgageTermYears || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageTermYears: +e.target.value || 0 }))} /></label>
+          <label>Monthly Payment <input type="number" min={0} step={0.01} value={form.mortgageMonthlyPayment || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageMonthlyPayment: +e.target.value || 0 }))} /></label>
+          <label>Start Date <input type="date" value={form.mortgageStartDate} onChange={(e) => setForm((f) => ({ ...f, mortgageStartDate: e.target.value }))} /></label>
+        </div>
+      </fieldset>
       <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
         <legend>Insurance</legend>
         <div className="form-grid">

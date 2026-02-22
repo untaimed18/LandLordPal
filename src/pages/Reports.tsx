@@ -4,7 +4,7 @@ import { useStore } from '../hooks/useStore'
 import { formatMoney } from '../lib/format'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { exportTablePdf, formatMoneyForPdf } from '../lib/pdfExport'
-import { getYoYTrends, getPropertyComparison } from '../lib/calculations'
+import { getYoYTrends, getPropertyComparison, getVacancyAnalysis, getMaintenanceCostTrends } from '../lib/calculations'
 import { useToast } from '../context/ToastContext'
 import type { ExpenseCategory } from '../types'
 import { BarChart3, ArrowUpRight, ArrowDownRight } from 'lucide-react'
@@ -23,10 +23,10 @@ const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
-type ReportType = 'pnl' | 'expenses' | 'tax' | 'cashflow' | 'yoy' | 'comparison'
+type ReportType = 'pnl' | 'expenses' | 'tax' | 'cashflow' | 'yoy' | 'comparison' | 'vacancy' | 'maintenance' | 'ledger'
 
 export default function Reports() {
-  const { properties, units, tenants, expenses, payments } = useStore()
+  const { properties, units, tenants, expenses, payments, maintenanceRequests } = useStore()
   const toast = useToast()
   const printRef = useRef<HTMLDivElement>(null)
   const now = new Date()
@@ -109,6 +109,16 @@ export default function Reports() {
   const propertyComparison = useMemo(
     () => getPropertyComparison(properties, units, tenants, expenses, payments, year),
     [properties, units, tenants, expenses, payments, year],
+  )
+
+  const vacancyData = useMemo(
+    () => getVacancyAnalysis(properties, units, tenants),
+    [properties, units, tenants],
+  )
+
+  const maintenanceTrends = useMemo(
+    () => getMaintenanceCostTrends(maintenanceRequests, 12),
+    [maintenanceRequests],
   )
 
   const totalIncome = monthly.reduce((s, m) => s + m.income, 0)
@@ -263,6 +273,9 @@ export default function Reports() {
           { key: 'cashflow' as const, label: 'Cash Flow' },
           { key: 'yoy' as const, label: 'Year-over-Year' },
           { key: 'comparison' as const, label: 'Property Comparison' },
+          { key: 'vacancy' as const, label: 'Vacancy' },
+          { key: 'maintenance' as const, label: 'Maintenance Costs' },
+          { key: 'ledger' as const, label: 'General Ledger' },
         ]).map((tab) => (
           <button
             key={tab.key}
@@ -457,6 +470,151 @@ export default function Reports() {
               )}
             </div>
           )}
+        </section>
+      )}
+
+      {activeReport === 'vacancy' && (
+        <section className="card section-card">
+          <h2>Vacancy Analysis</h2>
+          {vacancyData.vacantUnits.length === 0 ? (
+            <p className="empty-state">No vacant units — full occupancy.</p>
+          ) : (
+            <>
+              <div className="metrics-grid" style={{ marginBottom: '1rem' }}>
+                <div className="metric-card"><span className="metric-label">Vacant Units</span><span className="metric-value">{vacancyData.vacantUnits.length}</span></div>
+                <div className="metric-card"><span className="metric-label">Avg Days Vacant</span><span className="metric-value">{vacancyData.avgDaysVacant}</span></div>
+                <div className="metric-card"><span className="metric-label">Monthly Loss</span><span className="metric-value negative">{formatMoney(vacancyData.totalMonthlyLoss)}</span></div>
+                <div className="metric-card"><span className="metric-label">Occupancy Rate</span><span className="metric-value">{(vacancyData.occupancyRate * 100).toFixed(1)}%</span></div>
+              </div>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead><tr><th>Unit</th><th>Property</th><th>Days Vacant</th><th>Monthly Loss</th><th>Last Tenant End</th></tr></thead>
+                  <tbody>
+                    {vacancyData.vacantUnits.map((v) => (
+                      <tr key={v.unit.id}>
+                        <td><strong>{v.unit.name}</strong></td>
+                        <td>{v.property.name}</td>
+                        <td className={v.daysVacant > 30 ? 'negative' : ''}>{v.daysVacant}</td>
+                        <td className="negative">{formatMoney(v.monthlyLoss)}</td>
+                        <td>{v.lastTenantEnd ? v.lastTenantEnd : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {activeReport === 'maintenance' && (
+        <section className="card section-card">
+          <h2>Maintenance Cost Trends — Last 12 Months</h2>
+          {maintenanceTrends.every((m) => m.total === 0) ? (
+            <p className="empty-state">No maintenance costs recorded yet.</p>
+          ) : (
+            <>
+              <div className="cashflow-chart" style={{ marginBottom: '1rem' }}>
+                {(() => {
+                  const maxVal = Math.max(1, ...maintenanceTrends.map((m) => m.total))
+                  return maintenanceTrends.map((m, i) => (
+                    <div key={i} className="cashflow-bar-group">
+                      <div className="cashflow-bars">
+                        <div className="cashflow-bar expense" style={{ height: `${(m.total / maxVal) * 120}px` }} title={`${m.period}: ${formatMoney(m.total)}`} />
+                      </div>
+                      <span className="cashflow-label">{m.period.slice(5)}</span>
+                      <span className="cashflow-net negative">{formatMoney(m.total)}</span>
+                    </div>
+                  ))
+                })()}
+              </div>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead><tr><th>Month</th><th>Total</th><th>Categories</th></tr></thead>
+                  <tbody>
+                    {maintenanceTrends.filter((m) => m.total > 0).map((m) => (
+                      <tr key={m.period}>
+                        <td>{m.period}</td>
+                        <td className="negative">{formatMoney(m.total)}</td>
+                        <td className="muted">{Object.entries(m.byCategory).map(([k, v]) => `${k}: ${formatMoney(v)}`).join(', ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {activeReport === 'ledger' && (
+        <section className="card section-card">
+          <div className="section-card-header">
+            <h2>General Ledger — {year}</h2>
+            <button type="button" className="btn small" onClick={() => {
+              const entries: { date: string; account: string; description: string; debit: number; credit: number; property: string }[] = []
+              for (const p of filteredPayments.filter((p) => new Date(p.date + 'T12:00:00').getFullYear() === year)) {
+                const prop = properties.find((pr) => pr.id === p.propertyId)
+                const tenant = tenants.find((t) => t.id === p.tenantId)
+                entries.push({ date: p.date, account: 'Rental Income', description: `Payment — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.amount, property: prop?.name ?? '' })
+                if (p.lateFee && p.lateFee > 0) {
+                  entries.push({ date: p.date, account: 'Late Fee Income', description: `Late fee — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.lateFee, property: prop?.name ?? '' })
+                }
+              }
+              for (const ex of filteredExpenses.filter((e) => new Date(e.date + 'T12:00:00').getFullYear() === year)) {
+                const prop = properties.find((pr) => pr.id === ex.propertyId)
+                entries.push({ date: ex.date, account: ex.category.charAt(0).toUpperCase() + ex.category.slice(1), description: ex.description, debit: ex.amount, credit: 0, property: prop?.name ?? '' })
+              }
+              entries.sort((a, b) => a.date.localeCompare(b.date))
+              const csv = toCSV(
+                ['Date', 'Account', 'Description', 'Property', 'Debit', 'Credit'],
+                entries.map((e) => [e.date, e.account, e.description, e.property, e.debit || '', e.credit || ''])
+              )
+              downloadCSV(`general-ledger-${year}.csv`, csv)
+              toast('General ledger exported', 'info')
+            }}>Export CSV</button>
+          </div>
+          {(() => {
+            const entries: { date: string; account: string; description: string; debit: number; credit: number; property: string }[] = []
+            for (const p of filteredPayments.filter((p) => new Date(p.date + 'T12:00:00').getFullYear() === year)) {
+              const prop = properties.find((pr) => pr.id === p.propertyId)
+              const tenant = tenants.find((t) => t.id === p.tenantId)
+              entries.push({ date: p.date, account: 'Rental Income', description: `Payment — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.amount, property: prop?.name ?? '' })
+              if (p.lateFee && p.lateFee > 0) entries.push({ date: p.date, account: 'Late Fee Income', description: `Late fee — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.lateFee, property: prop?.name ?? '' })
+            }
+            for (const ex of filteredExpenses.filter((e) => new Date(e.date + 'T12:00:00').getFullYear() === year)) {
+              const prop = properties.find((pr) => pr.id === ex.propertyId)
+              entries.push({ date: ex.date, account: ex.category.charAt(0).toUpperCase() + ex.category.slice(1), description: ex.description, debit: ex.amount, credit: 0, property: prop?.name ?? '' })
+            }
+            entries.sort((a, b) => a.date.localeCompare(b.date))
+            const totalDebit = entries.reduce((s, e) => s + e.debit, 0)
+            const totalCredit = entries.reduce((s, e) => s + e.credit, 0)
+            if (entries.length === 0) return <p className="empty-state">No transactions for {year}.</p>
+            return (
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Property</th><th>Debit</th><th>Credit</th></tr></thead>
+                  <tbody>
+                    {entries.map((e, i) => (
+                      <tr key={i}>
+                        <td>{e.date}</td>
+                        <td>{e.account}</td>
+                        <td>{e.description}</td>
+                        <td className="muted">{e.property}</td>
+                        <td className={e.debit > 0 ? 'negative' : ''}>{e.debit > 0 ? formatMoney(e.debit) : ''}</td>
+                        <td className={e.credit > 0 ? 'positive' : ''}>{e.credit > 0 ? formatMoney(e.credit) : ''}</td>
+                      </tr>
+                    ))}
+                    <tr className="table-total-row">
+                      <td colSpan={4}><strong>Totals</strong></td>
+                      <td className="negative"><strong>{formatMoney(totalDebit)}</strong></td>
+                      <td className="positive"><strong>{formatMoney(totalCredit)}</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()}
         </section>
       )}
 

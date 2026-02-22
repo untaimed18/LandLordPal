@@ -1,17 +1,21 @@
 import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
+import { updateTenant } from '../store'
 import { getLeaseStatus, getTenantReliability } from '../lib/calculations'
 import { formatMoney, formatDate } from '../lib/format'
 import Breadcrumbs from '../components/Breadcrumbs'
 import DocumentAttachments from '../components/DocumentAttachments'
 import LeaseRenewalModal from '../components/LeaseRenewalModal'
 import EmailTemplateModal from '../components/EmailTemplateModal'
+import InspectionChecklistModal from '../components/InspectionChecklistModal'
 import { loadSettings } from '../lib/settings'
-import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send } from 'lucide-react'
+import { exportTenantStatementPdf, formatMoneyForPdf } from '../lib/pdfExport'
+import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send, FileText, ClipboardList } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
+import type { InspectionChecklist, InspectionItem } from '../types'
 
 export default function TenantDetail() {
   const { id } = useParams<{ id: string }>()
@@ -19,6 +23,7 @@ export default function TenantDetail() {
   const toast = useToast()
   const [showRenewal, setShowRenewal] = useState(false)
   const [showEmail, setShowEmail] = useState(false)
+  const [showInspection, setShowInspection] = useState<'move_in' | 'move_out' | null>(null)
 
   const tenant = tenants.find((t) => t.id === id)
   const settings = loadSettings()
@@ -46,6 +51,36 @@ export default function TenantDetail() {
 
     return { total, count, lateCount, avgPayment: count > 0 ? total / count : 0, monthlyMap }
   }, [tenantPayments, tenant, settings.defaultGracePeriodDays])
+
+  const ledger = useMemo(() => {
+    if (!tenant) return []
+    const entries: { date: string; description: string; charge: number; payment: number; balance: number }[] = []
+    const leaseStart = new Date(tenant.leaseStart + 'T12:00:00')
+    const leaseEnd = new Date(tenant.leaseEnd + 'T12:00:00')
+    const now = new Date()
+    const endDate = leaseEnd < now ? leaseEnd : now
+    let balance = 0
+
+    const allPayments = [...tenantPayments].sort((a, b) => a.date.localeCompare(b.date))
+
+    const d = new Date(leaseStart.getFullYear(), leaseStart.getMonth(), 1)
+    while (d <= endDate) {
+      const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      balance += tenant.monthlyRent
+      entries.push({ date: `${monthStr}-01`, description: `Rent due — ${monthStr}`, charge: tenant.monthlyRent, payment: 0, balance })
+      const monthPayments = allPayments.filter((p) => p.date.startsWith(monthStr))
+      for (const p of monthPayments) {
+        balance -= p.amount
+        entries.push({ date: p.date, description: `Payment${p.method ? ` (${p.method})` : ''}${p.notes ? ` — ${p.notes}` : ''}`, charge: 0, payment: p.amount, balance })
+        if (p.lateFee && p.lateFee > 0) {
+          balance += p.lateFee
+          entries.push({ date: p.date, description: 'Late fee', charge: p.lateFee, payment: 0, balance })
+        }
+      }
+      d.setMonth(d.getMonth() + 1)
+    }
+    return entries
+  }, [tenant, tenantPayments])
 
   const reliability = useMemo(
     () => (tenant ? getTenantReliability(tenant, payments, settings.defaultGracePeriodDays) : null),
@@ -102,6 +137,8 @@ export default function TenantDetail() {
           <button type="button" className="btn small" onClick={() => window.print()}><Printer size={14} /> Print summary</button>
           <button type="button" className="btn small primary" onClick={() => setShowRenewal(true)}><RotateCw size={14} /> Renew Lease</button>
           <button type="button" className="btn small" onClick={() => setShowEmail(true)} disabled={!tenant.email}><Send size={14} /> Send Email</button>
+          <button type="button" className="btn small" onClick={() => setShowInspection('move_in')}><ClipboardList size={14} /> Move-In Inspect</button>
+          <button type="button" className="btn small" onClick={() => setShowInspection('move_out')}><ClipboardList size={14} /> Move-Out Inspect</button>
           {tenantPayments.length > 0 && (
             <button type="button" className="btn small" onClick={() => {
               downloadCSV(`${tenant.name.replace(/\s+/g, '-')}-payments-${nowISO()}.csv`, toCSV(
@@ -111,10 +148,26 @@ export default function TenantDetail() {
               toast('Payments exported', 'info')
             }}>Export payments CSV</button>
           )}
+          {ledger.length > 0 && (
+            <button type="button" className="btn small" onClick={() => {
+              exportTenantStatementPdf({
+                tenantName: tenant.name,
+                propertyName: property?.name ?? 'Unknown',
+                unitName: unit?.name ?? 'Unknown',
+                monthlyRent: tenant.monthlyRent,
+                leaseStart: tenant.leaseStart,
+                leaseEnd: tenant.leaseEnd,
+                transactions: ledger,
+                filename: `${tenant.name.replace(/\s+/g, '-')}-statement-${nowISO()}.pdf`,
+              })
+              toast('Statement exported', 'info')
+            }}><FileText size={14} /> Export Statement PDF</button>
+          )}
         </div>
       </div>
 
       {showRenewal && <LeaseRenewalModal tenant={tenant} onClose={() => setShowRenewal(false)} />}
+      {showInspection && <InspectionChecklistModal tenant={tenant} type={showInspection} onClose={() => setShowInspection(null)} />}
       {showEmail && property && unit && (
         <EmailTemplateModal
           tenant={tenant}
@@ -203,6 +256,52 @@ export default function TenantDetail() {
         {tenant.notes && <p className="stc-notes">{tenant.notes}</p>}
       </section>
 
+      <section className="card section-card" style={{ marginBottom: '1.5rem' }}>
+        <h2>Screening & Application</h2>
+        <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
+          <label>
+            Status
+            <select
+              value={tenant.screeningStatus ?? ''}
+              onChange={async (e) => {
+                const val = e.target.value as 'applied' | 'approved' | 'rejected' | ''
+                try {
+                  await updateTenant(tenant.id, { screeningStatus: val || undefined })
+                  toast('Screening status updated')
+                } catch { toast('Failed to update status', 'error') }
+              }}
+            >
+              <option value="">Not set</option>
+              <option value="applied">Applied</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </label>
+        </div>
+        {tenant.screeningStatus && (
+          <span className={`badge ${tenant.screeningStatus === 'approved' ? 'active-lease' : tenant.screeningStatus === 'rejected' ? 'expired' : 'expiring'}`} style={{ marginBottom: '0.5rem', display: 'inline-block' }}>
+            {tenant.screeningStatus.charAt(0).toUpperCase() + tenant.screeningStatus.slice(1)}
+          </span>
+        )}
+        <label>
+          Screening Notes
+          <textarea
+            defaultValue={tenant.screeningNotes ?? ''}
+            rows={2}
+            onBlur={async (e) => {
+              const val = e.target.value
+              if (val !== (tenant.screeningNotes ?? '')) {
+                try {
+                  await updateTenant(tenant.id, { screeningNotes: val || undefined })
+                  toast('Screening notes saved')
+                } catch { toast('Failed to save notes', 'error') }
+              }
+            }}
+            placeholder="Background check results, references, credit score, etc."
+          />
+        </label>
+      </section>
+
       {tenant.rentHistory && tenant.rentHistory.length > 0 && (
         <section className="card section-card" style={{ marginBottom: '1.5rem' }}>
           <h2><TrendingUp size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Rent History</h2>
@@ -224,6 +323,33 @@ export default function TenantDetail() {
               </tbody>
             </table>
           </div>
+        </section>
+      )}
+
+      {ledger.length > 0 && (
+        <section className="card section-card" style={{ marginBottom: '1.5rem' }}>
+          <h2><FileText size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Account Ledger</h2>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead><tr><th>Date</th><th>Description</th><th>Charges</th><th>Payments</th><th>Balance</th></tr></thead>
+              <tbody>
+                {ledger.map((e, i) => (
+                  <tr key={i}>
+                    <td>{formatDate(e.date)}</td>
+                    <td>{e.description}</td>
+                    <td className={e.charge > 0 ? 'negative' : ''}>{e.charge > 0 ? formatMoney(e.charge) : ''}</td>
+                    <td className={e.payment > 0 ? 'positive' : ''}>{e.payment > 0 ? formatMoney(e.payment) : ''}</td>
+                    <td className={e.balance > 0 ? 'negative' : e.balance < 0 ? 'positive' : ''}>{formatMoney(e.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {ledger.length > 0 && (
+            <p style={{ marginTop: '0.75rem', fontWeight: 600 }}>
+              Current balance: <span className={ledger[ledger.length - 1].balance > 0 ? 'negative' : 'positive'}>{formatMoney(ledger[ledger.length - 1].balance)}</span>
+            </p>
+          )}
         </section>
       )}
 
@@ -269,6 +395,32 @@ export default function TenantDetail() {
               </tbody>
             </table>
           </div>
+        </section>
+      )}
+
+      {tenant.inspections && tenant.inspections.length > 0 && (
+        <section className="card section-card" style={{ marginBottom: '1.5rem' }}>
+          <h2><ClipboardList size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Inspection Reports ({tenant.inspections.length})</h2>
+          {tenant.inspections.map((insp, idx) => (
+            <div key={idx} style={{ marginBottom: idx < tenant.inspections!.length - 1 ? '1.5rem' : 0 }}>
+              <h3 style={{ marginBottom: '0.5rem' }}>{insp.type === 'move_in' ? 'Move-In' : 'Move-Out'} — {formatDate(insp.date)}</h3>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead><tr><th>Area</th><th>Condition</th><th>Notes</th></tr></thead>
+                  <tbody>
+                    {insp.items.map((item, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 500 }}>{item.area}</td>
+                        <td><span className={`badge ${item.condition === 'damaged' || item.condition === 'poor' ? 'expired' : item.condition === 'fair' ? 'expiring' : 'active-lease'}`}>{item.condition}</span></td>
+                        <td>{item.notes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {insp.generalNotes && <p className="muted" style={{ marginTop: '0.5rem' }}>{insp.generalNotes}</p>}
+            </div>
+          ))}
         </section>
       )}
 

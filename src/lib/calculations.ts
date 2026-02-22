@@ -576,3 +576,114 @@ export function getLeasesEndingSoon(
     })
     .sort((a, b) => a.tenant.leaseEnd.localeCompare(b.tenant.leaseEnd))
 }
+
+// ─── Vacancy Analysis ─────────────────────────────────────────────────────────
+
+export interface VacancyInfo {
+  unit: Unit;
+  property: Property;
+  daysVacant: number;
+  lastTenantEnd: string | null;
+  monthlyLoss: number;
+}
+
+export function getVacancyAnalysis(
+  properties: Property[],
+  units: Unit[],
+  tenants: Tenant[],
+): { vacantUnits: VacancyInfo[]; avgDaysVacant: number; totalMonthlyLoss: number; occupancyRate: number } {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const occupiedUnitIds = new Set(tenants.map((t) => t.unitId))
+  const vacantUnits: VacancyInfo[] = []
+
+  for (const unit of units) {
+    if (occupiedUnitIds.has(unit.id)) continue
+    const property = properties.find((p) => p.id === unit.propertyId)
+    if (!property) continue
+    const pastTenants = tenants
+      .filter((t) => t.unitId === unit.id && t.moveOutDate)
+      .sort((a, b) => (b.moveOutDate ?? '').localeCompare(a.moveOutDate ?? ''))
+    const allTenants = tenants
+      .filter((t) => t.unitId === unit.id)
+      .sort((a, b) => b.leaseEnd.localeCompare(a.leaseEnd))
+    const lastEnd = pastTenants[0]?.moveOutDate ?? allTenants[0]?.leaseEnd ?? null
+    let daysVacant = 0
+    if (lastEnd) {
+      const endDate = new Date(lastEnd + 'T12:00:00')
+      daysVacant = Math.max(0, Math.ceil((today.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24)))
+    } else {
+      const created = new Date(unit.createdAt + 'T12:00:00')
+      daysVacant = Math.max(0, Math.ceil((today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)))
+    }
+    vacantUnits.push({ unit, property, daysVacant, lastTenantEnd: lastEnd, monthlyLoss: unit.monthlyRent })
+  }
+
+  const totalMonthlyLoss = vacantUnits.reduce((s, v) => s + v.monthlyLoss, 0)
+  const avgDaysVacant = vacantUnits.length > 0 ? Math.round(vacantUnits.reduce((s, v) => s + v.daysVacant, 0) / vacantUnits.length) : 0
+  const occupancyRate = units.length > 0 ? ((units.length - vacantUnits.length) / units.length) : 1
+
+  return { vacantUnits: vacantUnits.sort((a, b) => b.daysVacant - a.daysVacant), avgDaysVacant, totalMonthlyLoss, occupancyRate }
+}
+
+// ─── Mortgage Amortization ────────────────────────────────────────────────────
+
+export interface AmortizationEntry {
+  month: number;
+  payment: number;
+  principal: number;
+  interest: number;
+  balance: number;
+}
+
+export function getMortgageAmortization(
+  balance: number,
+  annualRate: number,
+  termYears: number,
+): AmortizationEntry[] {
+  if (balance <= 0 || annualRate <= 0 || termYears <= 0) return []
+  const monthlyRate = annualRate / 100 / 12
+  const totalMonths = termYears * 12
+  const payment = balance * (monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / (Math.pow(1 + monthlyRate, totalMonths) - 1)
+  const schedule: AmortizationEntry[] = []
+  let remaining = balance
+  for (let m = 1; m <= totalMonths && remaining > 0.01; m++) {
+    const interest = remaining * monthlyRate
+    const principal = Math.min(payment - interest, remaining)
+    remaining -= principal
+    schedule.push({ month: m, payment: Math.round(payment * 100) / 100, principal: Math.round(principal * 100) / 100, interest: Math.round(interest * 100) / 100, balance: Math.round(Math.max(0, remaining) * 100) / 100 })
+  }
+  return schedule
+}
+
+// ─── Maintenance Cost Trends ──────────────────────────────────────────────────
+
+export interface MaintenanceTrend {
+  period: string;
+  total: number;
+  byCategory: Record<string, number>;
+}
+
+export function getMaintenanceCostTrends(
+  requests: { category: string; cost?: number; resolvedAt?: string; createdAt: string }[],
+  months: number = 12,
+): MaintenanceTrend[] {
+  const now = new Date()
+  const trends: MaintenanceTrend[] = []
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const monthRequests = requests.filter((r) => {
+      const dateStr = r.resolvedAt ?? r.createdAt
+      return dateStr.startsWith(prefix) && r.cost && r.cost > 0
+    })
+    const byCategory: Record<string, number> = {}
+    let total = 0
+    for (const r of monthRequests) {
+      total += r.cost!
+      byCategory[r.category] = (byCategory[r.category] ?? 0) + r.cost!
+    }
+    trends.push({ period: prefix, total, byCategory })
+  }
+  return trends
+}

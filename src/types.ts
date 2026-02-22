@@ -21,6 +21,11 @@ export interface Property {
   amenities?: string[];
   purchasePrice?: number;
   purchaseDate?: string;
+  mortgageBalance?: number;
+  mortgageRate?: number;
+  mortgageTermYears?: number;
+  mortgageMonthlyPayment?: number;
+  mortgageStartDate?: string;
   insuranceProvider?: string;
   insurancePolicyNumber?: string;
   insuranceExpiry?: string;
@@ -78,6 +83,9 @@ export interface Tenant {
   moveInNotes?: string;
   moveOutNotes?: string;
   notes?: string;
+  screeningStatus?: 'applied' | 'approved' | 'rejected';
+  screeningNotes?: string;
+  inspections?: InspectionChecklist[];
   rentHistory?: RentChange[];
   leaseHistory?: LeaseHistory[];
   createdAt: string;
@@ -209,6 +217,22 @@ export interface Document {
   size: number;
   mimeType: string;
   createdAt: string;
+}
+
+// Inspection checklists
+export type InspectionCondition = 'excellent' | 'good' | 'fair' | 'poor' | 'damaged';
+
+export interface InspectionItem {
+  area: string;
+  condition: InspectionCondition;
+  notes: string;
+}
+
+export interface InspectionChecklist {
+  type: 'move_in' | 'move_out';
+  date: string;
+  items: InspectionItem[];
+  generalNotes: string;
 }
 
 // Computed / display types

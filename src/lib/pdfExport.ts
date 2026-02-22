@@ -62,3 +62,60 @@ export function exportTablePdf({ title, subtitle, headers, rows, filename, total
 export function formatMoneyForPdf(n: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
 }
+
+interface TenantStatementOptions {
+  tenantName: string
+  propertyName: string
+  unitName: string
+  monthlyRent: number
+  leaseStart: string
+  leaseEnd: string
+  transactions: { date: string; description: string; charge: number; payment: number; balance: number }[]
+  filename: string
+}
+
+export function exportTenantStatementPdf(opts: TenantStatementOptions) {
+  const doc = new jsPDF()
+
+  doc.setFontSize(18)
+  doc.setTextColor(...BRAND_COLOR)
+  doc.text('Tenant Statement', 14, 20)
+
+  doc.setFontSize(10)
+  doc.setTextColor(60, 60, 60)
+  doc.text(opts.tenantName, 14, 28)
+  doc.text(`${opts.propertyName} — ${opts.unitName}`, 14, 34)
+  doc.text(`Lease: ${opts.leaseStart} to ${opts.leaseEnd}  ·  Rent: ${formatMoneyForPdf(opts.monthlyRent)}/mo`, 14, 40)
+
+  const rows = opts.transactions.map((t) => [
+    t.date,
+    t.description,
+    t.charge > 0 ? formatMoneyForPdf(t.charge) : '',
+    t.payment > 0 ? formatMoneyForPdf(t.payment) : '',
+    formatMoneyForPdf(t.balance),
+  ])
+
+  const finalBalance = opts.transactions.length > 0 ? opts.transactions[opts.transactions.length - 1].balance : 0
+
+  autoTable(doc, {
+    head: [['Date', 'Description', 'Charges', 'Payments', 'Balance']],
+    body: rows,
+    startY: 46,
+    headStyles: { fillColor: BRAND_COLOR, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    bodyStyles: { fontSize: 8.5 },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    margin: { left: 14, right: 14 },
+  })
+
+  const finalY = (doc as unknown as Record<string, number>).lastAutoTable?.finalY ?? 200
+  doc.setFontSize(11)
+  doc.setTextColor(30, 30, 30)
+  doc.text(`Balance Due: ${formatMoneyForPdf(finalBalance)}`, 14, finalY + 10)
+
+  doc.setFontSize(7)
+  doc.setTextColor(160, 160, 160)
+  const pageHeight = doc.internal.pageSize.getHeight()
+  doc.text(`LandLord Pal — Generated ${new Date().toLocaleDateString()}`, 14, pageHeight - 8)
+
+  doc.save(opts.filename)
+}

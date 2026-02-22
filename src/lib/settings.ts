@@ -5,6 +5,7 @@ export interface AppSettings {
   insuranceWarningDays: number;
   maintenanceLookaheadDays: number;
   defaultGracePeriodDays: number;
+  rentReminderDays: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -12,6 +13,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   insuranceWarningDays: 60,
   maintenanceLookaheadDays: 30,
   defaultGracePeriodDays: 5,
+  rentReminderDays: 3,
 };
 
 export function loadSettings(): AppSettings {
@@ -24,6 +26,7 @@ export function loadSettings(): AppSettings {
       insuranceWarningDays: typeof parsed.insuranceWarningDays === 'number' ? parsed.insuranceWarningDays : DEFAULT_SETTINGS.insuranceWarningDays,
       maintenanceLookaheadDays: typeof parsed.maintenanceLookaheadDays === 'number' ? parsed.maintenanceLookaheadDays : DEFAULT_SETTINGS.maintenanceLookaheadDays,
       defaultGracePeriodDays: typeof parsed.defaultGracePeriodDays === 'number' ? parsed.defaultGracePeriodDays : DEFAULT_SETTINGS.defaultGracePeriodDays,
+      rentReminderDays: typeof parsed.rentReminderDays === 'number' ? parsed.rentReminderDays : DEFAULT_SETTINGS.rentReminderDays,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

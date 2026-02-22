@@ -36,6 +36,7 @@ import {
   ArrowDownRight,
   Info,
   Activity,
+  Mail,
 } from 'lucide-react'
 
 export default function Dashboard() {
@@ -103,6 +104,14 @@ export default function Dashboard() {
   const [tooltipId, setTooltipId] = useState<string | null>(null)
 
   const hasData = properties.length > 0
+
+  const rentReminders = useMemo(() => {
+    const dayOfMonth = now.getDate()
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    const daysUntilFirst = dayOfMonth <= 1 ? (1 - dayOfMonth) : (daysInMonth - dayOfMonth + 1)
+    if (daysUntilFirst > settings.rentReminderDays) return []
+    return notPaidThisMonth.filter((r) => r.tenant.email)
+  }, [notPaidThisMonth, now, settings.rentReminderDays])
 
   const vacancyCost = fu
     .filter((u) => !ft.some((t) => t.unitId === u.id))
@@ -567,6 +576,34 @@ export default function Dashboard() {
           </div>
           <div className="dash-section-footer">
             <Link to="/rent" className="btn small">View full rent roll <ChevronRight size={14} aria-hidden="true" /></Link>
+          </div>
+        </section>
+      )}
+
+      {rentReminders.length > 0 && (
+        <section className="dash-section" aria-label="Rent reminders">
+          <div className="dash-section-header">
+            <h2><Mail size={18} aria-hidden="true" /> Rent Reminders</h2>
+            <span className="dash-section-count">{rentReminders.length}</span>
+          </div>
+          <p className="dash-section-desc">Rent is due soon — send reminders to tenants who haven't paid yet.</p>
+          <div className="dash-list">
+            {rentReminders.map((r) => (
+              <div key={`rem-${r.tenant.id}`} className="dash-list-item" style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="dash-list-body" style={{ flex: 1 }}>
+                  <strong>{r.tenant.name}</strong>
+                  <span>{r.property.name} · {formatMoney(r.expectedRent)} · {r.tenant.email}</span>
+                </div>
+                <a
+                  href={`mailto:${r.tenant.email}?subject=${encodeURIComponent(`Rent Reminder — ${r.property.name}`)}&body=${encodeURIComponent(`Hi ${r.tenant.name},\n\nThis is a friendly reminder that your rent of ${formatMoney(r.expectedRent)} is due on the 1st.\n\nThank you,\nManagement`)}`}
+                  className="btn small primary no-print"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Mail size={12} /> Send Reminder
+                </a>
+              </div>
+            ))}
           </div>
         </section>
       )}
