@@ -9,7 +9,7 @@ import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate, formatMonthYear } from '../lib/format'
 import { nowISO } from '../lib/id'
 import { toCSV, downloadCSV } from '../lib/csv'
-import { RefreshCw, DollarSign, Calendar, CreditCard, User, Home, Banknote } from 'lucide-react'
+import { RefreshCw, DollarSign, Calendar, CreditCard, User, Home, Banknote, Percent, TrendingUp, TrendingDown, Users } from 'lucide-react'
 
 function startOfMonth(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
@@ -369,53 +369,117 @@ export default function RentIncome() {
         </div>
       )}
 
-      {showBulkRent && (
-        <div className="modal-overlay" onClick={() => setShowBulkRent(false)}>
-          <div className="modal card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Bulk Rent Adjustment</h3>
-              <button type="button" className="btn-icon" onClick={() => setShowBulkRent(false)} aria-label="Close">×</button>
-            </div>
-            <p className="muted" style={{ marginBottom: '1rem' }}>Adjust rent for all current tenants at once. This is useful for annual rent increases.</p>
-            <div className="form-grid">
-              <label>Mode
-                <select value={bulkRentMode} onChange={(e) => setBulkRentMode(e.target.value as 'pct' | 'flat')}>
-                  <option value="pct">Percentage increase</option>
-                  <option value="flat">Flat amount increase</option>
-                </select>
-              </label>
-              {bulkRentMode === 'pct' ? (
-                <label>Increase (%) <input type="number" min={-50} max={50} step={0.5} value={bulkRentPct} onChange={(e) => setBulkRentPct(+e.target.value)} /></label>
-              ) : (
-                <label>Increase ($) <input type="number" min={-5000} max={5000} step={1} value={bulkRentFlat} onChange={(e) => setBulkRentFlat(+e.target.value)} /></label>
-              )}
-            </div>
-            <div style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
-              <strong>Preview:</strong> {tenants.length} tenant{tenants.length !== 1 ? 's' : ''} affected
-              <div style={{ marginTop: '0.5rem', background: 'var(--bg)', borderRadius: 'var(--radius)', padding: '0.5rem 0.75rem' }}>
-                {tenants.slice(0, 5).map((t) => {
-                  const newRent = bulkRentMode === 'pct' ? Math.round(t.monthlyRent * (1 + bulkRentPct / 100)) : t.monthlyRent + bulkRentFlat
-                  const diff = newRent - t.monthlyRent
-                  return (
-                    <div key={t.id} className="bulk-preview-item">
-                      <span>{t.name}</span>
-                      <span className="muted">
-                        {formatMoney(t.monthlyRent)} <span className="arrow">→</span> {formatMoney(newRent)}
-                        {diff !== 0 && <span className={diff > 0 ? ' positive' : ' negative'}> ({diff > 0 ? '+' : ''}{formatMoney(diff)})</span>}
+      {showBulkRent && (() => {
+        const adjustments = tenants.map((t) => {
+          const newRent = bulkRentMode === 'pct' ? Math.round(t.monthlyRent * (1 + bulkRentPct / 100)) : t.monthlyRent + bulkRentFlat
+          return { id: t.id, name: t.name, oldRent: t.monthlyRent, newRent, diff: newRent - t.monthlyRent }
+        }).filter((a) => a.newRent > 0)
+        const totalOld = adjustments.reduce((s, a) => s + a.oldRent, 0)
+        const totalNew = adjustments.reduce((s, a) => s + a.newRent, 0)
+        const totalDiff = totalNew - totalOld
+
+        return (
+          <div className="modal-overlay" onClick={() => setShowBulkRent(false)}>
+            <div className="modal card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+              <div className="modal-header">
+                <h3><TrendingUp size={16} style={{ marginRight: 6, verticalAlign: '-2px' }} />Bulk Rent Adjustment</h3>
+                <button type="button" className="btn-icon" onClick={() => setShowBulkRent(false)} aria-label="Close">×</button>
+              </div>
+
+              <p className="muted" style={{ marginBottom: '1rem', fontSize: '0.88rem' }}>Adjust rent for all current tenants at once. Useful for annual increases.</p>
+
+              <div className="bulk-mode-toggle">
+                <button
+                  type="button"
+                  className={`bulk-mode-btn ${bulkRentMode === 'pct' ? 'active' : ''}`}
+                  onClick={() => setBulkRentMode('pct')}
+                >
+                  <Percent size={14} /> Percentage
+                </button>
+                <button
+                  type="button"
+                  className={`bulk-mode-btn ${bulkRentMode === 'flat' ? 'active' : ''}`}
+                  onClick={() => setBulkRentMode('flat')}
+                >
+                  <DollarSign size={14} /> Flat Amount
+                </button>
+              </div>
+
+              <div className="bulk-input-row">
+                {bulkRentMode === 'pct' ? (
+                  <label className="bulk-input-field">
+                    <span className="bulk-input-label">Increase / Decrease (%)</span>
+                    <div className="bulk-input-with-unit">
+                      <input type="number" min={-50} max={50} step={0.5} value={bulkRentPct} onChange={(e) => setBulkRentPct(+e.target.value)} />
+                      <span className="bulk-input-unit">%</span>
+                    </div>
+                  </label>
+                ) : (
+                  <label className="bulk-input-field">
+                    <span className="bulk-input-label">Increase / Decrease ($)</span>
+                    <div className="bulk-input-with-unit">
+                      <span className="bulk-input-unit">$</span>
+                      <input type="number" min={-5000} max={5000} step={1} value={bulkRentFlat} onChange={(e) => setBulkRentFlat(+e.target.value)} />
+                    </div>
+                  </label>
+                )}
+              </div>
+
+              <div className="bulk-summary-strip">
+                <div className="bulk-summary-stat">
+                  <span className="bulk-summary-stat-label"><Users size={12} /> Tenants</span>
+                  <span className="bulk-summary-stat-value">{adjustments.length}</span>
+                </div>
+                <div className="bulk-summary-stat">
+                  <span className="bulk-summary-stat-label">Current total</span>
+                  <span className="bulk-summary-stat-value">{formatMoney(totalOld)}/mo</span>
+                </div>
+                <div className="bulk-summary-stat">
+                  <span className="bulk-summary-stat-label">New total</span>
+                  <span className="bulk-summary-stat-value">{formatMoney(totalNew)}/mo</span>
+                </div>
+                <div className="bulk-summary-stat">
+                  <span className="bulk-summary-stat-label">Change</span>
+                  <span className={`bulk-summary-stat-value ${totalDiff > 0 ? 'positive' : totalDiff < 0 ? 'negative' : ''}`}>
+                    {totalDiff > 0 ? '+' : ''}{formatMoney(totalDiff)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bulk-preview-section">
+                <span className="bulk-preview-heading">Preview</span>
+                <div className="bulk-preview-list">
+                  {adjustments.slice(0, 6).map((a) => (
+                    <div key={a.id} className="bulk-preview-row">
+                      <span className="bulk-preview-name">{a.name}</span>
+                      <span className="bulk-preview-amounts">
+                        <span className="muted">{formatMoney(a.oldRent)}</span>
+                        <span className="bulk-preview-arrow">→</span>
+                        <span style={{ fontWeight: 600 }}>{formatMoney(a.newRent)}</span>
+                        {a.diff !== 0 && (
+                          <span className={`bulk-preview-diff ${a.diff > 0 ? 'increase' : 'decrease'}`}>
+                            {a.diff > 0 ? '+' : ''}{formatMoney(a.diff)}
+                          </span>
+                        )}
                       </span>
                     </div>
-                  )
-                })}
-                {tenants.length > 5 && <div className="muted" style={{ paddingTop: '0.25rem', borderTop: '1px solid var(--border)' }}>...and {tenants.length - 5} more</div>}
+                  ))}
+                  {adjustments.length > 6 && (
+                    <div className="bulk-preview-more">and {adjustments.length - 6} more tenant{adjustments.length - 6 !== 1 ? 's' : ''}</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn" onClick={() => setShowBulkRent(false)}>Cancel</button>
+                <button type="button" className="btn primary" onClick={handleBulkRentAdjust}>
+                  <TrendingUp size={14} /> Apply to {adjustments.length} tenant{adjustments.length !== 1 ? 's' : ''}
+                </button>
               </div>
             </div>
-            <div className="form-actions" style={{ marginTop: '1rem' }}>
-              <button type="button" className="btn primary" onClick={handleBulkRentAdjust}>Apply Adjustment</button>
-              <button type="button" className="btn" onClick={() => setShowBulkRent(false)}>Cancel</button>
-            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
