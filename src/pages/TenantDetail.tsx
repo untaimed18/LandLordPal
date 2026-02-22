@@ -11,7 +11,7 @@ import EmailTemplateModal from '../components/EmailTemplateModal'
 import InspectionChecklistModal from '../components/InspectionChecklistModal'
 import { loadSettings } from '../lib/settings'
 import { exportTenantStatementPdf, formatMoneyForPdf } from '../lib/pdfExport'
-import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send, FileText, ClipboardList, UserCheck, UserX, UserPlus } from 'lucide-react'
+import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send, FileText, ClipboardList, UserCheck, UserX, UserPlus, CircleDollarSign } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
@@ -61,15 +61,36 @@ export default function TenantDetail() {
     const endDate = leaseEnd < now ? leaseEnd : now
     let balance = 0
 
-    const allPayments = [...tenantPayments].sort((a, b) => a.date.localeCompare(b.date))
+    const rentPayments = [...tenantPayments].filter((p) => !p.category || p.category === 'rent').sort((a, b) => a.date.localeCompare(b.date))
+    const depositPayments = tenantPayments.filter((p) => p.category === 'deposit').sort((a, b) => a.date.localeCompare(b.date))
+    const lastMonthPayments = tenantPayments.filter((p) => p.category === 'last_month').sort((a, b) => a.date.localeCompare(b.date))
+    const otherPayments = tenantPayments.filter((p) => p.category === 'fee' || p.category === 'other').sort((a, b) => a.date.localeCompare(b.date))
+
+    if (tenant.deposit && tenant.deposit > 0) {
+      balance += tenant.deposit
+      entries.push({ date: tenant.leaseStart, description: 'Security deposit due', charge: tenant.deposit, payment: 0, balance })
+      for (const p of depositPayments) {
+        balance -= p.amount
+        entries.push({ date: p.date, description: `Security deposit payment${p.method ? ` (${p.method})` : ''}`, charge: 0, payment: p.amount, balance })
+      }
+    }
+
+    if (tenant.requireLastMonth) {
+      balance += tenant.monthlyRent
+      entries.push({ date: tenant.leaseStart, description: "Last month's rent due", charge: tenant.monthlyRent, payment: 0, balance })
+      for (const p of lastMonthPayments) {
+        balance -= p.amount
+        entries.push({ date: p.date, description: `Last month's rent payment${p.method ? ` (${p.method})` : ''}`, charge: 0, payment: p.amount, balance })
+      }
+    }
 
     const d = new Date(leaseStart.getFullYear(), leaseStart.getMonth(), 1)
     while (d <= endDate) {
       const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       balance += tenant.monthlyRent
       entries.push({ date: `${monthStr}-01`, description: `Rent due — ${monthStr}`, charge: tenant.monthlyRent, payment: 0, balance })
-      const monthPayments = allPayments.filter((p) => p.date.startsWith(monthStr))
-      for (const p of monthPayments) {
+      const monthRentPayments = rentPayments.filter((p) => p.date.startsWith(monthStr))
+      for (const p of monthRentPayments) {
         balance -= p.amount
         entries.push({ date: p.date, description: `Payment${p.method ? ` (${p.method})` : ''}${p.notes ? ` — ${p.notes}` : ''}`, charge: 0, payment: p.amount, balance })
         if (p.lateFee && p.lateFee > 0) {
@@ -79,6 +100,12 @@ export default function TenantDetail() {
       }
       d.setMonth(d.getMonth() + 1)
     }
+
+    for (const p of otherPayments) {
+      balance -= p.amount
+      entries.push({ date: p.date, description: `${p.category === 'fee' ? 'Fee' : 'Other'} payment${p.notes ? ` — ${p.notes}` : ''}`, charge: 0, payment: p.amount, balance })
+    }
+
     return entries
   }, [tenant, tenantPayments])
 
@@ -255,6 +282,66 @@ export default function TenantDetail() {
         </div>
         {tenant.notes && <p className="stc-notes">{tenant.notes}</p>}
       </section>
+
+      {(tenant.deposit != null && tenant.deposit > 0 || tenant.requireLastMonth) && (() => {
+        const depositOwed = tenant.deposit ?? 0
+        const depositPaid = tenant.depositPaidAmount ?? 0
+        const depositStatus = tenant.depositStatus ?? (depositOwed > 0 ? 'pending' : undefined)
+        const lastMonthOwed = tenant.requireLastMonth ? tenant.monthlyRent : 0
+        const lastMonthPaid = tenant.lastMonthPaid
+        const firstMonthOwed = tenant.requireFirstMonth ? tenant.monthlyRent : 0
+        const firstMonthPaid = tenantPayments.some((p) => (!p.category || p.category === 'rent') && p.date.startsWith(tenant.leaseStart.slice(0, 7)))
+
+        const totalOwed = depositOwed + lastMonthOwed + firstMonthOwed
+        const totalCollected = depositPaid + (lastMonthPaid ? lastMonthOwed : 0) + (firstMonthPaid ? firstMonthOwed : 0)
+
+        return (
+          <section className="card section-card" style={{ marginBottom: '1.5rem' }}>
+            <h2><CircleDollarSign size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Move-In Costs</h2>
+            <div className="movein-cost-grid">
+              {depositOwed > 0 && (
+                <div className="movein-cost-item">
+                  <div className="movein-cost-item-header">
+                    <span className="movein-cost-item-label">Security Deposit</span>
+                    <span className={`badge ${depositStatus === 'paid' ? 'paid' : depositStatus === 'partial' ? 'partial' : 'overdue'}`}>
+                      {depositStatus === 'paid' ? 'Paid' : depositStatus === 'partial' ? 'Partial' : 'Pending'}
+                    </span>
+                  </div>
+                  <span className="movein-cost-item-amount">{formatMoney(depositOwed)}</span>
+                  {depositStatus === 'partial' && <span className="movein-cost-item-sub">{formatMoney(depositPaid)} of {formatMoney(depositOwed)} received</span>}
+                  {tenant.depositPaidDate && <span className="movein-cost-item-sub">Received {formatDate(tenant.depositPaidDate)}</span>}
+                </div>
+              )}
+              {firstMonthOwed > 0 && (
+                <div className="movein-cost-item">
+                  <div className="movein-cost-item-header">
+                    <span className="movein-cost-item-label">First Month's Rent</span>
+                    <span className={`badge ${firstMonthPaid ? 'paid' : 'overdue'}`}>{firstMonthPaid ? 'Paid' : 'Pending'}</span>
+                  </div>
+                  <span className="movein-cost-item-amount">{formatMoney(firstMonthOwed)}</span>
+                </div>
+              )}
+              {lastMonthOwed > 0 && (
+                <div className="movein-cost-item">
+                  <div className="movein-cost-item-header">
+                    <span className="movein-cost-item-label">Last Month's Rent</span>
+                    <span className={`badge ${lastMonthPaid ? 'paid' : 'overdue'}`}>{lastMonthPaid ? 'Paid' : 'Pending'}</span>
+                  </div>
+                  <span className="movein-cost-item-amount">{formatMoney(lastMonthOwed)}</span>
+                </div>
+              )}
+            </div>
+            {totalOwed > 0 && (
+              <div className="movein-cost-total">
+                <span>Total: <strong>{formatMoney(totalCollected)}</strong> of <strong>{formatMoney(totalOwed)}</strong> collected</span>
+                {totalCollected < totalOwed && (
+                  <span className="negative" style={{ fontWeight: 600 }}>Outstanding: {formatMoney(totalOwed - totalCollected)}</span>
+                )}
+              </div>
+            )}
+          </section>
+        )
+      })()}
 
       <section className="card section-card" style={{ marginBottom: '1.5rem' }}>
         <h2><ShieldCheck size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Screening & Application</h2>

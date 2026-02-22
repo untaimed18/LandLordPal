@@ -7,7 +7,7 @@ import { nowISO } from '../lib/id'
 import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../lib/settings'
 import { backupSchema } from '../lib/schemas'
 import { parseImportCSV, type ImportType } from '../lib/csvImport'
-import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download, RefreshCw, Upload, Mail } from 'lucide-react'
+import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download, RefreshCw, Upload, Mail, ShieldCheck } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
@@ -434,6 +434,64 @@ export default function Settings() {
         <button type="button" className="btn small" onClick={handleResetSettings} style={{ marginTop: '0.5rem' }}>
           Reset to defaults
         </button>
+      </section>
+
+      <section className="card section-card">
+        <div className="section-card-header">
+          <h2><ShieldCheck size={18} aria-hidden="true" /> Move-in requirements</h2>
+        </div>
+        <p className="section-desc">Default requirements for new tenants. These can be overridden per-tenant when adding them.</p>
+        <div className="settings-thresholds">
+          <div className="threshold-item">
+            <label className={`toggle-card${appSettings.requireSecurityDeposit ? ' active' : ''}`}>
+              <input type="checkbox" checked={appSettings.requireSecurityDeposit} onChange={(e) => handleSettingChange('requireSecurityDeposit', e.target.checked)} />
+              <span className="toggle-card-text">
+                <span className="toggle-card-label">Require security deposit</span>
+                <span className="toggle-card-desc">Collect a security deposit before move-in</span>
+              </span>
+              <span className="toggle-track"><span className="toggle-thumb" /></span>
+            </label>
+          </div>
+          {appSettings.requireSecurityDeposit && (
+            <div className="threshold-item">
+              <div className="threshold-header">
+                <span className="threshold-label">Default deposit amount</span>
+                <div className="threshold-input-wrap">
+                  <span className="threshold-unit">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={appSettings.defaultDepositAmount}
+                    onChange={(e) => handleSettingChange('defaultDepositAmount', Math.max(0, +e.target.value || 0))}
+                    aria-label="Default deposit amount"
+                  />
+                </div>
+              </div>
+              <span className="threshold-desc">Set to $0 to default to one month's rent for each unit.</span>
+            </div>
+          )}
+          <div className="threshold-item">
+            <label className={`toggle-card${appSettings.requireFirstMonth ? ' active' : ''}`}>
+              <input type="checkbox" checked={appSettings.requireFirstMonth} onChange={(e) => handleSettingChange('requireFirstMonth', e.target.checked)} />
+              <span className="toggle-card-text">
+                <span className="toggle-card-label">Require first month's rent</span>
+                <span className="toggle-card-desc">First month's rent due at move-in</span>
+              </span>
+              <span className="toggle-track"><span className="toggle-thumb" /></span>
+            </label>
+          </div>
+          <div className="threshold-item">
+            <label className={`toggle-card${appSettings.requireLastMonth ? ' active' : ''}`}>
+              <input type="checkbox" checked={appSettings.requireLastMonth} onChange={(e) => handleSettingChange('requireLastMonth', e.target.checked)} />
+              <span className="toggle-card-text">
+                <span className="toggle-card-label">Require last month's rent</span>
+                <span className="toggle-card-desc">Collect last month's rent upfront before move-in</span>
+              </span>
+              <span className="toggle-track"><span className="toggle-thumb" /></span>
+            </label>
+          </div>
+        </div>
       </section>
 
       <section className="card section-card">

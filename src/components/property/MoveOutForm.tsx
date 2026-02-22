@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { addActivityLog, deleteTenant, takeSnapshot, restoreSnapshot } from '../../store'
+import { addActivityLog, deleteTenant, updateTenant, takeSnapshot, restoreSnapshot } from '../../store'
 import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { nowISO } from '../../lib/id'
@@ -29,10 +29,16 @@ export default function MoveOutForm({ tenant, onClose }: Props) {
     if (!ok) return
 
     const snapshot = takeSnapshot()
+    await updateTenant(tenant.id, {
+      moveOutDate,
+      moveOutNotes: moveOutNotes || undefined,
+      depositReturned: depositReturned,
+      depositDeductions: depositDeductions || undefined,
+    })
     addActivityLog({
       entityType: 'unit',
       entityId: tenant.unitId,
-      note: `Tenant "${tenant.name}" moved out. Deposit returned: ${formatMoney(depositReturned)}${depositDeductions ? `. Deductions: ${depositDeductions}` : ''}${moveOutNotes ? `. Notes: ${moveOutNotes}` : ''}`,
+      note: `Tenant "${tenant.name}" moved out. Deposit held: ${formatMoney(tenant.deposit ?? 0)}. Returned: ${formatMoney(depositReturned)}${depositDeductions ? `. Deductions: ${depositDeductions}` : ''}${moveOutNotes ? `. Notes: ${moveOutNotes}` : ''}`,
       date: moveOutDate,
     })
     deleteTenant(tenant.id)
@@ -54,7 +60,16 @@ export default function MoveOutForm({ tenant, onClose }: Props) {
       <h3>Move-out: {tenant.name}</h3>
       <div className="form-grid">
         <label>Move-out date * <input type="date" required value={moveOutDate} onChange={(e) => setMoveOutDate(e.target.value)} /></label>
-        <label>Deposit held <div className="form-static">{formatMoney(tenant.deposit ?? 0)}</div></label>
+        <label>Deposit held
+          <div className="form-static">
+            {formatMoney(tenant.deposit ?? 0)}
+            {tenant.depositStatus && (
+              <span className={`badge ${tenant.depositStatus === 'paid' ? 'paid' : tenant.depositStatus === 'partial' ? 'partial' : 'overdue'}`} style={{ marginLeft: '0.5rem' }}>
+                {tenant.depositStatus === 'paid' ? 'Collected' : tenant.depositStatus === 'partial' ? `${formatMoney(tenant.depositPaidAmount ?? 0)} collected` : 'Not collected'}
+              </span>
+            )}
+          </div>
+        </label>
         <label>Amount returned <input type="number" min={0} step={0.01} value={depositReturned || ''} onChange={(e) => setDepositReturned(+e.target.value)} /></label>
         <label>Deductions <input value={depositDeductions} onChange={(e) => setDepositDeductions(e.target.value)} placeholder="e.g. Carpet replacement, wall damage" /></label>
       </div>

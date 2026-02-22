@@ -32,4 +32,28 @@ describe('settings', () => {
     localStorage.setItem('landlordpal-settings', JSON.stringify({ leaseWarningDays: 'bad' }))
     expect(loadSettings().leaseWarningDays).toBe(DEFAULT_SETTINGS.leaseWarningDays)
   })
+
+  it('includes move-in requirement defaults', () => {
+    const s = loadSettings()
+    expect(s.requireSecurityDeposit).toBe(true)
+    expect(s.requireFirstMonth).toBe(true)
+    expect(s.requireLastMonth).toBe(false)
+    expect(s.defaultDepositAmount).toBe(0)
+  })
+
+  it('loads saved boolean move-in settings', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, requireLastMonth: true, defaultDepositAmount: 1500 })
+    const s = loadSettings()
+    expect(s.requireLastMonth).toBe(true)
+    expect(s.defaultDepositAmount).toBe(1500)
+  })
+
+  it('uses defaults for missing move-in boolean settings', () => {
+    localStorage.setItem('landlordpal-settings', JSON.stringify({ leaseWarningDays: 90 }))
+    const s = loadSettings()
+    expect(s.requireSecurityDeposit).toBe(true)
+    expect(s.requireFirstMonth).toBe(true)
+    expect(s.requireLastMonth).toBe(false)
+    expect(s.defaultDepositAmount).toBe(0)
+  })
 })

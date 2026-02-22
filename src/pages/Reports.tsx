@@ -54,10 +54,12 @@ export default function Reports() {
   const filteredPayments = propertyFilter ? payments.filter((p) => p.propertyId === propertyFilter) : payments
   const filteredExpenses = propertyFilter ? expenses.filter((e) => e.propertyId === propertyFilter) : expenses
 
+  const incomePayments = filteredPayments.filter((p) => !p.category || p.category === 'rent' || p.category === 'fee')
+
   // Monthly income/expenses
   const monthly = useMemo(() => {
     return Array.from({ length: 12 }, (_, month) => {
-      const monthPayments = filteredPayments.filter((p) => {
+      const monthPayments = incomePayments.filter((p) => {
         const d = new Date(p.date + 'T12:00:00')
         return d.getFullYear() === year && d.getMonth() === month
       })
@@ -69,7 +71,7 @@ export default function Reports() {
       const exp = monthExpenses.reduce((s, e) => s + e.amount, 0)
       return { month, income, expenses: exp, net: income - exp }
     })
-  }, [filteredPayments, filteredExpenses, year])
+  }, [incomePayments, filteredExpenses, year])
 
   // Expense breakdown by category
   const expenseByCategory = useMemo(() => {
@@ -88,16 +90,16 @@ export default function Reports() {
     })).filter((c) => c.amount > 0).sort((a, b) => b.amount - a.amount)
   }, [filteredExpenses, year])
 
-  // Tax summary (Schedule E-like)
+  // Tax summary (Schedule E-like) — deposits/last-month are liabilities, not income
   const taxSummary = useMemo(() => {
-    const yearPayments = filteredPayments.filter((p) => new Date(p.date + 'T12:00:00').getFullYear() === year)
+    const yearPayments = incomePayments.filter((p) => new Date(p.date + 'T12:00:00').getFullYear() === year)
     const yearExpenses = filteredExpenses.filter((e) => new Date(e.date + 'T12:00:00').getFullYear() === year)
     const totalIncome = yearPayments.reduce((s, p) => s + p.amount, 0)
     const byCategory: Record<string, number> = {}
     yearExpenses.forEach((e) => { byCategory[e.category] = (byCategory[e.category] ?? 0) + e.amount })
     const totalExpenses = yearExpenses.reduce((s, e) => s + e.amount, 0)
     return { totalIncome, totalExpenses, netIncome: totalIncome - totalExpenses, byCategory }
-  }, [filteredPayments, filteredExpenses, year])
+  }, [incomePayments, filteredExpenses, year])
 
   // Cash flow chart data - find the max value for scaling
   const maxCashFlow = useMemo(() => {
@@ -191,7 +193,7 @@ export default function Reports() {
     const allRows: (string | number)[][] = []
 
     for (const prop of propList) {
-      const propPayments = payments.filter(p => p.propertyId === prop.id && new Date(p.date + 'T12:00:00').getFullYear() === year)
+      const propPayments = payments.filter(p => p.propertyId === prop.id && new Date(p.date + 'T12:00:00').getFullYear() === year && (!p.category || p.category === 'rent' || p.category === 'fee'))
       const propExpenses = expenses.filter(e => e.propertyId === prop.id && new Date(e.date + 'T12:00:00').getFullYear() === year)
       const propIncome = propPayments.reduce((s, p) => s + p.amount, 0)
       const propTotalExp = propExpenses.reduce((s, e) => s + e.amount, 0)
@@ -556,7 +558,8 @@ export default function Reports() {
               for (const p of filteredPayments.filter((p) => new Date(p.date + 'T12:00:00').getFullYear() === year)) {
                 const prop = properties.find((pr) => pr.id === p.propertyId)
                 const tenant = tenants.find((t) => t.id === p.tenantId)
-                entries.push({ date: p.date, account: 'Rental Income', description: `Payment — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.amount, property: prop?.name ?? '' })
+                const account = p.category === 'deposit' ? 'Security Deposit (Liability)' : p.category === 'last_month' ? "Last Month's Rent (Liability)" : 'Rental Income'
+                entries.push({ date: p.date, account, description: `Payment — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.amount, property: prop?.name ?? '' })
                 if (p.lateFee && p.lateFee > 0) {
                   entries.push({ date: p.date, account: 'Late Fee Income', description: `Late fee — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.lateFee, property: prop?.name ?? '' })
                 }
@@ -579,7 +582,8 @@ export default function Reports() {
             for (const p of filteredPayments.filter((p) => new Date(p.date + 'T12:00:00').getFullYear() === year)) {
               const prop = properties.find((pr) => pr.id === p.propertyId)
               const tenant = tenants.find((t) => t.id === p.tenantId)
-              entries.push({ date: p.date, account: 'Rental Income', description: `Payment — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.amount, property: prop?.name ?? '' })
+              const account = p.category === 'deposit' ? 'Security Deposit (Liability)' : p.category === 'last_month' ? "Last Month's Rent (Liability)" : 'Rental Income'
+              entries.push({ date: p.date, account, description: `Payment — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.amount, property: prop?.name ?? '' })
               if (p.lateFee && p.lateFee > 0) entries.push({ date: p.date, account: 'Late Fee Income', description: `Late fee — ${tenant?.name ?? 'Unknown'}`, debit: 0, credit: p.lateFee, property: prop?.name ?? '' })
             }
             for (const ex of filteredExpenses.filter((e) => new Date(e.date + 'T12:00:00').getFullYear() === year)) {

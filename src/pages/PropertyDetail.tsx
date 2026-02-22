@@ -87,7 +87,7 @@ export default function PropertyDetail() {
       if (firstAvailable) {
         setEditingTenantId(null)
         setTenantFormUnitId(firstAvailable.id)
-        setTenantFormData({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '' })
+        setTenantFormData({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: true, requireLastMonth: false })
         setSearchParams({}, { replace: true })
       }
     }
@@ -120,13 +120,13 @@ export default function PropertyDetail() {
   function openAddTenant(unitId: string, rent: number, deposit: number) {
     setEditingTenantId(null)
     setTenantFormUnitId(unitId)
-    setTenantFormData({ unitId, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: rent, deposit, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '' })
+    setTenantFormData({ unitId, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: rent, deposit, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: true, requireLastMonth: false })
   }
 
   function openEditTenant(t: typeof propTenants[0]) {
     setTenantFormUnitId(null)
     setEditingTenantId(t.id)
-    setTenantFormData({ unitId: t.unitId, name: t.name, email: t.email ?? '', phone: t.phone ?? '', leaseStart: t.leaseStart, leaseEnd: t.leaseEnd, monthlyRent: t.monthlyRent, deposit: t.deposit ?? 0, gracePeriodDays: t.gracePeriodDays ?? 5, lateFeeAmount: t.lateFeeAmount ?? 0, autopay: t.autopay ?? false, notes: t.notes ?? '' })
+    setTenantFormData({ unitId: t.unitId, name: t.name, email: t.email ?? '', phone: t.phone ?? '', leaseStart: t.leaseStart, leaseEnd: t.leaseEnd, monthlyRent: t.monthlyRent, deposit: t.deposit ?? 0, gracePeriodDays: t.gracePeriodDays ?? 5, lateFeeAmount: t.lateFeeAmount ?? 0, autopay: t.autopay ?? false, notes: t.notes ?? '', requireFirstMonth: t.requireFirstMonth ?? true, requireLastMonth: t.requireLastMonth ?? false })
   }
 
   function openRecordPayment(tenantId: string, amount: number) {

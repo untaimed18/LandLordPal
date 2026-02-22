@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
-import { addPayment } from '../../store'
+import { addPayment, updateTenant } from '../../store'
 import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { formatMoney } from '../../lib/format'
 import { loadSettings } from '../../lib/settings'
-import type { Tenant, Payment } from '../../types'
+import type { Tenant, Payment, PaymentCategory } from '../../types'
 
 function startOfMonth(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
@@ -33,6 +33,7 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
     amount: initialAmount,
     date: initialDate,
     method: 'transfer' as 'check' | 'transfer' | 'cash' | 'other',
+    category: 'rent' as PaymentCategory,
     notes: '',
     lateFee: 0,
   })
@@ -78,9 +79,23 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
         periodStart: startOfMonth(dateObj),
         periodEnd: endOfMonth(dateObj),
         method: form.method,
+        category: form.category !== 'rent' ? form.category : undefined,
         notes: form.notes || undefined,
         lateFee: form.lateFee > 0 ? form.lateFee : undefined,
       })
+      if (form.category === 'deposit') {
+        const prevPaid = t.depositPaidAmount ?? 0
+        const totalPaid = prevPaid + form.amount
+        const depositOwed = t.deposit ?? 0
+        await updateTenant(t.id, {
+          depositPaidAmount: totalPaid,
+          depositPaidDate: form.date,
+          depositStatus: totalPaid >= depositOwed ? 'paid' : 'partial',
+        })
+      }
+      if (form.category === 'last_month') {
+        await updateTenant(t.id, { lastMonthPaid: true })
+      }
       onClose()
       toast('Payment recorded')
     } catch {
@@ -90,7 +105,7 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
 
   return (
     <form className="card form-card" onSubmit={handleSubmit}>
-      <h3>Record rent payment</h3>
+      <h3>Record {form.category === 'deposit' ? 'deposit' : form.category === 'last_month' ? "last month's rent" : form.category === 'fee' ? 'fee' : 'rent'} payment</h3>
       <div className="form-grid">
         <label>
           Tenant
@@ -99,7 +114,7 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
             value={form.tenantId}
             onChange={(e) => {
               const t = tenants.find((x) => x.id === e.target.value)
-              setForm((p) => ({ ...p, tenantId: e.target.value, amount: t?.monthlyRent ?? 0, lateFee: 0 }))
+              setForm((p) => ({ ...p, tenantId: e.target.value, amount: t?.monthlyRent ?? 0, lateFee: 0, category: 'rent' }))
             }}
           >
             <option value="">Select tenant</option>
@@ -110,6 +125,23 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
         </label>
         <label>Amount * <input type="number" min={0} step={0.01} required value={form.amount || ''} onChange={(e) => setForm((p) => ({ ...p, amount: +e.target.value }))} /></label>
         <label>Date * <input type="date" required value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} /></label>
+        <label>Type
+          <select value={form.category} onChange={(e) => {
+            const cat = e.target.value as PaymentCategory
+            const t = tenants.find((x) => x.id === form.tenantId)
+            let amount = form.amount
+            if (cat === 'deposit' && t?.deposit) amount = t.deposit - (t.depositPaidAmount ?? 0)
+            else if (cat === 'last_month' && t) amount = t.monthlyRent
+            else if (cat === 'rent' && t) amount = t.monthlyRent
+            setForm((p) => ({ ...p, category: cat, amount }))
+          }}>
+            <option value="rent">Rent</option>
+            <option value="deposit">Security Deposit</option>
+            <option value="last_month">Last Month's Rent</option>
+            <option value="fee">Fee</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
         <label>Method <select value={form.method} onChange={(e) => setForm((p) => ({ ...p, method: e.target.value as 'check' | 'transfer' | 'cash' | 'other' }))}><option value="check">Check</option><option value="transfer">Transfer</option><option value="cash">Cash</option><option value="other">Other</option></select></label>
       </div>
       {lateInfo && (

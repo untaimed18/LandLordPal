@@ -6,6 +6,10 @@ export interface AppSettings {
   maintenanceLookaheadDays: number;
   defaultGracePeriodDays: number;
   rentReminderDays: number;
+  requireSecurityDeposit: boolean;
+  requireFirstMonth: boolean;
+  requireLastMonth: boolean;
+  defaultDepositAmount: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -14,6 +18,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maintenanceLookaheadDays: 30,
   defaultGracePeriodDays: 5,
   rentReminderDays: 3,
+  requireSecurityDeposit: true,
+  requireFirstMonth: true,
+  requireLastMonth: false,
+  defaultDepositAmount: 0,
 };
 
 export function loadSettings(): AppSettings {
@@ -27,6 +35,10 @@ export function loadSettings(): AppSettings {
       maintenanceLookaheadDays: typeof parsed.maintenanceLookaheadDays === 'number' ? parsed.maintenanceLookaheadDays : DEFAULT_SETTINGS.maintenanceLookaheadDays,
       defaultGracePeriodDays: typeof parsed.defaultGracePeriodDays === 'number' ? parsed.defaultGracePeriodDays : DEFAULT_SETTINGS.defaultGracePeriodDays,
       rentReminderDays: typeof parsed.rentReminderDays === 'number' ? parsed.rentReminderDays : DEFAULT_SETTINGS.rentReminderDays,
+      requireSecurityDeposit: typeof parsed.requireSecurityDeposit === 'boolean' ? parsed.requireSecurityDeposit : DEFAULT_SETTINGS.requireSecurityDeposit,
+      requireFirstMonth: typeof parsed.requireFirstMonth === 'boolean' ? parsed.requireFirstMonth : DEFAULT_SETTINGS.requireFirstMonth,
+      requireLastMonth: typeof parsed.requireLastMonth === 'boolean' ? parsed.requireLastMonth : DEFAULT_SETTINGS.requireLastMonth,
+      defaultDepositAmount: typeof parsed.defaultDepositAmount === 'number' ? parsed.defaultDepositAmount : DEFAULT_SETTINGS.defaultDepositAmount,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

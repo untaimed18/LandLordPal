@@ -77,7 +77,13 @@ export default function Dashboard() {
     return daysUntil >= 0 && daysUntil <= settings.maintenanceLookaheadDays
   }).sort((a, b) => (a.scheduledDate ?? '').localeCompare(b.scheduledDate ?? ''))
 
-  const notificationCount = leasesEndingSoon.length + insuranceAlerts.length + scheduledMaintenance.length
+  const pendingDeposits = ft.filter((t) => {
+    if (!t.deposit || t.deposit <= 0) return false
+    const status = t.depositStatus ?? 'pending'
+    return status === 'pending' || status === 'partial'
+  })
+
+  const notificationCount = leasesEndingSoon.length + insuranceAlerts.length + scheduledMaintenance.length + pendingDeposits.length
 
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const dayOfMonth = today.getDate()
@@ -527,6 +533,21 @@ export default function Dashboard() {
                 </Link>
               </div>
             ))}
+            {pendingDeposits.map((t) => {
+              const owed = t.deposit ?? 0
+              const paid = t.depositPaidAmount ?? 0
+              const prop = properties.find((p) => p.id === t.propertyId)
+              return (
+                <Link key={`dep-${t.id}`} to={`/tenants/${t.id}`} className="dash-notif dash-notif-warning">
+                  <DollarSign size={16} className="dash-notif-icon" aria-hidden="true" />
+                  <div className="dash-notif-body">
+                    <strong>{t.name}</strong>
+                    <span>{prop?.name ?? ''} · Deposit {paid > 0 ? `${formatMoney(paid)} of ` : ''}{formatMoney(owed)} {t.depositStatus === 'partial' ? 'partially paid' : 'pending'}</span>
+                  </div>
+                  <ChevronRight size={16} className="dash-notif-arrow" aria-hidden="true" />
+                </Link>
+              )
+            })}
           </div>
         </section>
       )}

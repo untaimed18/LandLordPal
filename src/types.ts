@@ -62,6 +62,8 @@ export interface LeaseHistory {
   renewedAt: string;
 }
 
+export type DepositStatus = 'pending' | 'paid' | 'partial';
+
 export interface Tenant {
   id: Id;
   unitId: Id;
@@ -73,8 +75,15 @@ export interface Tenant {
   leaseEnd: string;
   monthlyRent: number;
   deposit?: number;
+  depositStatus?: DepositStatus;
+  depositPaidDate?: string;
+  depositPaidAmount?: number;
   depositReturned?: number;
   depositDeductions?: string;
+  requireFirstMonth?: boolean;
+  requireLastMonth?: boolean;
+  lastMonthPaid?: boolean;
+  moveInCostNotes?: string;
   gracePeriodDays?: number;
   lateFeeAmount?: number;
   autopay?: boolean;
@@ -126,6 +135,8 @@ export interface Expense {
   updatedAt: string;
 }
 
+export type PaymentCategory = 'rent' | 'deposit' | 'last_month' | 'fee' | 'other';
+
 export interface Payment {
   id: Id;
   tenantId: Id;
@@ -136,6 +147,7 @@ export interface Payment {
   periodStart: string;
   periodEnd: string;
   method?: 'check' | 'transfer' | 'cash' | 'other';
+  category?: PaymentCategory;
   notes?: string;
   lateFee?: number;
   createdAt: string;

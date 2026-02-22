@@ -24,9 +24,13 @@ export function getExpectedMonthlyRent(tenants: Tenant[]): number {
   return tenants.reduce((sum, t) => sum + t.monthlyRent, 0);
 }
 
+function isIncomePayment(p: Payment): boolean {
+  return !p.category || p.category === 'rent' || p.category === 'fee';
+}
+
 export function getCollectedThisMonth(payments: Payment[], year: number, month: number): number {
   return payments
-    .filter((p) => isInMonth(p.date, year, month))
+    .filter((p) => isInMonth(p.date, year, month) && isIncomePayment(p))
     .reduce((sum, p) => sum + p.amount, 0);
 }
 
@@ -38,7 +42,7 @@ export function getExpensesThisMonth(expenses: Expense[], year: number, month: n
 
 export function getYTDIncome(payments: Payment[], year: number): number {
   return payments
-    .filter((p) => parseInt(p.date.split('-')[0], 10) === year)
+    .filter((p) => parseInt(p.date.split('-')[0], 10) === year && isIncomePayment(p))
     .reduce((sum, p) => sum + p.amount, 0);
 }
 

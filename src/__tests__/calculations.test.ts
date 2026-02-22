@@ -508,3 +508,71 @@ describe('getMaintenanceCostTrends', () => {
     expect(trends.every((t) => t.total === 0)).toBe(true)
   })
 })
+
+// ─── Deposit / Non-Income Payment Exclusion ──────────────────────────────────
+
+describe('deposit and liability payment exclusion', () => {
+  it('getCollectedThisMonth excludes deposit payments', () => {
+    const payments = [
+      makePayment({ date: '2025-06-15', amount: 1000 }),
+      makePayment({ id: 'dep1', date: '2025-06-15', amount: 2000, category: 'deposit' }),
+    ]
+    expect(getCollectedThisMonth(payments, 2025, 5)).toBe(1000)
+  })
+
+  it('getCollectedThisMonth excludes last_month payments', () => {
+    const payments = [
+      makePayment({ date: '2025-06-15', amount: 1000 }),
+      makePayment({ id: 'lm1', date: '2025-06-15', amount: 1000, category: 'last_month' }),
+    ]
+    expect(getCollectedThisMonth(payments, 2025, 5)).toBe(1000)
+  })
+
+  it('getCollectedThisMonth includes fee and other payments', () => {
+    const payments = [
+      makePayment({ date: '2025-06-15', amount: 1000 }),
+      makePayment({ id: 'fee1', date: '2025-06-15', amount: 50, category: 'fee' }),
+    ]
+    expect(getCollectedThisMonth(payments, 2025, 5)).toBe(1050)
+  })
+
+  it('getCollectedThisMonth treats undefined category as rent', () => {
+    const payments = [
+      makePayment({ date: '2025-06-15', amount: 1000, category: undefined }),
+    ]
+    expect(getCollectedThisMonth(payments, 2025, 5)).toBe(1000)
+  })
+
+  it('getYTDIncome excludes deposit and last_month payments', () => {
+    const payments = [
+      makePayment({ date: '2025-01-15', amount: 1000 }),
+      makePayment({ id: 'pay2', date: '2025-06-15', amount: 1000 }),
+      makePayment({ id: 'dep1', date: '2025-03-01', amount: 2000, category: 'deposit' }),
+      makePayment({ id: 'lm1', date: '2025-03-01', amount: 1000, category: 'last_month' }),
+    ]
+    expect(getYTDIncome(payments, 2025)).toBe(2000)
+  })
+
+  it('getDashboardStats excludes non-income payments from collectedThisMonth and ytdIncome', () => {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    const thisDate = `${y}-${m}-15`
+    const janDate = `${y}-01-15`
+
+    const payments = [
+      makePayment({ date: thisDate, amount: 1200 }),
+      makePayment({ id: 'dep1', date: thisDate, amount: 2400, category: 'deposit' }),
+      makePayment({ id: 'jan1', date: janDate, amount: 1200 }),
+    ]
+    const stats = getDashboardStats(
+      [makeProperty()],
+      [makeUnit()],
+      [makeTenant()],
+      [],
+      payments,
+    )
+    expect(stats.collectedThisMonth).toBe(1200)
+    expect(stats.ytdIncome).toBe(2400)
+  })
+})
