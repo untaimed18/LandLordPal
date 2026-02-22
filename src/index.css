@@ -964,6 +964,363 @@ kbd.shortcut-key { display: inline-block; background: var(--bg); border: 1px sol
 .bulk-preview-item { padding: 0.2rem 0; display: flex; justify-content: space-between; }
 .bulk-preview-item .arrow { margin: 0 0.35rem; }
 
+/* Record Payment Modal */
+.payment-tenant-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1rem;
+}
+.payment-tenant-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-muted);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.payment-tenant-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.payment-tenant-info strong {
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+.payment-tenant-info span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.payment-rent-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.payment-rent-stat {
+  text-align: center;
+  padding: 0.5rem 0.35rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+.payment-rent-stat-label {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 0.15rem;
+}
+.payment-rent-stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.payment-form-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+.payment-form-fields > :first-child {
+  grid-column: 1 / -1;
+}
+.payment-field {
+  display: flex;
+  flex-direction: column;
+}
+.payment-field-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.payment-field input,
+.payment-field select {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.payment-field input:focus,
+.payment-field select:focus { border-color: var(--accent); outline: none; }
+.payment-field input[type="number"] {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+/* Lease Renewal Modal */
+.renewal-current-lease {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.renewal-current-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.renewal-current-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.renewal-current-details span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.renewal-current-details svg { color: var(--text-muted); flex-shrink: 0; }
+.renewal-form-section {
+  margin-bottom: 0.5rem;
+}
+.renewal-form-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.renewal-date-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.renewal-date-arrow {
+  color: var(--text-muted);
+  padding-bottom: 0.6rem;
+  flex-shrink: 0;
+}
+.renewal-field { display: flex; flex-direction: column; flex: 1; }
+.renewal-field-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+.renewal-field input {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.renewal-field input:focus { border-color: var(--accent); outline: none; }
+.renewal-duration-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+}
+.renewal-rent-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.renewal-rent-input-row input { flex: 1; }
+.renewal-rent-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+.renewal-rent-change.increase { background: var(--negative-bg); color: var(--negative); }
+.renewal-rent-change.decrease { background: var(--positive-bg); color: var(--positive); }
+
+/* Inspection Checklist Modal */
+.inspect-meta-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.inspect-date-field {
+  display: flex;
+  flex-direction: column;
+}
+.inspect-field-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+.inspect-date-field input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.inspect-summary-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+.inspect-summary-pill {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.inspect-items-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+  max-height: 380px;
+  overflow-y: auto;
+}
+.inspect-item { border-bottom: 1px solid var(--border); }
+.inspect-item:last-child { border-bottom: none; }
+.inspect-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.1s;
+  gap: 0.5rem;
+}
+.inspect-item-header:hover { background: var(--bg); }
+.inspect-item-area { font-weight: 500; font-size: 0.9rem; }
+.inspect-item-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.inspect-chevron { color: var(--text-muted); }
+.inspect-condition-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.condition-excellent, .inspect-summary-pill.condition-excellent { background: var(--positive-bg); color: var(--positive); }
+.condition-good, .inspect-summary-pill.condition-good { background: var(--accent-muted); color: var(--accent); }
+.condition-fair, .inspect-summary-pill.condition-fair { background: #fef3c7; color: #92400e; }
+.condition-poor, .inspect-summary-pill.condition-poor { background: #fed7aa; color: #c2410c; }
+.condition-damaged, .inspect-summary-pill.condition-damaged { background: var(--negative-bg); color: var(--negative); }
+[data-theme="dark"] .condition-fair, [data-theme="dark"] .inspect-summary-pill.condition-fair { background: #422006; color: #fde68a; }
+[data-theme="dark"] .condition-poor, [data-theme="dark"] .inspect-summary-pill.condition-poor { background: #431407; color: #fdba74; }
+.inspect-item-body {
+  padding: 0.5rem 0.75rem 0.75rem;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+.inspect-condition-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+.inspect-condition-pill {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  font-weight: 500;
+  opacity: 0.5;
+  transition: opacity 0.1s, border-color 0.1s, transform 0.1s;
+}
+.inspect-condition-pill:hover { opacity: 0.8; }
+.inspect-condition-pill.active {
+  opacity: 1;
+  border-color: currentColor;
+  transform: scale(1.05);
+}
+.inspect-note-input {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  background: var(--surface);
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+.inspect-note-input:focus { border-color: var(--accent); outline: none; }
+.inspect-note-input::placeholder { color: var(--text-muted); opacity: 0.6; }
+.inspect-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  color: var(--negative);
+  cursor: pointer;
+  padding: 0.15rem 0;
+  opacity: 0.7;
+}
+.inspect-remove-btn:hover { opacity: 1; }
+.inspect-add-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.inspect-add-input {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.inspect-add-input:focus { border-color: var(--accent); outline: none; }
+.inspect-general-notes {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.inspect-general-notes textarea {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--text);
+  resize: vertical;
+  font-family: inherit;
+}
+.inspect-general-notes textarea:focus { border-color: var(--accent); outline: none; }
+
 /* Empty state card */
 .empty-state-card { text-align: center; padding: 2rem; }
 .empty-state-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.5rem 0; }

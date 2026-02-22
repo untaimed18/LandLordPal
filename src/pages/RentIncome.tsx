@@ -9,7 +9,7 @@ import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate, formatMonthYear } from '../lib/format'
 import { nowISO } from '../lib/id'
 import { toCSV, downloadCSV } from '../lib/csv'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, DollarSign, Calendar, CreditCard, User, Home, Banknote } from 'lucide-react'
 
 function startOfMonth(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
@@ -27,7 +27,7 @@ export default function RentIncome() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
-  const [paymentModal, setPaymentModal] = useState<{ tenantId: string; amount: number } | null>(null)
+  const [paymentModal, setPaymentModal] = useState<{ tenantId: string; amount: number; tenantName: string; propertyName: string; unitName: string; expectedRent: number; paidAmount: number } | null>(null)
   const [paymentDate, setPaymentDate] = useState(nowISO())
   const [paymentMethod, setPaymentMethod] = useState<'check' | 'transfer' | 'cash' | 'other'>('transfer')
   const [showBulkRent, setShowBulkRent] = useState(false)
@@ -287,7 +287,7 @@ export default function RentIncome() {
                             type="button"
                             className="btn small primary"
                             onClick={() => {
-                              setPaymentModal({ tenantId: r.tenant.id, amount: r.expectedRent })
+                              setPaymentModal({ tenantId: r.tenant.id, amount: r.expectedRent, tenantName: r.tenant.name, propertyName: r.property.name, unitName: r.unit.name, expectedRent: r.expectedRent, paidAmount: r.paidAmount })
                               // Default date to within the viewed month, not necessarily today
                               const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
                               setPaymentDate(isCurrentMonth ? nowISO() : `${year}-${String(month + 1).padStart(2, '0')}-01`)
@@ -308,24 +308,61 @@ export default function RentIncome() {
 
       {paymentModal && (
         <div className="modal-overlay" onClick={() => setPaymentModal(null)}>
-          <div className="modal card" onClick={(e) => e.stopPropagation()}>
+          <div className="modal card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <div className="modal-header">
-              <h3>Record rent payment</h3>
+              <h3><Banknote size={16} style={{ marginRight: 6, verticalAlign: '-2px' }} />Record Payment</h3>
               <button type="button" className="btn-icon" onClick={() => setPaymentModal(null)} aria-label="Close">×</button>
             </div>
-            <form onSubmit={handleRecordPayment}>
-              <div className="form-grid">
-                <label>
-                  Tenant
-                  <div className="form-static">{tenants.find((t) => t.id === paymentModal.tenantId)?.name}</div>
-                </label>
-                <label>Amount * <input type="number" min={0} step={0.01} required value={paymentModal.amount} onChange={(e) => setPaymentModal((p) => p && { ...p, amount: +e.target.value })} /></label>
-                <label>Date * <input type="date" required value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} /></label>
-                <label>Method <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'check' | 'transfer' | 'cash' | 'other')}><option value="check">Check</option><option value="transfer">Transfer</option><option value="cash">Cash</option><option value="other">Other</option></select></label>
+
+            <div className="payment-tenant-banner">
+              <div className="payment-tenant-avatar"><User size={18} /></div>
+              <div className="payment-tenant-info">
+                <strong>{paymentModal.tenantName}</strong>
+                <span><Home size={11} /> {paymentModal.propertyName} — {paymentModal.unitName}</span>
               </div>
-              <div className="form-actions">
-                <button type="submit" className="btn primary">Record payment</button>
+            </div>
+
+            <div className="payment-rent-summary">
+              <div className="payment-rent-stat">
+                <span className="payment-rent-stat-label">Expected</span>
+                <span className="payment-rent-stat-value">{formatMoney(paymentModal.expectedRent)}</span>
+              </div>
+              <div className="payment-rent-stat">
+                <span className="payment-rent-stat-label">Paid so far</span>
+                <span className={`payment-rent-stat-value ${paymentModal.paidAmount > 0 ? 'positive' : ''}`}>{formatMoney(paymentModal.paidAmount)}</span>
+              </div>
+              <div className="payment-rent-stat">
+                <span className="payment-rent-stat-label">Remaining</span>
+                <span className={`payment-rent-stat-value ${paymentModal.expectedRent - paymentModal.paidAmount > 0 ? 'negative' : 'positive'}`}>
+                  {formatMoney(paymentModal.expectedRent - paymentModal.paidAmount)}
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleRecordPayment}>
+              <div className="payment-form-fields">
+                <label className="payment-field">
+                  <span className="payment-field-label"><DollarSign size={13} /> Amount</span>
+                  <input type="number" min={0} step={0.01} required value={paymentModal.amount} onChange={(e) => setPaymentModal((p) => p && { ...p, amount: +e.target.value })} />
+                </label>
+                <label className="payment-field">
+                  <span className="payment-field-label"><Calendar size={13} /> Date</span>
+                  <input type="date" required value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+                </label>
+                <label className="payment-field">
+                  <span className="payment-field-label"><CreditCard size={13} /> Method</span>
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'check' | 'transfer' | 'cash' | 'other')}>
+                    <option value="check">Check</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="cash">Cash</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="modal-footer">
                 <button type="button" className="btn" onClick={() => setPaymentModal(null)}>Cancel</button>
+                <button type="submit" className="btn primary"><Banknote size={14} /> Record Payment</button>
               </div>
             </form>
           </div>
