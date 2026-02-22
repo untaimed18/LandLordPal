@@ -2417,6 +2417,115 @@ kbd.shortcut-key { display: inline-block; background: var(--bg); border: 1px sol
   gap: 0.5rem;
 }
 
+/* Email compose modal */
+.email-recipient-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.85rem;
+}
+.email-recipient-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--accent-muted);
+  color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.email-recipient-info { display: flex; flex-direction: column; }
+.email-recipient-name { font-weight: 600; font-size: 0.92rem; }
+.email-recipient-email { font-size: 0.78rem; color: var(--text-muted); }
+
+.email-warning {
+  display: flex; align-items: flex-start; gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  background: #fef3c7; color: #92400e;
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  margin-bottom: 0.85rem;
+}
+[data-theme="dark"] .email-warning { background: #422006; color: #fbbf24; }
+
+.email-template-select { margin-bottom: 0.85rem; }
+.email-field-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.email-select-wrap {
+  position: relative;
+}
+.email-select-wrap select {
+  width: 100%;
+  padding-right: 2rem;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.email-select-chevron {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted);
+}
+
+.email-preview-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.email-preview-header {
+  background: var(--bg);
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+.email-preview-field {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.email-preview-label {
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 50px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.email-preview-body {
+  padding: 0.85rem;
+  white-space: pre-wrap;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.email-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 0.88rem;
+}
+.email-empty-state svg { opacity: 0.4; margin-bottom: 0.25rem; }
+
 /* Recurring payment badge */
 .autopay-badge {
   display: inline-flex;
