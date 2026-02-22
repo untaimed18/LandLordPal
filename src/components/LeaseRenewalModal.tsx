@@ -51,10 +51,10 @@ export default function LeaseRenewalModal({ tenant, onClose }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Renew Lease — {tenant.name}</h2>
-          <button type="button" className="close-btn" onClick={onClose}>&times;</button>
+          <h3>Renew Lease — {tenant.name}</h3>
+          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">

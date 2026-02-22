@@ -61,10 +61,10 @@ export default function InspectionChecklistModal({ tenant, type, onClose }: Prop
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700, maxHeight: '90vh', overflow: 'auto' }}>
+      <div className="modal card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
         <div className="modal-header">
-          <h2>{type === 'move_in' ? 'Move-In' : 'Move-Out'} Inspection</h2>
-          <button type="button" className="close-btn" onClick={onClose}>&times;</button>
+          <h3>{type === 'move_in' ? 'Move-In' : 'Move-Out'} Inspection</h3>
+          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">×</button>
         </div>
         <div className="modal-body">
           <label style={{ display: 'block', marginBottom: '1rem' }}>

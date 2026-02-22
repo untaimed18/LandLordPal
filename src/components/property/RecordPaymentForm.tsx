@@ -113,10 +113,10 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
         <label>Method <select value={form.method} onChange={(e) => setForm((p) => ({ ...p, method: e.target.value as 'check' | 'transfer' | 'cash' | 'other' }))}><option value="check">Check</option><option value="transfer">Transfer</option><option value="cash">Cash</option><option value="other">Other</option></select></label>
       </div>
       {lateInfo && (
-        <div className="late-fee-notice" style={{ background: 'var(--warning-bg, #fef3cd)', padding: '0.75rem 1rem', borderRadius: 'var(--radius)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>
-          <strong>Late payment detected</strong> — Day {lateInfo.day} is past the {lateInfo.grace}-day grace period. Suggested late fee: {formatMoney(lateInfo.fee)}.
+        <div className="late-fee-notice">
+          <span><strong>Late payment detected</strong> — Day {lateInfo.day} is past the {lateInfo.grace}-day grace period. Suggested late fee: {formatMoney(lateInfo.fee)}.</span>
           {form.lateFee === 0 && (
-            <button type="button" className="btn small" style={{ marginLeft: '0.75rem' }} onClick={() => setForm((p) => ({ ...p, lateFee: lateInfo.fee }))}>
+            <button type="button" className="btn small" onClick={() => setForm((p) => ({ ...p, lateFee: lateInfo.fee }))}>
               Apply fee
             </button>
           )}

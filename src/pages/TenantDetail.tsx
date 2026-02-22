@@ -11,7 +11,7 @@ import EmailTemplateModal from '../components/EmailTemplateModal'
 import InspectionChecklistModal from '../components/InspectionChecklistModal'
 import { loadSettings } from '../lib/settings'
 import { exportTenantStatementPdf, formatMoneyForPdf } from '../lib/pdfExport'
-import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send, FileText, ClipboardList } from 'lucide-react'
+import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send, FileText, ClipboardList, UserCheck, UserX, UserPlus } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
@@ -257,49 +257,55 @@ export default function TenantDetail() {
       </section>
 
       <section className="card section-card" style={{ marginBottom: '1.5rem' }}>
-        <h2>Screening & Application</h2>
-        <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
-          <label>
-            Status
-            <select
-              value={tenant.screeningStatus ?? ''}
-              onChange={async (e) => {
-                const val = e.target.value as 'applied' | 'approved' | 'rejected' | ''
-                try {
-                  await updateTenant(tenant.id, { screeningStatus: val || undefined })
-                  toast('Screening status updated')
-                } catch { toast('Failed to update status', 'error') }
+        <h2><ShieldCheck size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Screening & Application</h2>
+        <div className="screening-layout">
+          <div className="screening-status-card">
+            <div className={`screening-status-icon ${tenant.screeningStatus === 'approved' ? 'approved' : tenant.screeningStatus === 'rejected' ? 'rejected' : tenant.screeningStatus === 'applied' ? 'applied' : 'none'}`}>
+              {tenant.screeningStatus === 'approved' ? <UserCheck size={22} /> : tenant.screeningStatus === 'rejected' ? <UserX size={22} /> : <UserPlus size={22} />}
+            </div>
+            <div className="screening-status-info">
+              <span className="screening-status-label">Application Status</span>
+              <select
+                className="screening-status-select"
+                value={tenant.screeningStatus ?? ''}
+                onChange={async (e) => {
+                  const val = e.target.value as 'applied' | 'approved' | 'rejected' | ''
+                  try {
+                    await updateTenant(tenant.id, { screeningStatus: val || undefined })
+                    toast('Screening status updated')
+                  } catch { toast('Failed to update status', 'error') }
+                }}
+              >
+                <option value="">Not set</option>
+                <option value="applied">Applied</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+          <div className="screening-notes-area">
+            <label className="screening-notes-label">
+              <FileText size={14} style={{ marginRight: 4, verticalAlign: '-2px', color: 'var(--text-muted)' }} />
+              Screening Notes
+            </label>
+            <textarea
+              className="screening-notes-input"
+              defaultValue={tenant.screeningNotes ?? ''}
+              rows={4}
+              onBlur={async (e) => {
+                const val = e.target.value
+                if (val !== (tenant.screeningNotes ?? '')) {
+                  try {
+                    await updateTenant(tenant.id, { screeningNotes: val || undefined })
+                    toast('Screening notes saved')
+                  } catch { toast('Failed to save notes', 'error') }
+                }
               }}
-            >
-              <option value="">Not set</option>
-              <option value="applied">Applied</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </label>
+              placeholder="Background check results, references, credit score, employment verification, etc."
+            />
+            <span className="screening-notes-hint">Auto-saves when you click away</span>
+          </div>
         </div>
-        {tenant.screeningStatus && (
-          <span className={`badge ${tenant.screeningStatus === 'approved' ? 'active-lease' : tenant.screeningStatus === 'rejected' ? 'expired' : 'expiring'}`} style={{ marginBottom: '0.5rem', display: 'inline-block' }}>
-            {tenant.screeningStatus.charAt(0).toUpperCase() + tenant.screeningStatus.slice(1)}
-          </span>
-        )}
-        <label>
-          Screening Notes
-          <textarea
-            defaultValue={tenant.screeningNotes ?? ''}
-            rows={2}
-            onBlur={async (e) => {
-              const val = e.target.value
-              if (val !== (tenant.screeningNotes ?? '')) {
-                try {
-                  await updateTenant(tenant.id, { screeningNotes: val || undefined })
-                  toast('Screening notes saved')
-                } catch { toast('Failed to save notes', 'error') }
-              }
-            }}
-            placeholder="Background check results, references, credit score, etc."
-          />
-        </label>
       </section>
 
       {tenant.rentHistory && tenant.rentHistory.length > 0 && (

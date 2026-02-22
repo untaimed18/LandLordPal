@@ -354,12 +354,23 @@ export default function RentIncome() {
               )}
             </div>
             <div style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
-              <strong>Preview:</strong> {tenants.length} tenant{tenants.length !== 1 ? 's' : ''} affected.
-              {tenants.slice(0, 5).map((t) => {
-                const newRent = bulkRentMode === 'pct' ? Math.round(t.monthlyRent * (1 + bulkRentPct / 100)) : t.monthlyRent + bulkRentFlat
-                return <div key={t.id} className="muted">{t.name}: {formatMoney(t.monthlyRent)} → {formatMoney(newRent)}</div>
-              })}
-              {tenants.length > 5 && <div className="muted">...and {tenants.length - 5} more</div>}
+              <strong>Preview:</strong> {tenants.length} tenant{tenants.length !== 1 ? 's' : ''} affected
+              <div style={{ marginTop: '0.5rem', background: 'var(--bg)', borderRadius: 'var(--radius)', padding: '0.5rem 0.75rem' }}>
+                {tenants.slice(0, 5).map((t) => {
+                  const newRent = bulkRentMode === 'pct' ? Math.round(t.monthlyRent * (1 + bulkRentPct / 100)) : t.monthlyRent + bulkRentFlat
+                  const diff = newRent - t.monthlyRent
+                  return (
+                    <div key={t.id} className="bulk-preview-item">
+                      <span>{t.name}</span>
+                      <span className="muted">
+                        {formatMoney(t.monthlyRent)} <span className="arrow">→</span> {formatMoney(newRent)}
+                        {diff !== 0 && <span className={diff > 0 ? ' positive' : ' negative'}> ({diff > 0 ? '+' : ''}{formatMoney(diff)})</span>}
+                      </span>
+                    </div>
+                  )
+                })}
+                {tenants.length > 5 && <div className="muted" style={{ paddingTop: '0.25rem', borderTop: '1px solid var(--border)' }}>...and {tenants.length - 5} more</div>}
+              </div>
             </div>
             <div className="form-actions" style={{ marginTop: '1rem' }}>
               <button type="button" className="btn primary" onClick={handleBulkRentAdjust}>Apply Adjustment</button>

@@ -53,10 +53,10 @@ export default function EmailTemplateModal({ tenant, property, unit, templates, 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Send Email to {tenant.name}</h2>
-          <button type="button" className="close-btn" onClick={onClose}>&times;</button>
+          <h3>Send Email to {tenant.name}</h3>
+          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close">×</button>
         </div>
         <div className="modal-body">
           <label style={{ display: 'block', marginBottom: '1rem' }}>
@@ -74,7 +74,7 @@ export default function EmailTemplateModal({ tenant, property, unit, templates, 
           </label>
 
           {template && (
-            <div className="email-preview" style={{ background: 'var(--bg-sub)', padding: '1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+            <div className="email-preview" style={{ background: 'var(--bg)', padding: '1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
               <div style={{ marginBottom: '0.5rem' }}><strong>To:</strong> {tenant.email || 'No email on file'}</div>
               <div style={{ marginBottom: '0.5rem' }}><strong>Subject:</strong> {subject}</div>
               <div style={{ whiteSpace: 'pre-wrap', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
