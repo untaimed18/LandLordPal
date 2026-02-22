@@ -58,7 +58,7 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
     
     const payMonth = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`
     const existing = payments.find(
-      (p) => p.tenantId === t.id && p.date.startsWith(payMonth)
+      (p) => p.tenantId === t.id && p.date.startsWith(payMonth) && (p.category ?? 'rent') === form.category
     )
     if (existing) {
       const ok = await confirm({
@@ -130,7 +130,7 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
             const cat = e.target.value as PaymentCategory
             const t = tenants.find((x) => x.id === form.tenantId)
             let amount = form.amount
-            if (cat === 'deposit' && t?.deposit) amount = t.deposit - (t.depositPaidAmount ?? 0)
+            if (cat === 'deposit' && t?.deposit) amount = Math.max(0, t.deposit - (t.depositPaidAmount ?? 0))
             else if (cat === 'last_month' && t) amount = t.monthlyRent
             else if (cat === 'rent' && t) amount = t.monthlyRent
             setForm((p) => ({ ...p, category: cat, amount }))

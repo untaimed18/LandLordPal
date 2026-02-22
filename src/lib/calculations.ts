@@ -164,7 +164,7 @@ export function getRentRollForMonth(
     const property = unit ? properties.find((p) => p.id === unit.propertyId) : undefined
     if (!unit || !property) continue
     const monthPayments = payments.filter(
-      (p) => p.tenantId === tenant.id && isInMonth(p.date, year, month)
+      (p) => p.tenantId === tenant.id && isInMonth(p.date, year, month) && isIncomePayment(p)
     )
     const paidAmount = monthPayments.reduce((s, p) => s + p.amount, 0)
     const lateFees = monthPayments.reduce((s, p) => s + (p.lateFee ?? 0), 0)
@@ -213,7 +213,7 @@ export function getInvestmentMetrics(
   const filteredExpenses = propertyId ? expenses.filter((x) => x.propertyId === propertyId) : expenses;
 
   const yearPayments = filteredPayments.filter(
-    (p) => parseInt(p.date.split('-')[0], 10) === year,
+    (p) => parseInt(p.date.split('-')[0], 10) === year && isIncomePayment(p),
   );
   const yearExpenses = filteredExpenses.filter(
     (e) => parseInt(e.date.split('-')[0], 10) === year,
@@ -302,7 +302,7 @@ export function getTenantReliability(
   payments: Payment[],
   gracePeriodDays: number,
 ): TenantReliability {
-  const tenantPayments = payments.filter((p) => p.tenantId === tenant.id);
+  const tenantPayments = payments.filter((p) => p.tenantId === tenant.id && isIncomePayment(p));
   const totalPayments = tenantPayments.length;
 
   if (totalPayments < 3) {
@@ -398,7 +398,7 @@ export function getYoYTrends(
   for (let i = 0; i < years.length; i++) {
     const y = years[i];
     const income = payments
-      .filter((p) => Number(p.date.slice(0, 4)) === y)
+      .filter((p) => Number(p.date.slice(0, 4)) === y && isIncomePayment(p))
       .reduce((s, p) => s + p.amount, 0);
     const totalExp = expenses
       .filter((e) => Number(e.date.slice(0, 4)) === y)
@@ -502,7 +502,7 @@ export function getForecast(
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     monthlyIncomes.push(
-      payments.filter((p) => p.date.startsWith(prefix)).reduce((s, p) => s + p.amount, 0),
+      payments.filter((p) => p.date.startsWith(prefix) && isIncomePayment(p)).reduce((s, p) => s + p.amount, 0),
     );
     monthlyExpenses.push(
       expenses.filter((e) => e.date.startsWith(prefix)).reduce((s, e) => s + e.amount, 0),
@@ -538,7 +538,7 @@ export function getForecast(
 
   const currentPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const actualThisMonth = payments
-    .filter((p) => p.date.startsWith(currentPrefix))
+    .filter((p) => p.date.startsWith(currentPrefix) && isIncomePayment(p))
     .reduce((s, p) => s + p.amount, 0);
   const actualVsProjectedIncome =
     projectedMonthlyIncome > 0

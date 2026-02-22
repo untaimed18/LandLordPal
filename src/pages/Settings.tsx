@@ -85,10 +85,10 @@ export default function Settings() {
           danger: true,
         })
         if (!ok) return
-        importState(parsed.data as Record<string, unknown>)
+        await importState(parsed.data as Record<string, unknown>)
         toast('Backup restored successfully')
       } catch {
-        toast('Invalid backup file. Please select a valid LandLord Pal backup.', 'error')
+        toast('Invalid backup file or failed to import. Please try again.', 'error')
       }
     }
     reader.readAsText(file)
@@ -196,8 +196,12 @@ export default function Settings() {
       danger: true,
     })
     if (!ok2) return
-    importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [], documents: [], emailTemplates: [] })
-    toast('All data cleared')
+    try {
+      await importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [], documents: [], emailTemplates: [] })
+      toast('All data cleared')
+    } catch {
+      toast('Failed to clear data', 'error')
+    }
   }
 
   const [updateChecking, setUpdateChecking] = useState(false)

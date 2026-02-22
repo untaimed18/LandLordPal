@@ -97,7 +97,7 @@ export default function Properties() {
 
   const emptyForm = { name: '', address: '', city: '', state: '', zip: '', propertyType: '', sqft: 0, amenities: [] as string[], purchasePrice: 0, purchaseDate: '', monthlyRent: 0, deposit: 0, bedrooms: 0, bathrooms: 0, insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '', notes: '' }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const data = {
       name: form.name,
@@ -115,44 +115,46 @@ export default function Properties() {
       insuranceExpiry: form.insuranceExpiry || undefined,
       notes: form.notes || undefined,
     }
-    if (editingId) {
-      updateProperty(editingId, data)
-      // If single-unit type, also update the unit's rent/deposit/beds/baths
-      if (isSingleUnitType(form.propertyType)) {
-        const existingUnit = units.find((u) => u.propertyId === editingId)
-        if (existingUnit) {
-          updateUnit(existingUnit.id, {
-            monthlyRent: form.monthlyRent || 0,
-            deposit: form.deposit || undefined,
+    try {
+      if (editingId) {
+        await updateProperty(editingId, data)
+        if (isSingleUnitType(form.propertyType)) {
+          const existingUnit = units.find((u) => u.propertyId === editingId)
+          if (existingUnit) {
+            await updateUnit(existingUnit.id, {
+              monthlyRent: form.monthlyRent || 0,
+              deposit: form.deposit || undefined,
+              bedrooms: form.bedrooms || 0,
+              bathrooms: form.bathrooms || 0,
+              sqft: form.sqft || undefined,
+            })
+          }
+        }
+        setEditingId(null)
+        toast('Property updated')
+      } else {
+        const newProperty = await addProperty(data)
+        if (isSingleUnitType(form.propertyType)) {
+          await addUnit({
+            propertyId: newProperty.id,
+            name: form.name,
             bedrooms: form.bedrooms || 0,
             bathrooms: form.bathrooms || 0,
+            monthlyRent: form.monthlyRent || 0,
             sqft: form.sqft || undefined,
+            deposit: form.deposit || undefined,
+            available: true,
           })
+          toast('Property added with unit ready for a tenant')
+        } else {
+          toast('Property added')
         }
       }
-      setEditingId(null)
-      toast('Property updated')
-    } else {
-      const newProperty = addProperty(data)
-      // Auto-create a default unit for single-unit property types
-      if (isSingleUnitType(form.propertyType)) {
-        addUnit({
-          propertyId: newProperty.id,
-          name: form.name,
-          bedrooms: form.bedrooms || 0,
-          bathrooms: form.bathrooms || 0,
-          monthlyRent: form.monthlyRent || 0,
-          sqft: form.sqft || undefined,
-          deposit: form.deposit || undefined,
-          available: true,
-        })
-        toast('Property added with unit ready for a tenant')
-      } else {
-        toast('Property added')
-      }
+      setForm(emptyForm)
+      setShowForm(false)
+    } catch {
+      toast('Failed to save property', 'error')
     }
-    setForm(emptyForm)
-    setShowForm(false)
   }
 
   async function handleDelete(id: string, name: string) {
@@ -164,12 +166,16 @@ export default function Properties() {
     })
     if (ok) {
       const snap = takeSnapshot()
-      deleteProperty(id)
-      if (editingId === id) {
-        setEditingId(null)
-        setShowForm(false)
+      try {
+        await deleteProperty(id)
+        if (editingId === id) {
+          setEditingId(null)
+          setShowForm(false)
+        }
+        toast('Property deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Property restored', 'info') } catch { toast('Undo failed', 'error') } } } })
+      } catch {
+        toast('Failed to delete property', 'error')
       }
-      toast('Property deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Property restored', 'info') } } })
     }
   }
 

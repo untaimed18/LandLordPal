@@ -66,21 +66,33 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('landlordpal:save-success', handler)
   }, [pushSnapshot])
 
-  const handleUndo = useCallback(() => {
+  const handleUndo = useCallback(async () => {
     if (undoStack.current.length < 2) { toast('Nothing to undo', 'info'); return }
     const current = undoStack.current.pop()!
     redoStack.current.push(current)
     const prev = undoStack.current[undoStack.current.length - 1]
-    restoreSnapshot(prev)
-    toast('Undone')
+    try {
+      await restoreSnapshot(prev)
+      toast('Undone')
+    } catch {
+      undoStack.current.push(current)
+      redoStack.current.pop()
+      toast('Undo failed', 'error')
+    }
   }, [toast])
 
-  const handleRedo = useCallback(() => {
+  const handleRedo = useCallback(async () => {
     if (redoStack.current.length === 0) { toast('Nothing to redo', 'info'); return }
     const next = redoStack.current.pop()!
     undoStack.current.push(next)
-    restoreSnapshot(next)
-    toast('Redone')
+    try {
+      await restoreSnapshot(next)
+      toast('Redone')
+    } catch {
+      undoStack.current.pop()
+      redoStack.current.push(next)
+      toast('Redo failed', 'error')
+    }
   }, [toast])
 
   useEffect(() => {

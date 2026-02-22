@@ -41,7 +41,7 @@ export default function Vendors() {
     setShowForm(true)
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const data = {
       name: form.name,
@@ -56,16 +56,20 @@ export default function Vendors() {
       return
     }
     setFormErrors({})
-    if (editingId) {
-      updateVendor(editingId, data)
-      setEditingId(null)
-      toast('Vendor updated')
-    } else {
-      addVendor(data)
-      toast('Vendor added')
+    try {
+      if (editingId) {
+        await updateVendor(editingId, data)
+        setEditingId(null)
+        toast('Vendor updated')
+      } else {
+        await addVendor(data)
+        toast('Vendor added')
+      }
+      setForm(emptyForm)
+      setShowForm(false)
+    } catch {
+      toast('Failed to save vendor', 'error')
     }
-    setForm(emptyForm)
-    setShowForm(false)
   }
 
   async function handleDelete(id: string, name: string) {
@@ -77,8 +81,12 @@ export default function Vendors() {
     })
     if (ok) {
       const snap = takeSnapshot()
-      deleteVendor(id)
-      toast('Vendor deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Vendor restored', 'info') } } })
+      try {
+        await deleteVendor(id)
+        toast('Vendor deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Vendor restored', 'info') } catch { toast('Undo failed', 'error') } } } })
+      } catch {
+        toast('Failed to delete vendor', 'error')
+      }
     }
   }
 

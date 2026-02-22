@@ -35,10 +35,11 @@ export default function TenantDetail() {
 
   const paymentStats = useMemo(() => {
     if (!tenant) return { total: 0, count: 0, lateCount: 0, avgPayment: 0, monthlyMap: new Map<string, number>() }
+    const rentPaymentsOnly = tenantPayments.filter((p) => !p.category || p.category === 'rent')
     const total = tenantPayments.reduce((s, p) => s + p.amount, 0)
     const count = tenantPayments.length
     const graceDays = tenant.gracePeriodDays ?? settings.defaultGracePeriodDays
-    const lateCount = tenantPayments.filter((p) => {
+    const lateCount = rentPaymentsOnly.filter((p) => {
       const day = parseInt(p.date.split('-')[2], 10)
       return day > graceDays
     }).length
@@ -283,7 +284,7 @@ export default function TenantDetail() {
         {tenant.notes && <p className="stc-notes">{tenant.notes}</p>}
       </section>
 
-      {(tenant.deposit != null && tenant.deposit > 0 || tenant.requireLastMonth) && (() => {
+      {((tenant.deposit != null && tenant.deposit > 0) || tenant.requireFirstMonth || tenant.requireLastMonth) && (() => {
         const depositOwed = tenant.deposit ?? 0
         const depositPaid = tenant.depositPaidAmount ?? 0
         const depositStatus = tenant.depositStatus ?? (depositOwed > 0 ? 'pending' : undefined)

@@ -158,12 +158,17 @@ function currentMonthKey(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function runMonthlyProcessors(): void {
+async function runMonthlyProcessors(): Promise<void> {
   const month = currentMonthKey();
   if (month === _lastProcessedMonth) return;
   _lastProcessedMonth = month;
-  processAutopayments();
-  processRecurringExpenses();
+  try {
+    await processAutopayments();
+    await processRecurringExpenses();
+  } catch (err) {
+    _lastProcessedMonth = '';
+    logger.error('Monthly processors failed:', err);
+  }
   notify();
 }
 
@@ -303,9 +308,9 @@ export function takeSnapshot(): AppState {
   return JSON.parse(JSON.stringify(state));
 }
 
-export function restoreSnapshot(snapshot: AppState): void {
+export async function restoreSnapshot(snapshot: AppState): Promise<void> {
   state = snapshot;
-  persistFullReplace(state);
+  await persistFullReplace(state);
   listeners.forEach((l) => l());
 }
 
@@ -319,7 +324,7 @@ function notify(): void {
 }
 
 // Full state replace (used for backup restore / data clear)
-export function importState(data: Record<string, unknown>): void {
+export async function importState(data: Record<string, unknown>): Promise<void> {
   const api = requireElectronAPI();
   for (const doc of state.documents) {
     api.docDeleteFile(doc.filename).catch((err: unknown) => {
@@ -327,7 +332,7 @@ export function importState(data: Record<string, unknown>): void {
     });
   }
   state = parseStateData(data);
-  persistFullReplace(state);
+  await persistFullReplace(state);
   notify();
 }
 

@@ -118,7 +118,7 @@ export default function Expenses() {
 
   const { errors: formErrors, validate: validateExpense, clearError } = useFormValidation(expenseSchema)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.propertyId) return
     const data = {
@@ -131,13 +131,18 @@ export default function Expenses() {
       recurring: form.recurring,
     }
     if (!validateExpense(data)) return
-    if (editingId) {
-      updateExpense(editingId, data)
-      setEditingId(null)
-      toast('Expense updated')
-    } else {
-      addExpense(data)
-      toast('Expense added')
+    try {
+      if (editingId) {
+        await updateExpense(editingId, data)
+        setEditingId(null)
+        toast('Expense updated')
+      } else {
+        await addExpense(data)
+        toast('Expense added')
+      }
+    } catch {
+      toast('Failed to save expense', 'error')
+      return
     }
     setForm({
       propertyId: form.propertyId,
@@ -328,7 +333,7 @@ export default function Expenses() {
                   <td className="negative">{formatMoney(e.amount)}</td>
                   <td className="actions-cell">
                     <button type="button" className="btn small" onClick={() => openEdit(e)}>Edit</button>
-                    <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete expense', message: `Delete "${e.description}"?`, confirmText: 'Delete', danger: true })) { const snap = takeSnapshot(); deleteExpense(e.id); toast('Expense deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Expense restored', 'info') } } }) } }}>Delete</button>
+                    <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete expense', message: `Delete "${e.description}"?`, confirmText: 'Delete', danger: true })) { const snap = takeSnapshot(); try { await deleteExpense(e.id); toast('Expense deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Expense restored', 'info') } catch { toast('Undo failed', 'error') } } } }) } catch { toast('Failed to delete expense', 'error') } } }}>Delete</button>
                   </td>
                 </tr>
               ))}

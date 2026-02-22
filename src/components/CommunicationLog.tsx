@@ -50,21 +50,25 @@ export default function CommunicationLogSection({ propertyId, tenants, communica
         )}
       </div>
       {commForm && (
-        <form className="form-card" style={{ marginBottom: '1rem' }} onSubmit={(e) => {
+        <form className="form-card" style={{ marginBottom: '1rem' }} onSubmit={async (e) => {
           e.preventDefault()
           const tenantId = (e.currentTarget.querySelector('[name="comm-tenant"]') as HTMLSelectElement)?.value
           if (!tenantId || !newComm.subject.trim()) return
           const t = tenants.find((x) => x.id === tenantId)
-          addCommunicationLog({
-            tenantId,
-            propertyId,
-            type: newComm.type,
-            date: newComm.date,
-            subject: newComm.subject,
-            notes: newComm.notes || undefined,
-          })
-          setCommForm(false)
-          toast(`Communication with ${t?.name ?? 'tenant'} logged`)
+          try {
+            await addCommunicationLog({
+              tenantId,
+              propertyId,
+              type: newComm.type,
+              date: newComm.date,
+              subject: newComm.subject,
+              notes: newComm.notes || undefined,
+            })
+            setCommForm(false)
+            toast(`Communication with ${t?.name ?? 'tenant'} logged`)
+          } catch {
+            toast('Failed to log communication', 'error')
+          }
         }}>
           <div className="form-grid">
             <label>Tenant * <select name="comm-tenant" required aria-label="Select tenant">

@@ -63,20 +63,24 @@ export default function RentIncome() {
     const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
     const dateStr = isCurrentMonth ? nowISO() : `${year}-${String(month + 1).padStart(2, '0')}-01`
     const d = new Date(dateStr + 'T12:00:00')
-    for (const r of unpaidAutopay) {
-      addPayment({
-        propertyId: r.property.id,
-        unitId: r.unit.id,
-        tenantId: r.tenant.id,
-        amount: r.expectedRent,
-        date: dateStr,
-        periodStart: startOfMonth(d),
-        periodEnd: endOfMonth(d),
-        method: 'transfer',
-        notes: 'Autopay',
-      })
+    try {
+      for (const r of unpaidAutopay) {
+        await addPayment({
+          propertyId: r.property.id,
+          unitId: r.unit.id,
+          tenantId: r.tenant.id,
+          amount: r.expectedRent,
+          date: dateStr,
+          periodStart: startOfMonth(d),
+          periodEnd: endOfMonth(d),
+          method: 'transfer',
+          notes: 'Autopay',
+        })
+      }
+      toast(`${unpaidAutopay.length} autopay payment${unpaidAutopay.length !== 1 ? 's' : ''} recorded`)
+    } catch {
+      toast('Failed to record autopay payments', 'error')
     }
-    toast(`${unpaidAutopay.length} autopay payment${unpaidAutopay.length !== 1 ? 's' : ''} recorded`)
   }
 
   async function handleRecordPayment(e: React.FormEvent) {
@@ -97,18 +101,22 @@ export default function RentIncome() {
       })
       if (!ok) return
     }
-    addPayment({
-      propertyId: tenant.propertyId,
-      unitId: tenant.unitId,
-      tenantId: tenant.id,
-      amount: paymentModal.amount,
-      date: paymentDate,
-      periodStart: startOfMonth(d),
-      periodEnd: endOfMonth(d),
-      method: paymentMethod,
-    })
-    toast('Payment recorded')
-    setPaymentModal(null)
+    try {
+      await addPayment({
+        propertyId: tenant.propertyId,
+        unitId: tenant.unitId,
+        tenantId: tenant.id,
+        amount: paymentModal.amount,
+        date: paymentDate,
+        periodStart: startOfMonth(d),
+        periodEnd: endOfMonth(d),
+        method: paymentMethod,
+      })
+      toast('Payment recorded')
+      setPaymentModal(null)
+    } catch {
+      toast('Failed to record payment', 'error')
+    }
   }
 
   async function handleBulkRentAdjust() {

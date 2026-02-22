@@ -29,30 +29,36 @@ export default function MoveOutForm({ tenant, onClose }: Props) {
     if (!ok) return
 
     const snapshot = takeSnapshot()
-    await updateTenant(tenant.id, {
-      moveOutDate,
-      moveOutNotes: moveOutNotes || undefined,
-      depositReturned: depositReturned,
-      depositDeductions: depositDeductions || undefined,
-    })
-    addActivityLog({
-      entityType: 'unit',
-      entityId: tenant.unitId,
-      note: `Tenant "${tenant.name}" moved out. Deposit held: ${formatMoney(tenant.deposit ?? 0)}. Returned: ${formatMoney(depositReturned)}${depositDeductions ? `. Deductions: ${depositDeductions}` : ''}${moveOutNotes ? `. Notes: ${moveOutNotes}` : ''}`,
-      date: moveOutDate,
-    })
-    deleteTenant(tenant.id)
-    onClose()
-    toast('Tenant moved out and unit marked available', {
-      type: 'success',
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          restoreSnapshot(snapshot)
-          toast('Move-out undone')
+    try {
+      await updateTenant(tenant.id, {
+        moveOutDate,
+        moveOutNotes: moveOutNotes || undefined,
+        depositReturned: depositReturned,
+        depositDeductions: depositDeductions || undefined,
+      })
+      await addActivityLog({
+        entityType: 'unit',
+        entityId: tenant.unitId,
+        note: `Tenant "${tenant.name}" moved out. Deposit held: ${formatMoney(tenant.deposit ?? 0)}. Returned: ${formatMoney(depositReturned)}${depositDeductions ? `. Deductions: ${depositDeductions}` : ''}${moveOutNotes ? `. Notes: ${moveOutNotes}` : ''}`,
+        date: moveOutDate,
+      })
+      await deleteTenant(tenant.id)
+      onClose()
+      toast('Tenant moved out and unit marked available', {
+        type: 'success',
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              await restoreSnapshot(snapshot)
+              toast('Move-out undone')
+            } catch { toast('Undo failed', 'error') }
+          },
         },
-      },
-    })
+      })
+    } catch {
+      toast('Failed to complete move-out', 'error')
+    }
   }
 
   return (

@@ -87,7 +87,7 @@ export default function PropertyDetail() {
       if (firstAvailable) {
         setEditingTenantId(null)
         setTenantFormUnitId(firstAvailable.id)
-        setTenantFormData({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: true, requireLastMonth: false })
+        setTenantFormData({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: settings.defaultGracePeriodDays, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: settings.requireFirstMonth, requireLastMonth: settings.requireLastMonth })
         setSearchParams({}, { replace: true })
       }
     }
@@ -120,7 +120,7 @@ export default function PropertyDetail() {
   function openAddTenant(unitId: string, rent: number, deposit: number) {
     setEditingTenantId(null)
     setTenantFormUnitId(unitId)
-    setTenantFormData({ unitId, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: rent, deposit, gracePeriodDays: 5, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: true, requireLastMonth: false })
+    setTenantFormData({ unitId, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: rent, deposit, gracePeriodDays: settings.defaultGracePeriodDays, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: settings.requireFirstMonth, requireLastMonth: settings.requireLastMonth })
   }
 
   function openEditTenant(t: typeof propTenants[0]) {
@@ -141,7 +141,7 @@ export default function PropertyDetail() {
       try {
         await deleteProperty(prop.id)
         navigate('/properties')
-        toast('Property deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); navigate(`/properties/${prop.id}`); toast('Property restored', 'info') } } })
+        toast('Property deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); navigate(`/properties/${prop.id}`); toast('Property restored', 'info') } catch { toast('Undo failed', 'error') } } } })
       } catch (err) {
         toast('Failed to delete property', 'error')
       }
@@ -157,7 +157,7 @@ export default function PropertyDetail() {
       try {
         await deleteUnit(unitId)
         setEditingUnitId(null)
-        toast('Unit deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Unit restored', 'info') } } })
+        toast('Unit deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Unit restored', 'info') } catch { toast('Undo failed', 'error') } } } })
       } catch (err) {
         toast('Failed to delete unit', 'error')
       }
@@ -171,7 +171,7 @@ export default function PropertyDetail() {
       try {
         await deleteTenant(tenantId)
         setEditingTenantId(null)
-        toast('Tenant removed', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Tenant restored', 'info') } } })
+        toast('Tenant removed', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Tenant restored', 'info') } catch { toast('Undo failed', 'error') } } } })
       } catch (err) {
         toast('Failed to remove tenant', 'error')
       }
@@ -184,7 +184,7 @@ export default function PropertyDetail() {
       const snap = takeSnapshot()
       try {
         await deletePayment(paymentId)
-        toast('Payment deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Payment restored', 'info') } } })
+        toast('Payment deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Payment restored', 'info') } catch { toast('Undo failed', 'error') } } } })
       } catch (err) {
         toast('Failed to delete payment', 'error')
       }

@@ -54,7 +54,7 @@ export default function Reports() {
   const filteredPayments = propertyFilter ? payments.filter((p) => p.propertyId === propertyFilter) : payments
   const filteredExpenses = propertyFilter ? expenses.filter((e) => e.propertyId === propertyFilter) : expenses
 
-  const incomePayments = filteredPayments.filter((p) => !p.category || p.category === 'rent' || p.category === 'fee')
+  const incomePayments = useMemo(() => filteredPayments.filter((p) => !p.category || p.category === 'rent' || p.category === 'fee'), [filteredPayments])
 
   // Monthly income/expenses
   const monthly = useMemo(() => {

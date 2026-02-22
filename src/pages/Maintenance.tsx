@@ -108,7 +108,7 @@ export default function Maintenance() {
 
   const { errors: formErrors, validate: validateMaintenance, clearError } = useFormValidation(maintenanceSchema)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.propertyId) return
     const payload = {
@@ -126,16 +126,20 @@ export default function Maintenance() {
       notes: form.notes || undefined,
     }
     if (!validateMaintenance(payload)) return
-    if (editingId) {
-      updateMaintenanceRequest(editingId, payload)
-      setEditingId(null)
-      toast('Request updated')
-    } else {
-      addMaintenanceRequest(payload)
-      toast('Request created')
+    try {
+      if (editingId) {
+        await updateMaintenanceRequest(editingId, payload)
+        setEditingId(null)
+        toast('Request updated')
+      } else {
+        await addMaintenanceRequest(payload)
+        toast('Request created')
+      }
+      setForm(emptyForm)
+      setShowForm(false)
+    } catch {
+      toast('Failed to save request', 'error')
     }
-    setForm(emptyForm)
-    setShowForm(false)
   }
 
   async function handleStatusChange(id: string, status: MaintenanceStatus) {
@@ -313,7 +317,7 @@ export default function Maintenance() {
                     <td>{formatDate(r.createdAt)}</td>
                     <td className="actions-cell">
                       <button type="button" className="btn small" onClick={() => openEdit(r)}>Edit</button>
-                      <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete request', message: `Delete "${r.title}"?`, confirmText: 'Delete', danger: true })) { const snap = takeSnapshot(); deleteMaintenanceRequest(r.id); toast('Request deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Request restored', 'info') } } }) } }}>Delete</button>
+                      <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete request', message: `Delete "${r.title}"?`, confirmText: 'Delete', danger: true })) { const snap = takeSnapshot(); try { await deleteMaintenanceRequest(r.id); toast('Request deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Request restored', 'info') } catch { toast('Undo failed', 'error') } } } }) } catch { toast('Failed to delete request', 'error') } } }}>Delete</button>
                     </td>
                   </tr>
                 )

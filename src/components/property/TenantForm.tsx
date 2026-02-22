@@ -52,7 +52,7 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
     return total
   }, [form.deposit, form.monthlyRent, form.requireFirstMonth, form.requireLastMonth])
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.unitId) return
 
@@ -97,21 +97,25 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
       requireLastMonth: form.requireLastMonth,
     }
 
-    if (editingTenantId) {
-      updateTenant(editingTenantId, data)
-      toast('Tenant updated')
-    } else {
-      addTenant({
-        ...data,
-        propertyId,
-        unitId: form.unitId,
-        moveInDate: form.leaseStart,
-        depositStatus: form.deposit > 0 ? 'pending' : undefined,
-      })
-      updateUnit(form.unitId, { available: false })
-      toast('Tenant added')
+    try {
+      if (editingTenantId) {
+        await updateTenant(editingTenantId, data)
+        toast('Tenant updated')
+      } else {
+        await addTenant({
+          ...data,
+          propertyId,
+          unitId: form.unitId,
+          moveInDate: form.leaseStart,
+          depositStatus: form.deposit > 0 ? 'pending' : undefined,
+        })
+        await updateUnit(form.unitId, { available: false })
+        toast('Tenant added')
+      }
+      onClose()
+    } catch {
+      toast('Failed to save tenant', 'error')
     }
-    onClose()
   }
 
   const isEdit = !!editingTenantId

@@ -57,7 +57,7 @@ export default function PropertyEditForm({ property, onClose }: Props) {
     insuranceExpiry: property.insuranceExpiry ?? '',
   })
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const payload = {
       name: form.name,
@@ -81,9 +81,13 @@ export default function PropertyEditForm({ property, onClose }: Props) {
       notes: form.notes || undefined,
     }
     if (!validate(payload)) return
-    updateProperty(property.id, payload)
-    onClose()
-    toast('Property updated')
+    try {
+      await updateProperty(property.id, payload)
+      onClose()
+      toast('Property updated')
+    } catch {
+      toast('Failed to update property', 'error')
+    }
   }
 
   return (
