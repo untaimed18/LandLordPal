@@ -176,6 +176,41 @@ export default function Reports() {
     toast('PDF exported', 'info')
   }
 
+  function exportScheduleEPdf() {
+    const propList = propertyFilter ? properties.filter(p => p.id === propertyFilter) : properties
+    const allRows: (string | number)[][] = []
+
+    for (const prop of propList) {
+      const propPayments = payments.filter(p => p.propertyId === prop.id && new Date(p.date + 'T12:00:00').getFullYear() === year)
+      const propExpenses = expenses.filter(e => e.propertyId === prop.id && new Date(e.date + 'T12:00:00').getFullYear() === year)
+      const propIncome = propPayments.reduce((s, p) => s + p.amount, 0)
+      const propTotalExp = propExpenses.reduce((s, e) => s + e.amount, 0)
+
+      allRows.push([prop.name, '', ''])
+      allRows.push(['  Rental Income', '', formatMoneyForPdf(propIncome)])
+      for (const c of CATEGORIES) {
+        const amt = propExpenses.filter(e => e.category === c.value).reduce((s, e) => s + e.amount, 0)
+        if (amt > 0) allRows.push([`  ${c.label}`, '', formatMoneyForPdf(amt)])
+      }
+      allRows.push(['  Total Expenses', '', formatMoneyForPdf(propTotalExp)])
+      allRows.push(['  Net Income', '', formatMoneyForPdf(propIncome - propTotalExp)])
+      allRows.push(['', '', ''])
+    }
+
+    const grandIncome = allRows.length > 0 ? taxSummary.totalIncome : 0
+    const grandExp = allRows.length > 0 ? taxSummary.totalExpenses : 0
+
+    exportTablePdf({
+      title: `Schedule E — ${year}`,
+      subtitle: 'Supplemental Income and Loss (Rental Real Estate)',
+      headers: ['Item', '', 'Amount'],
+      rows: allRows,
+      totals: ['Grand Total Net Income', '', formatMoneyForPdf(grandIncome - grandExp)],
+      filename: `schedule-e-${year}.pdf`,
+    })
+    toast('Schedule E exported', 'info')
+  }
+
   const hasData = payments.length > 0 || expenses.length > 0
 
   return (
@@ -305,6 +340,7 @@ export default function Reports() {
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button type="button" className="btn small" onClick={exportTax}>Export CSV</button>
               <button type="button" className="btn small" onClick={exportTaxPdf}>Export PDF</button>
+              <button type="button" className="btn small primary" onClick={exportScheduleEPdf}>Schedule E PDF</button>
             </div>
           </div>
           <div className="tax-summary-report">

@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { useToast } from '../context/ToastContext'
 import { loadSettings } from '../lib/settings'
+import { takeSnapshot, restoreSnapshot, type AppState } from '../store'
 import UpdateNotification from './UpdateNotification'
 import SaveIndicator from './SaveIndicator'
 import {
@@ -40,12 +41,62 @@ interface SearchResult {
   to: string
 }
 
+const MAX_UNDO = 20
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const toast = useToast()
   const { properties, units, tenants, vendors, maintenanceRequests } = useStore()
   const settings = loadSettings()
+
+  const undoStack = useRef<AppState[]>([])
+  const redoStack = useRef<AppState[]>([])
+
+  const pushSnapshot = useCallback(() => {
+    const snap = takeSnapshot()
+    undoStack.current.push(snap)
+    if (undoStack.current.length > MAX_UNDO) undoStack.current.shift()
+    redoStack.current = []
+  }, [])
+
+  useEffect(() => {
+    const handler = () => pushSnapshot()
+    window.addEventListener('landlordpal:save-success', handler)
+    return () => window.removeEventListener('landlordpal:save-success', handler)
+  }, [pushSnapshot])
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.current.length < 2) { toast('Nothing to undo', 'info'); return }
+    const current = undoStack.current.pop()!
+    redoStack.current.push(current)
+    const prev = undoStack.current[undoStack.current.length - 1]
+    restoreSnapshot(prev)
+    toast('Undone')
+  }, [toast])
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.current.length === 0) { toast('Nothing to redo', 'info'); return }
+    const next = redoStack.current.pop()!
+    undoStack.current.push(next)
+    restoreSnapshot(next)
+    toast('Redone')
+  }, [toast])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        handleUndo()
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault()
+        handleRedo()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [handleUndo, handleRedo])
 
   useEffect(() => {
     const saveHandler = (e: Event) => {

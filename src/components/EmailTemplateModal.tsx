@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Tenant, Property, Unit, EmailTemplate } from '../types'
+import { addCommunicationLog } from '../store'
 import { processTemplate } from '../lib/email'
 import { formatMoney } from '../lib/format'
+import { nowISO } from '../lib/id'
+import { useToast } from '../context/ToastContext'
 
 interface Props {
   tenant: Tenant
@@ -12,6 +15,7 @@ interface Props {
 }
 
 export default function EmailTemplateModal({ tenant, property, unit, templates, onClose }: Props) {
+  const toast = useToast()
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
   
   const template = templates.find(t => t.id === selectedTemplateId)
@@ -27,10 +31,23 @@ export default function EmailTemplateModal({ tenant, property, unit, templates, 
   const subject = template ? processTemplate(template.subject, data) : ''
   const body = template ? processTemplate(template.body, data) : ''
 
-  function handleSend() {
+  async function handleSend() {
     if (!template) return
     const mailto = `mailto:${tenant.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
     window.open(mailto, '_blank')
+
+    try {
+      await addCommunicationLog({
+        tenantId: tenant.id,
+        propertyId: tenant.propertyId,
+        type: 'email',
+        date: nowISO(),
+        subject,
+        notes: `Sent via template "${template.name}"`,
+      })
+    } catch {
+      toast('Email opened but failed to log communication', 'error')
+    }
     onClose()
   }
 

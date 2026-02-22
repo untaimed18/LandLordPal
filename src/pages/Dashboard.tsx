@@ -41,17 +41,24 @@ import {
 export default function Dashboard() {
   const { properties, units, tenants, expenses, payments, maintenanceRequests } = useStore()
   const settings = loadSettings()
-  const stats = getDashboardStats(properties, units, tenants, expenses, payments)
-  const summaries = properties.map((p) =>
+  const [propertyFilter, setPropertyFilter] = useState('')
+  const fp = propertyFilter ? properties.filter(p => p.id === propertyFilter) : properties
+  const fu = propertyFilter ? units.filter(u => u.propertyId === propertyFilter) : units
+  const ft = propertyFilter ? tenants.filter(t => t.propertyId === propertyFilter) : tenants
+  const fe = propertyFilter ? expenses.filter(e => e.propertyId === propertyFilter) : expenses
+  const fPay = propertyFilter ? payments.filter(p => p.propertyId === propertyFilter) : payments
+  const fMaint = propertyFilter ? maintenanceRequests.filter(m => m.propertyId === propertyFilter) : maintenanceRequests
+  const stats = getDashboardStats(fp, fu, ft, fe, fPay)
+  const summaries = fp.map((p) =>
     getPropertySummary(p, units, tenants, expenses, payments)
   )
   const now = new Date()
-  const rentRoll = getRentRollForMonth(now.getFullYear(), now.getMonth(), properties, units, tenants, payments)
+  const rentRoll = getRentRollForMonth(now.getFullYear(), now.getMonth(), fp, fu, ft, fPay)
   const notPaidThisMonth = rentRoll.filter((r) => !r.paid)
-  const leasesEndingSoon = getLeasesEndingSoon(tenants, settings.leaseWarningDays)
-  const openMaintenance = maintenanceRequests.filter((r) => r.status !== 'completed')
+  const leasesEndingSoon = getLeasesEndingSoon(ft, settings.leaseWarningDays)
+  const openMaintenance = fMaint.filter((r) => r.status !== 'completed')
 
-  const insuranceAlerts = properties.filter((p) => {
+  const insuranceAlerts = fp.filter((p) => {
     if (!p.insuranceExpiry) return false
     const expiry = new Date(p.insuranceExpiry + 'T12:00:00')
     const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -62,7 +69,7 @@ export default function Dashboard() {
     return { property: p, daysLeft }
   }).sort((a, b) => a.daysLeft - b.daysLeft)
 
-  const scheduledMaintenance = maintenanceRequests.filter((r) => {
+  const scheduledMaintenance = fMaint.filter((r) => {
     if (!r.scheduledDate || r.status === 'completed') return false
     const scheduled = new Date(r.scheduledDate + 'T12:00:00')
     const daysUntil = Math.ceil((scheduled.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -79,26 +86,26 @@ export default function Dashboard() {
   })
 
   const investmentMetrics = useMemo(
-    () => getInvestmentMetrics(properties, units, tenants, expenses, payments, now.getFullYear()),
-    [properties, units, tenants, expenses, payments],
+    () => getInvestmentMetrics(fp, fu, ft, fe, fPay, now.getFullYear()),
+    [fp, fu, ft, fe, fPay],
   )
 
   const forecast = useMemo(
-    () => getForecast(tenants, expenses, payments),
-    [tenants, expenses, payments],
+    () => getForecast(ft, fe, fPay),
+    [ft, fe, fPay],
   )
 
   const yoyTrends = useMemo(
-    () => getYoYTrends(payments, expenses),
-    [payments, expenses],
+    () => getYoYTrends(fPay, fe),
+    [fPay, fe],
   )
 
   const [tooltipId, setTooltipId] = useState<string | null>(null)
 
   const hasData = properties.length > 0
 
-  const vacancyCost = units
-    .filter((u) => !tenants.some((t) => t.unitId === u.id))
+  const vacancyCost = fu
+    .filter((u) => !ft.some((t) => t.unitId === u.id))
     .reduce((sum, u) => sum + u.monthlyRent, 0)
 
   const collectionRate = stats.expectedMonthlyRent > 0
@@ -115,12 +122,12 @@ export default function Dashboard() {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(currentYear, currentMonth - i, 1)
       const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      const income = payments.filter((p) => p.date.startsWith(prefix)).reduce((s, p) => s + p.amount, 0)
-      const exp = expenses.filter((e) => e.date.startsWith(prefix)).reduce((s, e) => s + e.amount, 0)
+      const income = fPay.filter((p) => p.date.startsWith(prefix)).reduce((s, p) => s + p.amount, 0)
+      const exp = fe.filter((e) => e.date.startsWith(prefix)).reduce((s, e) => s + e.amount, 0)
       months.push({ label: monthNames[d.getMonth()], income, expenses: exp })
     }
     return months
-  }, [payments, expenses, currentYear, currentMonth])
+  }, [fPay, fe, currentYear, currentMonth])
 
   const incomeData = monthlyTrend.map((m) => m.income)
   const expenseData = monthlyTrend.map((m) => m.expenses)
@@ -132,10 +139,16 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <p className="page-desc">
             {hasData
-              ? `${monthNames[now.getMonth()]} ${now.getFullYear()} — ${properties.length} propert${properties.length !== 1 ? 'ies' : 'y'}, ${tenants.length} tenant${tenants.length !== 1 ? 's' : ''}`
+              ? `${monthNames[now.getMonth()]} ${now.getFullYear()} — ${fp.length} propert${fp.length !== 1 ? 'ies' : 'y'}, ${ft.length} tenant${ft.length !== 1 ? 's' : ''}`
               : 'Your portfolio at a glance.'}
           </p>
         </div>
+        {properties.length > 1 && (
+          <select className="select-inline" value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)}>
+            <option value="">All properties</option>
+            {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        )}
       </div>
 
       {!hasData && (
@@ -422,7 +435,7 @@ export default function Dashboard() {
                   </div>
                   <div className="forecast-risk-list">
                     {forecast.leaseExpirationRisk.slice(0, 5).map((r) => (
-                      <Link key={r.tenant.id} to={`/properties/${r.tenant.propertyId}`} className="forecast-risk-item">
+                      <Link key={r.tenant.id} to={`/tenants/${r.tenant.id}`} className="forecast-risk-item">
                         <strong>{r.tenant.name}</strong>
                         <span>{formatMoney(r.monthlyRent)}/mo · {r.daysLeft}d left</span>
                       </Link>
@@ -494,14 +507,16 @@ export default function Dashboard() {
               )
             })}
             {leasesEndingSoon.slice(0, 5).map(({ tenant, daysLeft }) => (
-              <Link key={`lease-${tenant.id}`} to={`/properties/${tenant.propertyId}`} className="dash-notif dash-notif-alert">
+              <div key={`lease-${tenant.id}`} className="dash-notif dash-notif-alert" style={{ display: 'flex', alignItems: 'center' }}>
                 <CalendarDays size={16} className="dash-notif-icon" aria-hidden="true" />
-                <div className="dash-notif-body">
+                <Link to={`/tenants/${tenant.id}`} className="dash-notif-body" style={{ flex: 1, textDecoration: 'none', color: 'inherit' }}>
                   <strong>{tenant.name}</strong>
-                  <span>Lease ends in {daysLeft} day{daysLeft !== 1 ? 's' : ''}</span>
-                </div>
-                <ChevronRight size={16} className="dash-notif-arrow" aria-hidden="true" />
-              </Link>
+                  <span>Lease ends in {daysLeft} day{daysLeft !== 1 ? 's' : ''} · {formatMoney(tenant.monthlyRent)}/mo</span>
+                </Link>
+                <Link to={`/tenants/${tenant.id}`} className="btn small primary no-print" style={{ marginLeft: '0.5rem', whiteSpace: 'nowrap' }}>
+                  Renew Lease
+                </Link>
+              </div>
             ))}
           </div>
         </section>

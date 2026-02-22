@@ -140,6 +140,8 @@ export interface RentRollItem {
   property: Property;
   expectedRent: number;
   paidAmount: number;
+  balance: number;
+  lateFees: number;
   paid: boolean;
   paymentDate?: string;
 }
@@ -161,13 +163,17 @@ export function getRentRollForMonth(
       (p) => p.tenantId === tenant.id && isInMonth(p.date, year, month)
     )
     const paidAmount = monthPayments.reduce((s, p) => s + p.amount, 0)
+    const lateFees = monthPayments.reduce((s, p) => s + (p.lateFee ?? 0), 0)
     const latestPayment = [...monthPayments].sort((a, b) => b.date.localeCompare(a.date))[0]
+    const balance = Math.max(0, tenant.monthlyRent - paidAmount)
     items.push({
       tenant,
       unit,
       property,
       expectedRent: tenant.monthlyRent,
       paidAmount,
+      balance,
+      lateFees,
       paid: paidAmount >= tenant.monthlyRent,
       paymentDate: latestPayment?.date,
     })

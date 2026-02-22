@@ -138,12 +138,40 @@ export default function Maintenance() {
     setShowForm(false)
   }
 
-  function handleStatusChange(id: string, status: MaintenanceStatus) {
-    updateMaintenanceRequest(id, {
+  async function handleStatusChange(id: string, status: MaintenanceStatus) {
+    const request = maintenanceRequests.find(r => r.id === id)
+    await updateMaintenanceRequest(id, {
       status,
       resolvedAt: status === 'completed' ? nowISO() : undefined,
     })
     toast(`Marked as ${STATUSES.find((s) => s.value === status)?.label}`)
+
+    if (status === 'completed' && request?.recurrence && request.recurrence !== 'none') {
+      const baseDate = request.scheduledDate ? new Date(request.scheduledDate + 'T12:00:00') : new Date()
+      const next = new Date(baseDate)
+      switch (request.recurrence) {
+        case 'monthly': next.setMonth(next.getMonth() + 1); break
+        case 'quarterly': next.setMonth(next.getMonth() + 3); break
+        case 'semi_annual': next.setMonth(next.getMonth() + 6); break
+        case 'annual': next.setFullYear(next.getFullYear() + 1); break
+      }
+      const nextDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+      await addMaintenanceRequest({
+        propertyId: request.propertyId,
+        unitId: request.unitId,
+        tenantId: request.tenantId,
+        title: request.title,
+        description: request.description,
+        priority: request.priority,
+        status: 'open',
+        category: request.category,
+        vendorId: request.vendorId,
+        scheduledDate: nextDate,
+        recurrence: request.recurrence,
+        notes: request.notes,
+      })
+      toast(`Next ${request.recurrence} occurrence scheduled for ${nextDate}`, 'info')
+    }
   }
 
   return (

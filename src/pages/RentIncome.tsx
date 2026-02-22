@@ -197,6 +197,7 @@ export default function RentIncome() {
                     <th>Property / Unit</th>
                     <th>Expected</th>
                     <th>Paid</th>
+                    <th>Balance</th>
                     <th>Status</th>
                     <th>Reliability</th>
                     <th></th>
@@ -218,6 +219,10 @@ export default function RentIncome() {
                       <td className={r.paidAmount > 0 ? 'positive' : ''}>
                         {r.paidAmount > 0 ? formatMoney(r.paidAmount) : '—'}
                         {r.paymentDate && <span className="muted block">{formatDate(r.paymentDate)}</span>}
+                      </td>
+                      <td className={r.balance > 0 ? 'negative' : ''}>
+                        {r.balance > 0 ? formatMoney(r.balance) : '—'}
+                        {r.lateFees > 0 && <span className="muted block">+{formatMoney(r.lateFees)} fees</span>}
                       </td>
                       <td>
                         {r.paid ? (

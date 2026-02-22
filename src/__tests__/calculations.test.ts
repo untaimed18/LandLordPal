@@ -313,7 +313,9 @@ describe('getTenantReliability', () => {
       makePayment({ id: 'pay2', tenantId: 't2', date: '2025-06-03', amount: 1000 }),
     ]
     const r = getTenantReliability(tenant, payments, 5)
-    expect(r.totalPayments).toBe(1)
+    // With < 3 payments, returns "New Tenant" early path with totalPayments: 0
+    expect(r.label).toBe('New Tenant')
+    expect(r.totalPayments).toBe(0)
   })
 })
 

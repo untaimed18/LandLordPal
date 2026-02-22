@@ -1,12 +1,12 @@
 import { useRef, useState, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
-import { getState, importState, addProperty, addUnit, addTenant, updateUnit, addEmailTemplate, updateEmailTemplate, deleteEmailTemplate } from '../store'
+import { getState, importState, addProperty, addUnit, addTenant, updateUnit, addExpense, addPayment, addEmailTemplate, updateEmailTemplate, deleteEmailTemplate } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
 import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../lib/settings'
 import { backupSchema } from '../lib/schemas'
-import { parseImportCSV } from '../lib/csvImport'
+import { parseImportCSV, type ImportType } from '../lib/csvImport'
 import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download, RefreshCw, Upload, Mail } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 
@@ -29,7 +29,7 @@ export default function Settings() {
   const csvInput = useRef<HTMLInputElement>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(getTheme)
   const [appSettings, setAppSettings] = useState<AppSettings>(() => loadSettings())
-  const [importType, setImportType] = useState<'properties' | 'units' | 'tenants'>('properties')
+  const [importType, setImportType] = useState<ImportType>('properties')
   const [templateForm, setTemplateForm] = useState<{ id?: string; name: string; subject: string; body: string } | null>(null)
 
   useEffect(() => {
@@ -101,14 +101,16 @@ export default function Settings() {
     const reader = new FileReader()
     reader.onload = async () => {
       const text = reader.result as string
-      const result = parseImportCSV(importType, text, properties, units)
+      const result = parseImportCSV(importType, text, properties, units, tenants)
       
       if (result.errors.length > 0) {
         toast(`Import failed: ${result.errors[0]}`, 'error')
         return
       }
 
-      const count = result.properties.length + result.units.length + result.tenants.length
+      const count = result.properties.length + result.units.length + result.tenants.length + result.expenses.length + result.payments.length
+      if (count === 0) { toast('No valid records found in CSV', 'error'); return }
+
       const ok = await confirm({
         title: `Import ${count} ${importType}?`,
         message: `Found ${count} records. Ready to import?`,
@@ -126,6 +128,10 @@ export default function Settings() {
             await addTenant(t)
             await updateUnit(t.unitId, { available: false })
           }
+        } else if (importType === 'expenses') {
+          for (const ex of result.expenses) await addExpense(ex)
+        } else if (importType === 'payments') {
+          for (const p of result.payments) await addPayment(p)
         }
         toast(`Successfully imported ${count} ${importType}`)
       } catch {
@@ -136,13 +142,15 @@ export default function Settings() {
     if (csvInput.current) csvInput.current.value = ''
   }
 
-  function downloadTemplate(type: 'properties' | 'units' | 'tenants') {
-    let headers: string[] = []
-    if (type === 'properties') headers = ['Name', 'Address', 'City', 'State', 'ZIP', 'Notes']
-    if (type === 'units') headers = ['Property', 'Name', 'Rent', 'Bedrooms', 'Bathrooms', 'Notes']
-    if (type === 'tenants') headers = ['Property', 'Unit', 'Name', 'Rent', 'Lease Start', 'Lease End', 'Deposit', 'Email', 'Phone']
-    
-    downloadCSV(`${type}-template.csv`, toCSV(headers, []))
+  function downloadTemplate(type: ImportType) {
+    const templates: Record<ImportType, string[]> = {
+      properties: ['Name', 'Address', 'City', 'State', 'ZIP', 'Notes'],
+      units: ['Property', 'Name', 'Rent', 'Bedrooms', 'Bathrooms', 'Notes'],
+      tenants: ['Property', 'Unit', 'Name', 'Rent', 'Lease Start', 'Lease End', 'Deposit', 'Email', 'Phone'],
+      expenses: ['Property', 'Unit', 'Date', 'Amount', 'Category', 'Description', 'Recurring'],
+      payments: ['Tenant', 'Property', 'Date', 'Amount', 'Method', 'Period Start', 'Period End', 'Notes', 'Late Fee'],
+    }
+    downloadCSV(`${type}-template.csv`, toCSV(templates[type], []))
   }
 
   async function handleSaveTemplate(e: React.FormEvent) {
@@ -252,6 +260,8 @@ export default function Settings() {
             <option value="properties">Properties</option>
             <option value="units">Units</option>
             <option value="tenants">Tenants</option>
+            <option value="expenses">Expenses</option>
+            <option value="payments">Payments</option>
           </select>
           <button type="button" className="btn small" onClick={() => downloadTemplate(importType)}>Download Template</button>
         </div>
