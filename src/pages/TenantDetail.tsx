@@ -1,20 +1,24 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { getLeaseStatus, getTenantReliability } from '../lib/calculations'
 import { formatMoney, formatDate } from '../lib/format'
 import Breadcrumbs from '../components/Breadcrumbs'
 import DocumentAttachments from '../components/DocumentAttachments'
+import LeaseRenewalModal from '../components/LeaseRenewalModal'
+import EmailTemplateModal from '../components/EmailTemplateModal'
 import { loadSettings } from '../lib/settings'
-import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer } from 'lucide-react'
+import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
 
 export default function TenantDetail() {
   const { id } = useParams<{ id: string }>()
-  const { tenants, properties, units, payments, communicationLogs } = useStore()
+  const { tenants, properties, units, payments, communicationLogs, emailTemplates } = useStore()
   const toast = useToast()
+  const [showRenewal, setShowRenewal] = useState(false)
+  const [showEmail, setShowEmail] = useState(false)
 
   const tenant = tenants.find((t) => t.id === id)
   const settings = loadSettings()
@@ -96,6 +100,8 @@ export default function TenantDetail() {
         </div>
         <div className="header-actions no-print">
           <button type="button" className="btn small" onClick={() => window.print()}><Printer size={14} /> Print summary</button>
+          <button type="button" className="btn small primary" onClick={() => setShowRenewal(true)}><RotateCw size={14} /> Renew Lease</button>
+          <button type="button" className="btn small" onClick={() => setShowEmail(true)} disabled={!tenant.email}><Send size={14} /> Send Email</button>
           {tenantPayments.length > 0 && (
             <button type="button" className="btn small" onClick={() => {
               downloadCSV(`${tenant.name.replace(/\s+/g, '-')}-payments-${nowISO()}.csv`, toCSV(
@@ -107,6 +113,17 @@ export default function TenantDetail() {
           )}
         </div>
       </div>
+
+      {showRenewal && <LeaseRenewalModal tenant={tenant} onClose={() => setShowRenewal(false)} />}
+      {showEmail && property && unit && (
+        <EmailTemplateModal
+          tenant={tenant}
+          property={property}
+          unit={unit}
+          templates={emailTemplates}
+          onClose={() => setShowEmail(false)}
+        />
+      )}
 
       <div className="stats-grid two" style={{ marginBottom: '1.5rem' }}>
         <div className="stat-card">

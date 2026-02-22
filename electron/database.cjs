@@ -8,7 +8,7 @@ let db = null;
 let dbFilePath = null;
 let userDataDir = null;
 
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 // ─── Encryption ──────────────────────────────────────────────────────────────
 
@@ -91,12 +91,13 @@ const TABLE_NAME_MAP = {
   vendors: 'vendors',
   communicationLogs: 'communication_logs',
   documents: 'documents',
+  emailTemplates: 'email_templates',
 };
 
 const TABLE_COLUMNS = {
   properties: ['id', 'name', 'address', 'city', 'state', 'zip', 'propertyType', 'sqft', 'amenities', 'purchasePrice', 'purchaseDate', 'insuranceProvider', 'insurancePolicyNumber', 'insuranceExpiry', 'notes', 'createdAt', 'updatedAt'],
   units: ['id', 'propertyId', 'name', 'bedrooms', 'bathrooms', 'sqft', 'monthlyRent', 'deposit', 'available', 'notes', 'createdAt', 'updatedAt'],
-  tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositReturned', 'depositDeductions', 'gracePeriodDays', 'lateFeeAmount', 'autopay', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'rentHistory', 'createdAt', 'updatedAt'],
+  tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositReturned', 'depositDeductions', 'gracePeriodDays', 'lateFeeAmount', 'autopay', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'rentHistory', 'leaseHistory', 'createdAt', 'updatedAt'],
   expenses: ['id', 'propertyId', 'unitId', 'category', 'amount', 'date', 'description', 'recurring', 'vendorId', 'createdAt', 'updatedAt'],
   payments: ['id', 'tenantId', 'unitId', 'propertyId', 'amount', 'date', 'periodStart', 'periodEnd', 'method', 'notes', 'lateFee', 'createdAt', 'updatedAt'],
   maintenance_requests: ['id', 'propertyId', 'unitId', 'tenantId', 'title', 'description', 'priority', 'status', 'category', 'vendorId', 'cost', 'scheduledDate', 'recurrence', 'resolvedAt', 'notes', 'createdAt', 'updatedAt'],
@@ -104,6 +105,7 @@ const TABLE_COLUMNS = {
   vendors: ['id', 'name', 'phone', 'email', 'specialty', 'notes', 'createdAt', 'updatedAt'],
   communication_logs: ['id', 'tenantId', 'propertyId', 'type', 'date', 'subject', 'notes', 'createdAt'],
   documents: ['id', 'entityType', 'entityId', 'filename', 'originalName', 'size', 'mimeType', 'createdAt'],
+  email_templates: ['id', 'name', 'subject', 'body', 'createdAt', 'updatedAt'],
 };
 
 // JS object -> DB row serializers
@@ -137,6 +139,7 @@ const serializers = {
     moveInNotes: t.moveInNotes ?? null, moveOutNotes: t.moveOutNotes ?? null,
     notes: t.notes ?? null,
     rentHistory: t.rentHistory ? JSON.stringify(t.rentHistory) : null,
+    leaseHistory: t.leaseHistory ? JSON.stringify(t.leaseHistory) : null,
     createdAt: t.createdAt, updatedAt: t.updatedAt,
   }),
   expenses: (e) => ({
@@ -179,6 +182,10 @@ const serializers = {
     id: d.id, entityType: d.entityType, entityId: d.entityId,
     filename: d.filename, originalName: d.originalName,
     size: d.size, mimeType: d.mimeType, createdAt: d.createdAt,
+  }),
+  email_templates: (t) => ({
+    id: t.id, name: t.name, subject: t.subject, body: t.body,
+    createdAt: t.createdAt, updatedAt: t.updatedAt,
   }),
 };
 
@@ -289,6 +296,7 @@ async function migrateIfNeeded(userDataPath) {
       if (currentVersion < 2) runMigrationV2();
       if (currentVersion < 3) runMigrationV3();
       if (currentVersion < 4) runMigrationV4();
+      if (currentVersion < 5) runMigrationV5();
       setSchemaVersion(CURRENT_SCHEMA_VERSION);
     });
     migrate();
@@ -486,6 +494,25 @@ function runMigrationV4() {
   `);
 }
 
+function runMigrationV5() {
+  log.info('  Running migration v5: email templates + lease history');
+  const addCol = (table, col, type) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch { /* already exists */ }
+  };
+  addCol('tenants', 'leaseHistory', 'TEXT');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS email_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+  `);
+}
+
 // ─── File management for document attachments ─────────────────────────────────
 
 function getDocumentsDir() {
@@ -633,6 +660,14 @@ function createTables() {
       mimeType TEXT NOT NULL,
       createdAt TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS email_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
   `);
 }
 
@@ -666,6 +701,7 @@ function rowToTenant(row) {
     phone: decrypt(row.phone) || undefined,
     autopay: !!row.autopay,
     rentHistory: safeJsonParse(row.rentHistory, undefined),
+    leaseHistory: safeJsonParse(row.leaseHistory, undefined),
   };
 }
 
@@ -730,6 +766,7 @@ const ROW_CONVERTERS = {
   vendors: rowToVendor,
   communication_logs: rowToCommunicationLog,
   documents: rowToDocument,
+  email_templates: (row) => row,
 };
 
 // JS key -> serializer key uses the SQL table name for maintenance_requests, activity_logs, communication_logs
@@ -751,6 +788,7 @@ function loadAll() {
     vendors: db.prepare('SELECT * FROM vendors').all().map(rowToVendor),
     communicationLogs: db.prepare('SELECT * FROM communication_logs').all().map(rowToCommunicationLog),
     documents: db.prepare('SELECT * FROM documents').all().map(rowToDocument),
+    emailTemplates: db.prepare('SELECT * FROM email_templates').all(),
   };
 }
 
@@ -769,6 +807,7 @@ function replaceAll(state) {
     activity_logs: 'activityLogs', vendors: 'vendors',
     communication_logs: 'communicationLogs',
     documents: 'documents',
+    email_templates: 'emailTemplates',
   };
 
   // Safety check: count total incoming records to prevent writing an empty/corrupt state

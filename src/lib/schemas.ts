@@ -128,6 +128,7 @@ export const backupSchema = z.object({
   vendors: backupArraySchema,
   communicationLogs: backupArraySchema,
   documents: backupArraySchema,
+  emailTemplates: backupArraySchema,
 })
 
 export type ValidationErrors = Record<string, string>

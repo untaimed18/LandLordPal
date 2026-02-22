@@ -50,6 +50,13 @@ export interface RentChange {
   newRent: number;
 }
 
+export interface LeaseHistory {
+  startDate: string;
+  endDate: string;
+  monthlyRent: number;
+  renewedAt: string;
+}
+
 export interface Tenant {
   id: Id;
   unitId: Id;
@@ -72,6 +79,16 @@ export interface Tenant {
   moveOutNotes?: string;
   notes?: string;
   rentHistory?: RentChange[];
+  leaseHistory?: LeaseHistory[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailTemplate {
+  id: Id;
+  name: string;
+  subject: string;
+  body: string;
   createdAt: string;
   updatedAt: string;
 }

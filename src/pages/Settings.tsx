@@ -1,12 +1,13 @@
 import { useRef, useState, useEffect } from 'react'
 import { useStore } from '../hooks/useStore'
-import { getState, importState } from '../store'
+import { getState, importState, addProperty, addUnit, addTenant, updateUnit, addEmailTemplate, updateEmailTemplate, deleteEmailTemplate } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { nowISO } from '../lib/id'
 import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../lib/settings'
 import { backupSchema } from '../lib/schemas'
-import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download, RefreshCw } from 'lucide-react'
+import { parseImportCSV } from '../lib/csvImport'
+import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download, RefreshCw, Upload, Mail } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
@@ -23,10 +24,13 @@ function setThemeClass(theme: 'light' | 'dark') {
 export default function Settings() {
   const toast = useToast()
   const confirm = useConfirm()
-  const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, vendors, communicationLogs, documents } = useStore()
+  const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, vendors, communicationLogs, documents, emailTemplates } = useStore()
   const fileInput = useRef<HTMLInputElement>(null)
+  const csvInput = useRef<HTMLInputElement>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(getTheme)
   const [appSettings, setAppSettings] = useState<AppSettings>(() => loadSettings())
+  const [importType, setImportType] = useState<'properties' | 'units' | 'tenants'>('properties')
+  const [templateForm, setTemplateForm] = useState<{ id?: string; name: string; subject: string; body: string } | null>(null)
 
   useEffect(() => {
     setThemeClass(theme)
@@ -91,6 +95,84 @@ export default function Settings() {
     if (fileInput.current) fileInput.current.value = ''
   }
 
+  function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const text = reader.result as string
+      const result = parseImportCSV(importType, text, properties, units)
+      
+      if (result.errors.length > 0) {
+        toast(`Import failed: ${result.errors[0]}`, 'error')
+        return
+      }
+
+      const count = result.properties.length + result.units.length + result.tenants.length
+      const ok = await confirm({
+        title: `Import ${count} ${importType}?`,
+        message: `Found ${count} records. Ready to import?`,
+        confirmText: 'Import',
+      })
+      if (!ok) return
+
+      try {
+        if (importType === 'properties') {
+          for (const p of result.properties) await addProperty(p)
+        } else if (importType === 'units') {
+          for (const u of result.units) await addUnit(u)
+        } else if (importType === 'tenants') {
+          for (const t of result.tenants) {
+            await addTenant(t)
+            await updateUnit(t.unitId, { available: false })
+          }
+        }
+        toast(`Successfully imported ${count} ${importType}`)
+      } catch {
+        toast('Import failed partway through', 'error')
+      }
+    }
+    reader.readAsText(file)
+    if (csvInput.current) csvInput.current.value = ''
+  }
+
+  function downloadTemplate(type: 'properties' | 'units' | 'tenants') {
+    let headers: string[] = []
+    if (type === 'properties') headers = ['Name', 'Address', 'City', 'State', 'ZIP', 'Notes']
+    if (type === 'units') headers = ['Property', 'Name', 'Rent', 'Bedrooms', 'Bathrooms', 'Notes']
+    if (type === 'tenants') headers = ['Property', 'Unit', 'Name', 'Rent', 'Lease Start', 'Lease End', 'Deposit', 'Email', 'Phone']
+    
+    downloadCSV(`${type}-template.csv`, toCSV(headers, []))
+  }
+
+  async function handleSaveTemplate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!templateForm) return
+    try {
+      if (templateForm.id) {
+        await updateEmailTemplate(templateForm.id, { name: templateForm.name, subject: templateForm.subject, body: templateForm.body })
+        toast('Template updated')
+      } else {
+        await addEmailTemplate({ name: templateForm.name, subject: templateForm.subject, body: templateForm.body })
+        toast('Template created')
+      }
+      setTemplateForm(null)
+    } catch {
+      toast('Failed to save template', 'error')
+    }
+  }
+
+  async function handleDeleteTemplate(id: string) {
+    const ok = await confirm({ title: 'Delete template', message: 'Are you sure?', confirmText: 'Delete', danger: true })
+    if (!ok) return
+    try {
+      await deleteEmailTemplate(id)
+      toast('Template deleted')
+    } catch {
+      toast('Failed to delete template', 'error')
+    }
+  }
+
   async function handleClearData() {
     const ok1 = await confirm({
       title: 'Delete all data',
@@ -106,7 +188,7 @@ export default function Settings() {
       danger: true,
     })
     if (!ok2) return
-    importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [], documents: [] })
+    importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [], documents: [], emailTemplates: [] })
     toast('All data cleared')
   }
 
@@ -158,6 +240,82 @@ export default function Settings() {
           >
             <Moon size={14} aria-hidden="true" /> Dark
           </button>
+        </div>
+      </section>
+
+      <section className="card section-card">
+        <h2><Upload size={18} style={{ verticalAlign: 'text-bottom', marginRight: 8 }} /> Bulk Import</h2>
+        <p className="section-desc">Import data from CSV files. Please use the templates provided to ensure correct formatting.</p>
+        
+        <div className="import-controls" style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
+          <select value={importType} onChange={(e) => setImportType(e.target.value as any)} className="select-inline">
+            <option value="properties">Properties</option>
+            <option value="units">Units</option>
+            <option value="tenants">Tenants</option>
+          </select>
+          <button type="button" className="btn small" onClick={() => downloadTemplate(importType)}>Download Template</button>
+        </div>
+
+        <label className="btn primary">
+          Select CSV File
+          <input
+            ref={csvInput}
+            type="file"
+            accept=".csv"
+            onChange={handleCsvImport}
+            style={{ display: 'none' }}
+          />
+        </label>
+      </section>
+
+      <section className="card section-card">
+        <div className="section-card-header">
+          <h2><Mail size={18} style={{ verticalAlign: 'text-bottom', marginRight: 8 }} /> Email Templates</h2>
+          <button type="button" className="btn small" onClick={() => setTemplateForm({ name: '', subject: '', body: '' })}>+ New Template</button>
+        </div>
+        
+        {templateForm && (
+          <form className="form-card" onSubmit={handleSaveTemplate} style={{ marginBottom: '1.5rem', border: '1px solid var(--border)', padding: '1rem', borderRadius: 'var(--radius)' }}>
+            <h3>{templateForm.id ? 'Edit Template' : 'New Template'}</h3>
+            <div className="form-grid">
+              <label>Template Name <input required value={templateForm.name} onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })} placeholder="e.g. Rent Reminder" /></label>
+              <label>Subject Line <input required value={templateForm.subject} onChange={(e) => setTemplateForm({ ...templateForm, subject: e.target.value })} placeholder="Email subject..." /></label>
+            </div>
+            <label>
+              Body
+              <textarea
+                required
+                rows={5}
+                value={templateForm.body}
+                onChange={(e) => setTemplateForm({ ...templateForm, body: e.target.value })}
+                placeholder="Hello {{tenantName}}, ..."
+              />
+              <span className="field-hint">Available variables: {'{{tenantName}}'}, {'{{unitName}}'}, {'{{propertyName}}'}, {'{{rentAmount}}'}, {'{{dueDate}}'}</span>
+            </label>
+            <div className="form-actions">
+              <button type="submit" className="btn primary">Save</button>
+              <button type="button" className="btn" onClick={() => setTemplateForm(null)}>Cancel</button>
+            </div>
+          </form>
+        )}
+
+        <div className="template-list">
+          {emailTemplates.length === 0 ? (
+            <p className="empty-state">No templates yet.</p>
+          ) : (
+            emailTemplates.map((t) => (
+              <div key={t.id} className="template-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+                <div>
+                  <strong>{t.name}</strong>
+                  <div className="muted" style={{ fontSize: '0.85rem' }}>{t.subject}</div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button type="button" className="btn small" onClick={() => setTemplateForm(t)}>Edit</button>
+                  <button type="button" className="btn small danger" onClick={() => handleDeleteTemplate(t.id)}>Delete</button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </section>
 

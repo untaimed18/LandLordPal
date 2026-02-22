@@ -9,6 +9,7 @@ import type {
   Vendor,
   CommunicationLog,
   Document,
+  EmailTemplate,
 } from './types';
 import { generateId, nowISO } from './lib/id';
 import logger from './lib/logger';
@@ -24,6 +25,7 @@ export interface AppState {
   vendors: Vendor[];
   communicationLogs: CommunicationLog[];
   documents: Document[];
+  emailTemplates: EmailTemplate[];
 }
 
 const defaultState: AppState = {
@@ -37,6 +39,7 @@ const defaultState: AppState = {
   vendors: [],
   communicationLogs: [],
   documents: [],
+  emailTemplates: [],
 };
 
 function isArray(x: unknown): x is unknown[] {
@@ -105,6 +108,7 @@ function parseStateData(data: Record<string, unknown>): AppState {
     vendors: isArray(data.vendors) ? filterValidItems<Vendor>(data.vendors) : [],
     communicationLogs: isArray(data.communicationLogs) ? filterValidItems<CommunicationLog>(data.communicationLogs) : [],
     documents: isArray(data.documents) ? filterValidItems<Document>(data.documents) : [],
+    emailTemplates: isArray(data.emailTemplates) ? filterValidItems<EmailTemplate>(data.emailTemplates) : [],
   };
 }
 
@@ -560,6 +564,7 @@ export async function updateTenant(id: string, input: Partial<Omit<Tenant, 'id'>
       history.push({ date: nowISO(), oldRent: t.monthlyRent, newRent: input.monthlyRent });
       updated.rentHistory = history;
     }
+    // If lease dates changed significantly, we might want to track that too, but usually that's done via "Renew Lease"
     return updated;
   });
   const updated = tenants.find((t) => t.id === id);
@@ -779,3 +784,11 @@ export function openDocument(id: string): void {
     });
   }
 }
+
+// ─── Email Templates ──────────────────────────────────────────────────────────
+
+const emailTemplateCrud = createCrud<EmailTemplate>('emailTemplates', 'email_templates');
+export const addEmailTemplate = emailTemplateCrud.add;
+export const updateEmailTemplate = emailTemplateCrud.update;
+export const deleteEmailTemplate = emailTemplateCrud.remove;
+
