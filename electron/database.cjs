@@ -8,7 +8,7 @@ let db = null;
 let dbFilePath = null;
 let userDataDir = null;
 
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 // ─── Encryption ──────────────────────────────────────────────────────────────
 
@@ -95,11 +95,11 @@ const TABLE_NAME_MAP = {
 };
 
 const TABLE_COLUMNS = {
-  properties: ['id', 'name', 'address', 'city', 'state', 'zip', 'propertyType', 'sqft', 'amenities', 'purchasePrice', 'purchaseDate', 'insuranceProvider', 'insurancePolicyNumber', 'insuranceExpiry', 'notes', 'createdAt', 'updatedAt'],
+  properties: ['id', 'name', 'address', 'city', 'state', 'zip', 'propertyType', 'sqft', 'amenities', 'purchasePrice', 'purchaseDate', 'mortgageBalance', 'mortgageRate', 'mortgageTermYears', 'mortgageMonthlyPayment', 'mortgageStartDate', 'insuranceProvider', 'insurancePolicyNumber', 'insuranceExpiry', 'notes', 'createdAt', 'updatedAt'],
   units: ['id', 'propertyId', 'name', 'bedrooms', 'bathrooms', 'sqft', 'monthlyRent', 'deposit', 'available', 'notes', 'createdAt', 'updatedAt'],
-  tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositReturned', 'depositDeductions', 'gracePeriodDays', 'lateFeeAmount', 'autopay', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'rentHistory', 'leaseHistory', 'createdAt', 'updatedAt'],
+  tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositStatus', 'depositPaidDate', 'depositPaidAmount', 'depositReturned', 'depositDeductions', 'requireFirstMonth', 'requireLastMonth', 'lastMonthPaid', 'moveInCostNotes', 'gracePeriodDays', 'lateFeeAmount', 'autopay', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'screeningStatus', 'screeningNotes', 'inspections', 'rentHistory', 'leaseHistory', 'createdAt', 'updatedAt'],
   expenses: ['id', 'propertyId', 'unitId', 'category', 'amount', 'date', 'description', 'recurring', 'vendorId', 'createdAt', 'updatedAt'],
-  payments: ['id', 'tenantId', 'unitId', 'propertyId', 'amount', 'date', 'periodStart', 'periodEnd', 'method', 'notes', 'lateFee', 'createdAt', 'updatedAt'],
+  payments: ['id', 'tenantId', 'unitId', 'propertyId', 'amount', 'date', 'periodStart', 'periodEnd', 'method', 'category', 'notes', 'lateFee', 'createdAt', 'updatedAt'],
   maintenance_requests: ['id', 'propertyId', 'unitId', 'tenantId', 'title', 'description', 'priority', 'status', 'category', 'vendorId', 'cost', 'scheduledDate', 'recurrence', 'resolvedAt', 'notes', 'createdAt', 'updatedAt'],
   activity_logs: ['id', 'entityType', 'entityId', 'note', 'date', 'createdAt'],
   vendors: ['id', 'name', 'phone', 'email', 'specialty', 'notes', 'createdAt', 'updatedAt'],
@@ -115,6 +115,9 @@ const serializers = {
     propertyType: p.propertyType ?? null, sqft: p.sqft ?? null,
     amenities: p.amenities ? JSON.stringify(p.amenities) : null,
     purchasePrice: p.purchasePrice ?? null, purchaseDate: p.purchaseDate ?? null,
+    mortgageBalance: p.mortgageBalance ?? null, mortgageRate: p.mortgageRate ?? null,
+    mortgageTermYears: p.mortgageTermYears ?? null, mortgageMonthlyPayment: p.mortgageMonthlyPayment ?? null,
+    mortgageStartDate: p.mortgageStartDate ?? null,
     insuranceProvider: p.insuranceProvider ?? null,
     insurancePolicyNumber: p.insurancePolicyNumber ?? null,
     insuranceExpiry: p.insuranceExpiry ?? null,
@@ -131,13 +134,21 @@ const serializers = {
     id: t.id, unitId: t.unitId, propertyId: t.propertyId, name: t.name,
     email: encrypt(t.email) ?? null, phone: encrypt(t.phone) ?? null,
     leaseStart: t.leaseStart, leaseEnd: t.leaseEnd, monthlyRent: t.monthlyRent,
-    deposit: t.deposit ?? null, depositReturned: t.depositReturned ?? null,
-    depositDeductions: t.depositDeductions ?? null,
+    deposit: t.deposit ?? null,
+    depositStatus: t.depositStatus ?? null, depositPaidDate: t.depositPaidDate ?? null,
+    depositPaidAmount: t.depositPaidAmount ?? null,
+    depositReturned: t.depositReturned ?? null, depositDeductions: t.depositDeductions ?? null,
+    requireFirstMonth: t.requireFirstMonth ? 1 : 0,
+    requireLastMonth: t.requireLastMonth ? 1 : 0,
+    lastMonthPaid: t.lastMonthPaid ? 1 : 0,
+    moveInCostNotes: t.moveInCostNotes ?? null,
     gracePeriodDays: t.gracePeriodDays ?? null, lateFeeAmount: t.lateFeeAmount ?? null,
     autopay: t.autopay ? 1 : 0,
     moveInDate: t.moveInDate ?? null, moveOutDate: t.moveOutDate ?? null,
     moveInNotes: t.moveInNotes ?? null, moveOutNotes: t.moveOutNotes ?? null,
     notes: t.notes ?? null,
+    screeningStatus: t.screeningStatus ?? null, screeningNotes: t.screeningNotes ?? null,
+    inspections: t.inspections ? JSON.stringify(t.inspections) : null,
     rentHistory: t.rentHistory ? JSON.stringify(t.rentHistory) : null,
     leaseHistory: t.leaseHistory ? JSON.stringify(t.leaseHistory) : null,
     createdAt: t.createdAt, updatedAt: t.updatedAt,
@@ -151,7 +162,8 @@ const serializers = {
   payments: (p) => ({
     id: p.id, tenantId: p.tenantId, unitId: p.unitId, propertyId: p.propertyId,
     amount: p.amount, date: p.date, periodStart: p.periodStart, periodEnd: p.periodEnd,
-    method: p.method ?? null, notes: p.notes ?? null, lateFee: p.lateFee ?? null,
+    method: p.method ?? null, category: p.category ?? null,
+    notes: p.notes ?? null, lateFee: p.lateFee ?? null,
     createdAt: p.createdAt, updatedAt: p.updatedAt,
   }),
   maintenance_requests: (m) => ({
@@ -297,6 +309,7 @@ async function migrateIfNeeded(userDataPath) {
       if (currentVersion < 3) runMigrationV3();
       if (currentVersion < 4) runMigrationV4();
       if (currentVersion < 5) runMigrationV5();
+      if (currentVersion < 6) runMigrationV6();
       setSchemaVersion(CURRENT_SCHEMA_VERSION);
     });
     migrate();
@@ -513,6 +526,39 @@ function runMigrationV5() {
   `);
 }
 
+function runMigrationV6() {
+  log.info('  Running migration v6: move-in costs, payment categories, mortgage, screening, inspections');
+  const addCol = (table, col, type) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch { /* already exists */ }
+  };
+
+  // Property mortgage fields
+  addCol('properties', 'mortgageBalance', 'REAL');
+  addCol('properties', 'mortgageRate', 'REAL');
+  addCol('properties', 'mortgageTermYears', 'INTEGER');
+  addCol('properties', 'mortgageMonthlyPayment', 'REAL');
+  addCol('properties', 'mortgageStartDate', 'TEXT');
+
+  // Tenant move-in cost fields
+  addCol('tenants', 'depositStatus', 'TEXT');
+  addCol('tenants', 'depositPaidDate', 'TEXT');
+  addCol('tenants', 'depositPaidAmount', 'REAL');
+  addCol('tenants', 'requireFirstMonth', 'INTEGER DEFAULT 0');
+  addCol('tenants', 'requireLastMonth', 'INTEGER DEFAULT 0');
+  addCol('tenants', 'lastMonthPaid', 'INTEGER DEFAULT 0');
+  addCol('tenants', 'moveInCostNotes', 'TEXT');
+
+  // Tenant screening fields
+  addCol('tenants', 'screeningStatus', 'TEXT');
+  addCol('tenants', 'screeningNotes', 'TEXT');
+
+  // Tenant inspections (JSON array)
+  addCol('tenants', 'inspections', 'TEXT');
+
+  // Payment category
+  addCol('payments', 'category', 'TEXT');
+}
+
 // ─── File management for document attachments ─────────────────────────────────
 
 function getDocumentsDir() {
@@ -577,6 +623,8 @@ function createTables() {
       name TEXT NOT NULL, address TEXT NOT NULL, city TEXT NOT NULL, state TEXT NOT NULL, zip TEXT NOT NULL,
       propertyType TEXT, sqft INTEGER, amenities TEXT,
       purchasePrice REAL, purchaseDate TEXT,
+      mortgageBalance REAL, mortgageRate REAL, mortgageTermYears INTEGER,
+      mortgageMonthlyPayment REAL, mortgageStartDate TEXT,
       insuranceProvider TEXT, insurancePolicyNumber TEXT, insuranceExpiry TEXT,
       notes TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
     );
@@ -595,11 +643,16 @@ function createTables() {
       name TEXT NOT NULL, email TEXT, phone TEXT,
       leaseStart TEXT NOT NULL, leaseEnd TEXT NOT NULL,
       monthlyRent REAL NOT NULL DEFAULT 0, deposit REAL,
+      depositStatus TEXT, depositPaidDate TEXT, depositPaidAmount REAL,
       depositReturned REAL, depositDeductions TEXT,
+      requireFirstMonth INTEGER DEFAULT 0, requireLastMonth INTEGER DEFAULT 0,
+      lastMonthPaid INTEGER DEFAULT 0, moveInCostNotes TEXT,
       gracePeriodDays INTEGER, lateFeeAmount REAL,
       autopay INTEGER DEFAULT 0,
       moveInDate TEXT, moveOutDate TEXT, moveInNotes TEXT, moveOutNotes TEXT,
-      notes TEXT, rentHistory TEXT,
+      notes TEXT,
+      screeningStatus TEXT, screeningNotes TEXT, inspections TEXT,
+      rentHistory TEXT, leaseHistory TEXT,
       createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS expenses (
@@ -618,7 +671,7 @@ function createTables() {
       propertyId TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
       amount REAL NOT NULL DEFAULT 0, date TEXT NOT NULL,
       periodStart TEXT NOT NULL, periodEnd TEXT NOT NULL,
-      method TEXT, notes TEXT, lateFee REAL,
+      method TEXT, category TEXT, notes TEXT, lateFee REAL,
       createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS maintenance_requests (
@@ -684,6 +737,11 @@ function rowToProperty(row) {
     amenities: safeJsonParse(row.amenities, undefined),
     propertyType: row.propertyType || undefined,
     sqft: row.sqft != null ? row.sqft : undefined,
+    mortgageBalance: row.mortgageBalance != null ? row.mortgageBalance : undefined,
+    mortgageRate: row.mortgageRate != null ? row.mortgageRate : undefined,
+    mortgageTermYears: row.mortgageTermYears != null ? row.mortgageTermYears : undefined,
+    mortgageMonthlyPayment: row.mortgageMonthlyPayment != null ? row.mortgageMonthlyPayment : undefined,
+    mortgageStartDate: row.mortgageStartDate || undefined,
     insuranceProvider: row.insuranceProvider || undefined,
     insurancePolicyNumber: row.insurancePolicyNumber || undefined,
     insuranceExpiry: row.insuranceExpiry || undefined,
@@ -699,7 +757,17 @@ function rowToTenant(row) {
     ...row,
     email: decrypt(row.email) || undefined,
     phone: decrypt(row.phone) || undefined,
+    depositStatus: row.depositStatus || undefined,
+    depositPaidDate: row.depositPaidDate || undefined,
+    depositPaidAmount: row.depositPaidAmount != null ? row.depositPaidAmount : undefined,
+    requireFirstMonth: !!row.requireFirstMonth,
+    requireLastMonth: !!row.requireLastMonth,
+    lastMonthPaid: !!row.lastMonthPaid,
+    moveInCostNotes: row.moveInCostNotes || undefined,
     autopay: !!row.autopay,
+    screeningStatus: row.screeningStatus || undefined,
+    screeningNotes: row.screeningNotes || undefined,
+    inspections: safeJsonParse(row.inspections, undefined),
     rentHistory: safeJsonParse(row.rentHistory, undefined),
     leaseHistory: safeJsonParse(row.leaseHistory, undefined),
   };
@@ -718,6 +786,7 @@ function rowToPayment(row) {
   return {
     ...row,
     method: row.method || undefined,
+    category: row.category || undefined,
     notes: row.notes || undefined,
     lateFee: row.lateFee != null ? row.lateFee : undefined,
   };
@@ -810,24 +879,18 @@ function replaceAll(state) {
     email_templates: 'emailTemplates',
   };
 
-  // Safety check: count total incoming records to prevent writing an empty/corrupt state
-  // over a non-empty database (which would wipe all data)
+  // Safety check: distinguish intentional clear (all keys present as empty arrays)
+  // from a corrupt/truncated state (keys missing or not arrays).
+  const allJsKeys = Object.values(tableKeyMap);
+  const allKeysAreArrays = allJsKeys.every((k) => Array.isArray(state[k]));
   let incomingCount = 0;
-  for (const jsKey of Object.values(tableKeyMap)) {
+  for (const jsKey of allJsKeys) {
     const items = state[jsKey];
     if (Array.isArray(items)) incomingCount += items.length;
   }
 
-  let existingCount = 0;
-  for (const sqlTable of Object.keys(TABLE_COLUMNS)) {
-    try {
-      const row = db.prepare(`SELECT COUNT(*) AS cnt FROM ${sqlTable}`).get();
-      existingCount += row.cnt;
-    } catch { /* table may not exist yet */ }
-  }
-
-  if (incomingCount === 0 && existingCount > 0) {
-    log.error(`replaceAll: refusing to write — incoming state is empty but database has ${existingCount} records. This would wipe all data.`);
+  if (incomingCount === 0 && !allKeysAreArrays) {
+    log.error('replaceAll: refusing to write — incoming state has missing or non-array keys. This looks like a corrupt payload.');
     return;
   }
 
