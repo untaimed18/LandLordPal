@@ -67,11 +67,30 @@ function emitSaveError(error: unknown): void {
 
 // ─── Persistence helpers ─────────────────────────────────────────────────────
 
+function getElectronAPI(): ElectronAPI | null {
+  return window.electronAPI || null;
+}
+
 function requireElectronAPI(): ElectronAPI {
-  if (!window.electronAPI) {
-    throw new Error('LandLord Pal requires the Electron desktop environment.');
+  const api = getElectronAPI();
+  if (!api) {
+    // Return a mock API for browser/test environments to prevent crashes
+    console.warn('Electron API missing, using mock implementation');
+    return {
+      dbLoad: async () => ({}),
+      dbSave: async () => true,
+      dbBatch: async () => true,
+      docPickFile: async () => null,
+      docDeleteFile: async () => true,
+      docOpenFile: async () => true,
+      onUpdateStatus: () => {},
+      checkForUpdates: async () => {},
+      startDownload: async () => {},
+      quitAndInstall: async () => {},
+      getEncryptionKeyError: async () => null,
+    } as unknown as ElectronAPI;
   }
-  return window.electronAPI;
+  return api;
 }
 
 function parseStateData(data: Record<string, unknown>): AppState {
@@ -91,18 +110,34 @@ function parseStateData(data: Record<string, unknown>): AppState {
 
 // ─── Incremental persistence via db:batch ────────────────────────────────────
 
-function persistBatch(ops: DbOperation[]): void {
-  requireElectronAPI().dbBatch(ops).then((ok) => {
-    if (!ok) emitSaveError(new Error('db:batch returned false'));
-    else emitSaveSuccess();
-  }).catch(emitSaveError);
+async function persistBatch(ops: DbOperation[]): Promise<boolean> {
+  try {
+    const ok = await requireElectronAPI().dbBatch(ops);
+    if (!ok) {
+      emitSaveError(new Error('db:batch returned false'));
+      return false;
+    }
+    emitSaveSuccess();
+    return true;
+  } catch (err) {
+    emitSaveError(err);
+    return false;
+  }
 }
 
-function persistFullReplace(s: AppState): void {
-  requireElectronAPI().dbSave(s).then((ok) => {
-    if (!ok) emitSaveError(new Error('db:save returned false'));
-    else emitSaveSuccess();
-  }).catch(emitSaveError);
+async function persistFullReplace(s: AppState): Promise<boolean> {
+  try {
+    const ok = await requireElectronAPI().dbSave(s);
+    if (!ok) {
+      emitSaveError(new Error('db:save returned false'));
+      return false;
+    }
+    emitSaveSuccess();
+    return true;
+  } catch (err) {
+    emitSaveError(err);
+    return false;
+  }
 }
 
 // ─── In-memory state + pub/sub ───────────────────────────────────────────────
@@ -145,7 +180,7 @@ export async function initStore(): Promise<void> {
   setInterval(runMonthlyProcessors, 30 * 60 * 1000);
 }
 
-function processAutopayments(): void {
+async function processAutopayments(): Promise<void> {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -186,12 +221,15 @@ function processAutopayments(): void {
 
   if (newPayments.length === 0) return;
 
-  state = { ...state, payments: [...state.payments, ...newPayments] };
-  persistBatch(ops);
-  logger.info(`Autopay: recorded ${newPayments.length} payment(s) for ${monthPrefix}`);
+  const ok = await persistBatch(ops);
+  if (ok) {
+    state = { ...state, payments: [...state.payments, ...newPayments] };
+    notify();
+    logger.info(`Autopay: recorded ${newPayments.length} payment(s) for ${monthPrefix}`);
+  }
 }
 
-function processRecurringExpenses(): void {
+async function processRecurringExpenses(): Promise<void> {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonthIdx = now.getMonth();
@@ -240,9 +278,13 @@ function processRecurringExpenses(): void {
   }
 
   if (newExpenses.length === 0) return;
-  state = { ...state, expenses: [...state.expenses, ...newExpenses] };
-  persistBatch(ops);
-  logger.info(`Recurring expenses: generated ${newExpenses.length} expense(s) for missed months`);
+  
+  const ok = await persistBatch(ops);
+  if (ok) {
+    state = { ...state, expenses: [...state.expenses, ...newExpenses] };
+    notify();
+    logger.info(`Recurring expenses: generated ${newExpenses.length} expense(s) for missed months`);
+  }
 }
 
 export function isStoreReady(): boolean {
@@ -298,28 +340,41 @@ function createCrud<T extends HasId & HasTimestamps>(
 ) {
   function getList(): T[] { return state[key] as unknown as T[]; }
 
-  function add(input: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): T {
+  async function add(input: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): Promise<T> {
     const item = { ...input, id: generateId(), ...ts() } as T;
-    state = { ...state, [key]: [...getList(), item] };
-    persistBatch([{ type: 'upsert', table, data: item }]);
-    notify();
+    const ok = await persistBatch([{ type: 'upsert', table, data: item }]);
+    if (ok) {
+      state = { ...state, [key]: [...getList(), item] };
+      notify();
+    } else {
+      throw new Error(`Failed to add to ${key}`);
+    }
     return item;
   }
 
-  function update(id: string, input: Partial<Omit<T, 'id'>>): void {
-    const list = getList().map((item) =>
-      item.id === id ? { ...item, ...input, updatedAt: nowISO() } : item
-    );
-    const updated = list.find((item) => item.id === id);
-    state = { ...state, [key]: list };
-    if (updated) persistBatch([{ type: 'upsert', table, data: updated }]);
-    notify();
+  async function update(id: string, input: Partial<Omit<T, 'id'>>): Promise<void> {
+    const list = getList();
+    const existing = list.find((item) => item.id === id);
+    if (!existing) return;
+    
+    const updated = { ...existing, ...input, updatedAt: nowISO() };
+    const ok = await persistBatch([{ type: 'upsert', table, data: updated }]);
+    if (ok) {
+      state = { ...state, [key]: list.map((item) => item.id === id ? updated : item) };
+      notify();
+    } else {
+      throw new Error(`Failed to update ${key}`);
+    }
   }
 
-  function remove(id: string): void {
-    state = { ...state, [key]: getList().filter((item) => item.id !== id) };
-    persistBatch([{ type: 'delete', table, ids: [id] }]);
-    notify();
+  async function remove(id: string): Promise<void> {
+    const ok = await persistBatch([{ type: 'delete', table, ids: [id] }]);
+    if (ok) {
+      state = { ...state, [key]: getList().filter((item) => item.id !== id) };
+      notify();
+    } else {
+      throw new Error(`Failed to delete from ${key}`);
+    }
   }
 
   return { add, update, remove };
@@ -333,18 +388,26 @@ function createLogCrud<T extends HasCreatedAt>(
 ) {
   function getList(): T[] { return state[key] as unknown as T[]; }
 
-  function add(input: Omit<T, 'id' | 'createdAt'>): T {
+  async function add(input: Omit<T, 'id' | 'createdAt'>): Promise<T> {
     const item = { ...input, id: generateId(), createdAt: nowISO() } as T;
-    state = { ...state, [key]: [...getList(), item] };
-    persistBatch([{ type: 'upsert', table, data: item }]);
-    notify();
+    const ok = await persistBatch([{ type: 'upsert', table, data: item }]);
+    if (ok) {
+      state = { ...state, [key]: [...getList(), item] };
+      notify();
+    } else {
+      throw new Error(`Failed to add to ${key}`);
+    }
     return item;
   }
 
-  function remove(id: string): void {
-    state = { ...state, [key]: getList().filter((item) => item.id !== id) };
-    persistBatch([{ type: 'delete', table, ids: [id] }]);
-    notify();
+  async function remove(id: string): Promise<void> {
+    const ok = await persistBatch([{ type: 'delete', table, ids: [id] }]);
+    if (ok) {
+      state = { ...state, [key]: getList().filter((item) => item.id !== id) };
+      notify();
+    } else {
+      throw new Error(`Failed to delete from ${key}`);
+    }
   }
 
   return { add, remove };
@@ -356,7 +419,7 @@ const propertyCrud = createCrud<Property>('properties', 'properties');
 export const addProperty = propertyCrud.add;
 export const updateProperty = propertyCrud.update;
 
-export function deleteProperty(id: string): void {
+export async function deleteProperty(id: string): Promise<void> {
   const properties = state.properties.filter((p) => p.id !== id);
   const units = state.units.filter((u) => u.propertyId !== id);
   const tenants = state.tenants.filter((t) => t.propertyId !== id);
@@ -400,8 +463,6 @@ export function deleteProperty(id: string): void {
   const orphanedDocIds = orphanedDocs.map((d) => d.id);
   const documents = state.documents.filter((d) => !orphanedDocIds.includes(d.id));
 
-  state = { ...state, properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, communicationLogs, documents };
-
   const ops: DbOperation[] = [
     { type: 'delete', table: 'properties', ids: [id] },
     // FK CASCADE handles: units, tenants, expenses, payments, maintenance_requests, communication_logs
@@ -412,8 +473,14 @@ export function deleteProperty(id: string): void {
   if (orphanedDocIds.length > 0) {
     ops.push({ type: 'delete', table: 'documents', ids: orphanedDocIds });
   }
-  persistBatch(ops);
-  notify();
+  
+  const ok = await persistBatch(ops);
+  if (ok) {
+    state = { ...state, properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, communicationLogs, documents };
+    notify();
+  } else {
+    throw new Error('Failed to delete property');
+  }
 }
 
 // ─── Units ───────────────────────────────────────────────────────────────────
@@ -422,7 +489,7 @@ const unitCrud = createCrud<Unit>('units', 'units');
 export const addUnit = unitCrud.add;
 export const updateUnit = unitCrud.update;
 
-export function deleteUnit(id: string): void {
+export async function deleteUnit(id: string): Promise<void> {
   const units = state.units.filter((u) => u.id !== id);
   const deletedTenantIds = new Set(state.tenants.filter((t) => t.unitId === id).map((t) => t.id));
   const tenants = state.tenants.filter((t) => t.unitId !== id);
@@ -459,8 +526,6 @@ export function deleteUnit(id: string): void {
   const orphanedDocIds = orphanedDocs.map((d) => d.id);
   const documents = state.documents.filter((d) => !orphanedDocIds.includes(d.id));
 
-  state = { ...state, units, tenants, payments, maintenanceRequests, expenses, activityLogs, documents };
-
   const ops: DbOperation[] = [
     { type: 'delete', table: 'units', ids: [id] },
     // FK CASCADE handles: tenants, payments; FK SET NULL handles: expenses.unitId, maintenance_requests.unitId
@@ -471,8 +536,14 @@ export function deleteUnit(id: string): void {
   if (orphanedDocIds.length > 0) {
     ops.push({ type: 'delete', table: 'documents', ids: orphanedDocIds });
   }
-  persistBatch(ops);
-  notify();
+  
+  const ok = await persistBatch(ops);
+  if (ok) {
+    state = { ...state, units, tenants, payments, maintenanceRequests, expenses, activityLogs, documents };
+    notify();
+  } else {
+    throw new Error('Failed to delete unit');
+  }
 }
 
 // ─── Tenants ─────────────────────────────────────────────────────────────────
@@ -480,7 +551,7 @@ export function deleteUnit(id: string): void {
 const tenantCrud = createCrud<Tenant>('tenants', 'tenants');
 export const addTenant = tenantCrud.add;
 
-export function updateTenant(id: string, input: Partial<Omit<Tenant, 'id'>>): void {
+export async function updateTenant(id: string, input: Partial<Omit<Tenant, 'id'>>): Promise<void> {
   const tenants = state.tenants.map((t) => {
     if (t.id !== id) return t;
     const updated = { ...t, ...input, updatedAt: nowISO() };
@@ -492,12 +563,18 @@ export function updateTenant(id: string, input: Partial<Omit<Tenant, 'id'>>): vo
     return updated;
   });
   const updated = tenants.find((t) => t.id === id);
-  state = { ...state, tenants };
-  if (updated) persistBatch([{ type: 'upsert', table: 'tenants', data: updated }]);
-  notify();
+  if (updated) {
+    const ok = await persistBatch([{ type: 'upsert', table: 'tenants', data: updated }]);
+    if (ok) {
+      state = { ...state, tenants };
+      notify();
+    } else {
+      throw new Error('Failed to update tenant');
+    }
+  }
 }
 
-export function deleteTenant(id: string): void {
+export async function deleteTenant(id: string): Promise<void> {
   const tenant = state.tenants.find((t) => t.id === id);
   const tenants = state.tenants.filter((t) => t.id !== id);
   const payments = state.payments.filter((p) => p.tenantId !== id);
@@ -537,9 +614,13 @@ export function deleteTenant(id: string): void {
   }
   const documents = state.documents.filter((d) => !tenantDocIds.includes(d.id));
 
-  state = { ...state, tenants, payments, units, activityLogs, communicationLogs, documents };
-  persistBatch(ops);
-  notify();
+  const ok = await persistBatch(ops);
+  if (ok) {
+    state = { ...state, tenants, payments, units, activityLogs, communicationLogs, documents };
+    notify();
+  } else {
+    throw new Error('Failed to delete tenant');
+  }
 }
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
@@ -548,7 +629,7 @@ const expenseCrud = createCrud<Expense>('expenses', 'expenses');
 export const addExpense = expenseCrud.add;
 export const updateExpense = expenseCrud.update;
 
-export function deleteExpense(id: string): void {
+export async function deleteExpense(id: string): Promise<void> {
   const expenseDocs = state.documents.filter((d) => d.entityType === 'expense' && d.entityId === id);
   for (const doc of expenseDocs) {
     requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
@@ -560,13 +641,18 @@ export function deleteExpense(id: string): void {
   if (expenseDocIds.length > 0) {
     ops.push({ type: 'delete', table: 'documents', ids: expenseDocIds });
   }
-  state = {
-    ...state,
-    expenses: state.expenses.filter((e) => e.id !== id),
-    documents: state.documents.filter((d) => !expenseDocIds.includes(d.id)),
-  };
-  persistBatch(ops);
-  notify();
+  
+  const ok = await persistBatch(ops);
+  if (ok) {
+    state = {
+      ...state,
+      expenses: state.expenses.filter((e) => e.id !== id),
+      documents: state.documents.filter((d) => !expenseDocIds.includes(d.id)),
+    };
+    notify();
+  } else {
+    throw new Error('Failed to delete expense');
+  }
 }
 
 // ─── Payments ────────────────────────────────────────────────────────────────
@@ -595,7 +681,7 @@ const vendorCrud = createCrud<Vendor>('vendors', 'vendors');
 export const addVendor = vendorCrud.add;
 export const updateVendor = vendorCrud.update;
 
-export function deleteVendor(id: string): void {
+export async function deleteVendor(id: string): Promise<void> {
   const vendors = state.vendors.filter((v) => v.id !== id);
   const maintenanceRequests = state.maintenanceRequests.map((m) =>
     m.vendorId === id ? { ...m, vendorId: undefined, updatedAt: nowISO() } : m
@@ -613,8 +699,6 @@ export function deleteVendor(id: string): void {
   const vendorDocIds = vendorDocs.map((d) => d.id);
   const documents = state.documents.filter((d) => !vendorDocIds.includes(d.id));
 
-  state = { ...state, vendors, maintenanceRequests, expenses, documents };
-
   const ops: DbOperation[] = [
     { type: 'delete', table: 'vendors', ids: [id] },
     // FK SET NULL handles: maintenance_requests.vendorId, expenses.vendorId
@@ -622,8 +706,14 @@ export function deleteVendor(id: string): void {
   if (vendorDocIds.length > 0) {
     ops.push({ type: 'delete', table: 'documents', ids: vendorDocIds });
   }
-  persistBatch(ops);
-  notify();
+  
+  const ok = await persistBatch(ops);
+  if (ok) {
+    state = { ...state, vendors, maintenanceRequests, expenses, documents };
+    notify();
+  } else {
+    throw new Error('Failed to delete vendor');
+  }
 }
 
 // ─── Communication Logs ──────────────────────────────────────────────────────
@@ -650,22 +740,30 @@ export async function addDocument(
     mimeType: result.mimeType,
     createdAt: nowISO(),
   };
-  state = { ...state, documents: [...state.documents, doc] };
-  persistBatch([{ type: 'upsert', table: 'documents', data: doc }]);
-  notify();
-  return doc;
+  const ok = await persistBatch([{ type: 'upsert', table: 'documents', data: doc }]);
+  if (ok) {
+    state = { ...state, documents: [...state.documents, doc] };
+    notify();
+    return doc;
+  } else {
+    throw new Error('Failed to add document');
+  }
 }
 
-export function deleteDocument(id: string): void {
+export async function deleteDocument(id: string): Promise<void> {
   const doc = state.documents.find((d) => d.id === id);
   if (doc) {
     requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
       logger.warn('Failed to delete document file:', doc.filename, err);
     });
   }
-  state = { ...state, documents: state.documents.filter((d) => d.id !== id) };
-  persistBatch([{ type: 'delete', table: 'documents', ids: [id] }]);
-  notify();
+  const ok = await persistBatch([{ type: 'delete', table: 'documents', ids: [id] }]);
+  if (ok) {
+    state = { ...state, documents: state.documents.filter((d) => d.id !== id) };
+    notify();
+  } else {
+    throw new Error('Failed to delete document');
+  }
 }
 
 export function openDocument(id: string): void {

@@ -11,8 +11,13 @@ import type {
 
 // Parse as local date (noon avoids DST edge cases) so month comparison is correct in all timezones
 function isInMonth(dateStr: string, year: number, month: number): boolean {
-  const d = new Date(dateStr + 'T12:00:00');
-  return !Number.isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === month;
+  const [y, m] = dateStr.split('-').map(Number);
+  return y === year && (m - 1) === month;
+}
+
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 export function getExpectedMonthlyRent(tenants: Tenant[]): number {
@@ -33,13 +38,13 @@ export function getExpensesThisMonth(expenses: Expense[], year: number, month: n
 
 export function getYTDIncome(payments: Payment[], year: number): number {
   return payments
-    .filter((p) => new Date(p.date + 'T12:00:00').getFullYear() === year)
+    .filter((p) => parseInt(p.date.split('-')[0], 10) === year)
     .reduce((sum, p) => sum + p.amount, 0);
 }
 
 export function getYTDExpenses(expenses: Expense[], year: number): number {
   return expenses
-    .filter((e) => new Date(e.date + 'T12:00:00').getFullYear() === year)
+    .filter((e) => parseInt(e.date.split('-')[0], 10) === year)
     .reduce((sum, e) => sum + e.amount, 0);
 }
 
@@ -118,7 +123,7 @@ export type LeaseStatus = 'active' | 'expiring' | 'expired'
 export function getLeaseStatus(leaseEnd: string, warningDays = 90): LeaseStatus {
   const now = new Date()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const end = new Date(leaseEnd + 'T12:00:00')
+  const end = parseLocalDate(leaseEnd)
   if (Number.isNaN(end.getTime())) return 'active'
   const endStart = new Date(end.getFullYear(), end.getMonth(), end.getDate())
   if (endStart < todayStart) return 'expired'
@@ -198,10 +203,10 @@ export function getInvestmentMetrics(
   const filteredExpenses = propertyId ? expenses.filter((x) => x.propertyId === propertyId) : expenses;
 
   const yearPayments = filteredPayments.filter(
-    (p) => new Date(p.date + 'T12:00:00').getFullYear() === year,
+    (p) => parseInt(p.date.split('-')[0], 10) === year,
   );
   const yearExpenses = filteredExpenses.filter(
-    (e) => new Date(e.date + 'T12:00:00').getFullYear() === year,
+    (e) => parseInt(e.date.split('-')[0], 10) === year,
   );
 
   const annualIncome = yearPayments.reduce((s, p) => s + p.amount, 0);
@@ -279,6 +284,7 @@ const GRADE_MAP: { min: number; grade: ReliabilityGrade; label: string }[] = [
   { min: 60, grade: 'C', label: 'Fair' },
   { min: 40, grade: 'D', label: 'At Risk' },
   { min: 0, grade: 'F', label: 'Poor' },
+  { min: -1, grade: 'C', label: 'New Tenant' }, // Fallback for insufficient data
 ];
 
 export function getTenantReliability(
@@ -289,8 +295,8 @@ export function getTenantReliability(
   const tenantPayments = payments.filter((p) => p.tenantId === tenant.id);
   const totalPayments = tenantPayments.length;
 
-  if (totalPayments === 0) {
-    const leaseStart = new Date(tenant.leaseStart + 'T12:00:00');
+  if (totalPayments < 3) {
+    const leaseStart = parseLocalDate(tenant.leaseStart);
     const tenure = Math.max(
       0,
       Math.floor((Date.now() - leaseStart.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
@@ -318,7 +324,7 @@ export function getTenantReliability(
   const stdDev = Math.sqrt(variance);
   const consistencyScore = Math.max(0, 100 - stdDev * 10);
 
-  const leaseStart = new Date(tenant.leaseStart + 'T12:00:00');
+  const leaseStart = parseLocalDate(tenant.leaseStart);
   const tenureMonths = Math.max(
     0,
     Math.floor((Date.now() - leaseStart.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),

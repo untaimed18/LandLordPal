@@ -38,8 +38,11 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
     e.preventDefault()
     const t = tenants.find((x) => x.id === form.tenantId)
     if (!t) return
-    const d = new Date(form.date + 'T12:00:00')
-    const payMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    
+    const [y, m, d] = form.date.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    
+    const payMonth = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`
     const existing = payments.find(
       (p) => p.tenantId === t.id && p.date.startsWith(payMonth)
     )
@@ -51,19 +54,24 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
       })
       if (!ok) return
     }
-    addPayment({
-      propertyId,
-      unitId: t.unitId,
-      tenantId: t.id,
-      amount: form.amount,
-      date: form.date,
-      periodStart: startOfMonth(d),
-      periodEnd: endOfMonth(d),
-      method: form.method,
-      notes: form.notes || undefined,
-    })
-    onClose()
-    toast('Payment recorded')
+    
+    try {
+      await addPayment({
+        propertyId,
+        unitId: t.unitId,
+        tenantId: t.id,
+        amount: form.amount,
+        date: form.date,
+        periodStart: startOfMonth(dateObj),
+        periodEnd: endOfMonth(dateObj),
+        method: form.method,
+        notes: form.notes || undefined,
+      })
+      onClose()
+      toast('Payment recorded')
+    } catch (err) {
+      toast('Failed to record payment', 'error')
+    }
   }
 
   return (

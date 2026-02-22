@@ -138,9 +138,13 @@ export default function PropertyDetail() {
     const ok = await confirm({ title: 'Delete property', message: `Delete "${prop.name}"? This will remove all units, tenants, expenses, and payments for this property.`, confirmText: 'Delete', danger: true })
     if (ok) {
       const snap = takeSnapshot()
-      deleteProperty(prop.id)
-      navigate('/properties')
-      toast('Property deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); navigate(`/properties/${prop.id}`); toast('Property restored', 'info') } } })
+      try {
+        await deleteProperty(prop.id)
+        navigate('/properties')
+        toast('Property deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); navigate(`/properties/${prop.id}`); toast('Property restored', 'info') } } })
+      } catch (err) {
+        toast('Failed to delete property', 'error')
+      }
     }
   }
 
@@ -150,9 +154,13 @@ export default function PropertyDetail() {
     const ok = await confirm({ title: 'Delete unit', message: `Delete unit "${unitName}"?`, confirmText: 'Delete', danger: true })
     if (ok) {
       const snap = takeSnapshot()
-      deleteUnit(unitId)
-      setEditingUnitId(null)
-      toast('Unit deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Unit restored', 'info') } } })
+      try {
+        await deleteUnit(unitId)
+        setEditingUnitId(null)
+        toast('Unit deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Unit restored', 'info') } } })
+      } catch (err) {
+        toast('Failed to delete unit', 'error')
+      }
     }
   }
 
@@ -160,9 +168,13 @@ export default function PropertyDetail() {
     const ok = await confirm({ title: 'Remove tenant', message: `Remove tenant "${tenantName}"? The unit will be marked available again.`, confirmText: 'Remove', danger: true })
     if (ok) {
       const snap = takeSnapshot()
-      deleteTenant(tenantId)
-      setEditingTenantId(null)
-      toast('Tenant removed', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Tenant restored', 'info') } } })
+      try {
+        await deleteTenant(tenantId)
+        setEditingTenantId(null)
+        toast('Tenant removed', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Tenant restored', 'info') } } })
+      } catch (err) {
+        toast('Failed to remove tenant', 'error')
+      }
     }
   }
 
@@ -170,25 +182,37 @@ export default function PropertyDetail() {
     const ok = await confirm({ title: 'Delete payment', message: 'Delete this payment record?', confirmText: 'Delete', danger: true })
     if (ok) {
       const snap = takeSnapshot()
-      deletePayment(paymentId)
-      toast('Payment deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Payment restored', 'info') } } })
+      try {
+        await deletePayment(paymentId)
+        toast('Payment deleted', { action: { label: 'Undo', onClick: () => { restoreSnapshot(snap); toast('Payment restored', 'info') } } })
+      } catch (err) {
+        toast('Failed to delete payment', 'error')
+      }
     }
   }
 
-  function handleAddUnit(e: React.FormEvent) {
+  async function handleAddUnit(e: React.FormEvent) {
     e.preventDefault()
-    addUnit({ propertyId: prop.id, name: newUnit.name, bedrooms: newUnit.bedrooms, bathrooms: newUnit.bathrooms, monthlyRent: newUnit.monthlyRent, sqft: newUnit.sqft || undefined, deposit: newUnit.deposit || undefined, notes: newUnit.notes || undefined, available: newUnit.available })
-    setNewUnit({ name: '', bedrooms: 1, bathrooms: 1, monthlyRent: 0, sqft: 0, deposit: 0, notes: '', available: true })
-    setUnitForm(false)
-    toast('Unit added')
+    try {
+      await addUnit({ propertyId: prop.id, name: newUnit.name, bedrooms: newUnit.bedrooms, bathrooms: newUnit.bathrooms, monthlyRent: newUnit.monthlyRent, sqft: newUnit.sqft || undefined, deposit: newUnit.deposit || undefined, notes: newUnit.notes || undefined, available: newUnit.available })
+      setNewUnit({ name: '', bedrooms: 1, bathrooms: 1, monthlyRent: 0, sqft: 0, deposit: 0, notes: '', available: true })
+      setUnitForm(false)
+      toast('Unit added')
+    } catch (err) {
+      toast('Failed to add unit', 'error')
+    }
   }
 
-  function handleAddNote() {
+  async function handleAddNote() {
     if (!noteEntity || !noteText.trim()) return
-    addActivityLog({ entityType: noteEntity.type, entityId: noteEntity.id, note: noteText.trim(), date: nowISO() })
-    setNoteText('')
-    setNoteEntity(null)
-    toast('Note added')
+    try {
+      await addActivityLog({ entityType: noteEntity.type, entityId: noteEntity.id, note: noteText.trim(), date: nowISO() })
+      setNoteText('')
+      setNoteEntity(null)
+      toast('Note added')
+    } catch (err) {
+      toast('Failed to add note', 'error')
+    }
   }
 
   const showTenantForm = !!(tenantFormUnitId || editingTenantId) && tenantFormData
@@ -291,7 +315,7 @@ export default function PropertyDetail() {
               return (
                 <div key={unit.id} className="unit-row">
                   {isEditingUnit ? (
-                    <form className="unit-edit-inline" onSubmit={(e) => {
+                    <form className="unit-edit-inline" onSubmit={async (e) => {
                       e.preventDefault()
                       const f = e.currentTarget
                       const name = (f.querySelector('[name="unit-name"]') as HTMLInputElement)?.value ?? unit.name
@@ -301,9 +325,13 @@ export default function PropertyDetail() {
                       const sqft = parseInt((f.querySelector('[name="unit-sqft"]') as HTMLInputElement)?.value ?? '0', 10) || undefined
                       const deposit = parseFloat((f.querySelector('[name="unit-deposit"]') as HTMLInputElement)?.value ?? '0') || undefined
                       const notes = (f.querySelector('[name="unit-notes"]') as HTMLInputElement)?.value || undefined
-                      updateUnit(unit.id, { name, bedrooms, bathrooms, monthlyRent, sqft, deposit, notes })
-                      setEditingUnitId(null)
-                      toast('Unit updated')
+                      try {
+                        await updateUnit(unit.id, { name, bedrooms, bathrooms, monthlyRent, sqft, deposit, notes })
+                        setEditingUnitId(null)
+                        toast('Unit updated')
+                      } catch (err) {
+                        toast('Failed to update unit', 'error')
+                      }
                     }}>
                       <input name="unit-name" defaultValue={unit.name} placeholder="Unit name" required />
                       <input name="unit-bedrooms" type="number" min={0} defaultValue={unit.bedrooms} placeholder="Beds" />

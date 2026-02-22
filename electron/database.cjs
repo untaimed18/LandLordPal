@@ -516,7 +516,16 @@ function deleteDocumentFile(filename) {
     log.warn('Rejected unsafe document filename:', filename);
     return;
   }
-  const filePath = path.join(getDocumentsDir(), filename);
+  
+  const documentsDir = getDocumentsDir();
+  const filePath = path.join(documentsDir, filename);
+  
+  // Extra safety check against path traversal
+  if (!filePath.startsWith(documentsDir)) {
+    log.warn('Path traversal detected:', filename);
+    return;
+  }
+
   try {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   } catch (err) {
