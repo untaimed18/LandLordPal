@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const mockDbBatch = vi.fn().mockResolvedValue(true)
+const mockDbBatch = vi.fn().mockResolvedValue({ success: true })
 const mockDbSave = vi.fn().mockResolvedValue(true)
 const mockDbLoad = vi.fn().mockResolvedValue(null)
 const mockDocDeleteFile = vi.fn().mockResolvedValue(true)

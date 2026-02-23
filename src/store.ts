@@ -82,7 +82,7 @@ function requireElectronAPI(): ElectronAPI {
     return {
       dbLoad: async () => ({}),
       dbSave: async () => true,
-      dbBatch: async () => true,
+      dbBatch: async () => ({ success: true }),
       docPickFile: async () => null,
       docDeleteFile: async () => true,
       docOpenFile: async () => true,
@@ -116,9 +116,9 @@ function parseStateData(data: Record<string, unknown>): AppState {
 
 async function persistBatch(ops: DbOperation[]): Promise<boolean> {
   try {
-    const ok = await requireElectronAPI().dbBatch(ops);
-    if (!ok) {
-      emitSaveError(new Error('db:batch returned false'));
+    const result = await requireElectronAPI().dbBatch(ops);
+    if (!result.success) {
+      emitSaveError(new Error(result.error || 'db:batch returned false'));
       return false;
     }
     emitSaveSuccess();

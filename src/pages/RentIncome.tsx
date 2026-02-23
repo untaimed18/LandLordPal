@@ -88,6 +88,13 @@ export default function RentIncome() {
     if (!paymentModal) return
     const tenant = tenants.find((t) => t.id === paymentModal.tenantId)
     if (!tenant) return
+
+    const unitExists = units.some((u) => u.id === tenant.unitId)
+    if (!unitExists) {
+      toast('Cannot record payment: Tenant is assigned to a non-existent unit.', 'error')
+      return
+    }
+
     const d = new Date(paymentDate + 'T12:00:00')
     const payMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const existingPayment = payments.find(

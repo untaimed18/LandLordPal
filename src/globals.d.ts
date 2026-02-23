@@ -42,7 +42,7 @@ interface ElectronAPI {
   // Database
   dbLoad: () => Promise<AppStateData | null>;
   dbSave: (state: AppStateData) => Promise<boolean>;
-  dbBatch: (operations: DbOperation[]) => Promise<boolean>;
+  dbBatch: (operations: DbOperation[]) => Promise<{ success: boolean; error?: string }>;
   // Documents
   docPickFile: () => Promise<{ filename: string; originalName: string; size: number; mimeType: string } | null>;
   docDeleteFile: (filename: string) => Promise<boolean>;

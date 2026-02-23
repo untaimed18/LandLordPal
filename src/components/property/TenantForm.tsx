@@ -205,9 +205,8 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
               </div>
               <div className="occupant-card-fields">
                 <label className="occupant-field-full">
-                  Name *
+                  Name
                   <input
-                    required
                     value={occ.name}
                     placeholder="Full name"
                     onChange={(e) => {

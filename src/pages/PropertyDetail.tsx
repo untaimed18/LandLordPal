@@ -494,6 +494,7 @@ export default function PropertyDetail() {
           propertyId={prop.id}
           tenants={propTenants}
           payments={payments}
+          units={units}
           initialTenantId={paymentFormTenantId}
           initialAmount={paymentInitial.amount}
           initialDate={paymentInitial.date}

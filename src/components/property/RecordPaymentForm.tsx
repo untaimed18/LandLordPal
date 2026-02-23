@@ -4,7 +4,7 @@ import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { formatMoney } from '../../lib/format'
 import { loadSettings } from '../../lib/settings'
-import type { Tenant, Payment, PaymentCategory } from '../../types'
+import type { Tenant, Payment, PaymentCategory, Unit } from '../../types'
 
 function startOfMonth(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
@@ -18,14 +18,16 @@ interface Props {
   propertyId: string
   tenants: Tenant[]
   payments: Payment[]
+  units?: Unit[]
   initialTenantId: string
   initialAmount: number
   initialDate: string
   onClose: () => void
 }
 
-export default function RecordPaymentForm({ propertyId, tenants, payments, initialTenantId, initialAmount, initialDate, onClose }: Props) {
+export default function RecordPaymentForm({ propertyId, tenants, payments, units, initialTenantId, initialAmount, initialDate, onClose }: Props) {
   const toast = useToast()
+
   const confirm = useConfirm()
   const settings = loadSettings()
   const [form, setForm] = useState({
@@ -52,6 +54,14 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
     e.preventDefault()
     const t = tenants.find((x) => x.id === form.tenantId)
     if (!t) return
+
+    if (units) {
+      const unitExists = units.some((u) => u.id === t.unitId)
+      if (!unitExists) {
+        toast('Cannot record payment: Tenant is assigned to a non-existent unit.', 'error')
+        return
+      }
+    }
     
     const [y, m, d] = form.date.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
@@ -71,7 +81,7 @@ export default function RecordPaymentForm({ propertyId, tenants, payments, initi
     
     try {
       await addPayment({
-        propertyId,
+        propertyId: t.propertyId,
         unitId: t.unitId,
         tenantId: t.id,
         amount: form.amount,

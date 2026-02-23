@@ -173,10 +173,10 @@ async function setupDatabase() {
   ipcMain.handle('db:batch', (_event, operations) => {
     try {
       executeBatch(operations);
-      return true;
+      return { success: true };
     } catch (err) {
       log.error('db:batch failed:', err.message);
-      return false;
+      return { success: false, error: err.message };
     }
   });
 

@@ -246,8 +246,24 @@ async function initDatabase(userDataPath) {
   db.pragma('journal_mode = WAL');
 
   loadEncryptionKey();
+
+  // Check if it's a fresh DB (no tables) before creating them
+  let isFresh = false;
+  try {
+    const row = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='properties'").get();
+    isFresh = !row || row.count === 0;
+  } catch (e) {
+    isFresh = true;
+  }
+
   createTables();
-  await migrateIfNeeded(userDataPath);
+
+  if (isFresh) {
+    setSchemaVersion(CURRENT_SCHEMA_VERSION);
+    log.info('Initialized fresh database with schema v' + CURRENT_SCHEMA_VERSION);
+  } else {
+    await migrateIfNeeded(userDataPath);
+  }
 
   db.pragma('foreign_keys = ON');
   prepareStatements();
@@ -276,7 +292,20 @@ function cleanupOldBackups(userDataPath) {
 }
 
 async function migrateIfNeeded(userDataPath) {
-  const currentVersion = getSchemaVersion();
+  let currentVersion = getSchemaVersion();
+
+  // Heuristic: If version is 0 but we have v7 columns, assume v7.
+  // This handles the case where a previous run initialized tables but failed to set version.
+  if (currentVersion === 0) {
+    try {
+      const colInfo = db.prepare("PRAGMA table_info(tenants)").all();
+      if (colInfo.some(c => c.name === 'occupants')) {
+        log.info('Detected v7 schema (occupants column exists) with missing version. Setting version to ' + CURRENT_SCHEMA_VERSION);
+        setSchemaVersion(CURRENT_SCHEMA_VERSION);
+        currentVersion = CURRENT_SCHEMA_VERSION;
+      }
+    } catch (e) { /* ignore */ }
+  }
 
   if (currentVersion >= CURRENT_SCHEMA_VERSION) {
     log.info(`Database schema is up to date (v${currentVersion}).`);
