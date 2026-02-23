@@ -83,6 +83,7 @@ function requireElectronAPI(): ElectronAPI {
       dbLoad: async () => ({}),
       dbSave: async () => true,
       dbBatch: async () => ({ success: true }),
+      dbBackup: async () => ({ success: true }),
       docPickFile: async () => null,
       docDeleteFile: async () => true,
       docOpenFile: async () => true,
@@ -172,6 +173,8 @@ async function runMonthlyProcessors(): Promise<void> {
   notify();
 }
 
+import { loadSettings } from './lib/settings';
+
 export async function initStore(): Promise<void> {
   if (_initialized) return;
 
@@ -184,6 +187,16 @@ export async function initStore(): Promise<void> {
 
   _initialized = true;
   runMonthlyProcessors();
+
+  // Auto-backup on launch
+  const settings = loadSettings();
+  if (settings.autoBackup) {
+    // Run in background, don't await
+    api.dbBackup().then((res) => {
+      if (res.success) logger.info('Auto-backup completed:', res.path);
+      else logger.warn('Auto-backup failed:', res.error);
+    });
+  }
 
   // Re-check every 30 minutes so the app picks up a new month without restarting
   setInterval(runMonthlyProcessors, 30 * 60 * 1000);

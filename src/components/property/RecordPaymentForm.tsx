@@ -25,7 +25,7 @@ interface Props {
   onClose: () => void
 }
 
-export default function RecordPaymentForm({ propertyId, tenants, payments, units, initialTenantId, initialAmount, initialDate, onClose }: Props) {
+export default function RecordPaymentForm({ tenants, payments, units, initialTenantId, initialAmount, initialDate, onClose }: Props) {
   const toast = useToast()
 
   const confirm = useConfirm()

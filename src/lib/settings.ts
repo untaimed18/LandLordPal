@@ -10,6 +10,7 @@ export interface AppSettings {
   requireFirstMonth: boolean;
   requireLastMonth: boolean;
   defaultDepositAmount: number;
+  autoBackup: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -22,6 +23,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   requireFirstMonth: true,
   requireLastMonth: false,
   defaultDepositAmount: 0,
+  autoBackup: true,
 };
 
 export function loadSettings(): AppSettings {
@@ -39,6 +41,7 @@ export function loadSettings(): AppSettings {
       requireFirstMonth: typeof parsed.requireFirstMonth === 'boolean' ? parsed.requireFirstMonth : DEFAULT_SETTINGS.requireFirstMonth,
       requireLastMonth: typeof parsed.requireLastMonth === 'boolean' ? parsed.requireLastMonth : DEFAULT_SETTINGS.requireLastMonth,
       defaultDepositAmount: typeof parsed.defaultDepositAmount === 'number' ? parsed.defaultDepositAmount : DEFAULT_SETTINGS.defaultDepositAmount,
+      autoBackup: typeof parsed.autoBackup === 'boolean' ? parsed.autoBackup : DEFAULT_SETTINGS.autoBackup,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

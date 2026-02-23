@@ -13,10 +13,27 @@ interface Props {
 
 export default function LeaseRenewalModal({ tenant, onClose }: Props) {
   const toast = useToast()
-  const [form, setForm] = useState({
-    leaseStart: '',
-    leaseEnd: '',
-    monthlyRent: tenant.monthlyRent,
+  const [form, setForm] = useState(() => {
+    let defaultStart = ''
+    let defaultEnd = ''
+    
+    if (tenant.leaseEnd) {
+      const currentEnd = new Date(tenant.leaseEnd + 'T12:00:00')
+      const nextDay = new Date(currentEnd)
+      nextDay.setDate(nextDay.getDate() + 1)
+      defaultStart = nextDay.toISOString().slice(0, 10)
+      
+      const nextYear = new Date(nextDay)
+      nextYear.setFullYear(nextYear.getFullYear() + 1)
+      nextYear.setDate(nextYear.getDate() - 1)
+      defaultEnd = nextYear.toISOString().slice(0, 10)
+    }
+
+    return {
+      leaseStart: defaultStart,
+      leaseEnd: defaultEnd,
+      monthlyRent: tenant.monthlyRent,
+    }
   })
 
   const rentChange = useMemo(() => {
@@ -115,6 +132,19 @@ export default function LeaseRenewalModal({ tenant, onClose }: Props) {
                     {rentChange.diff > 0 ? '+' : ''}{formatMoney(rentChange.diff)} ({rentChange.pct > 0 ? '+' : ''}{rentChange.pct.toFixed(1)}%)
                   </span>
                 )}
+              </div>
+              <div className="renewal-quick-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <span className="muted" style={{ fontSize: '0.8rem', alignSelf: 'center' }}>Quick increase:</span>
+                {[2, 3, 5, 10].map(pct => (
+                  <button
+                    key={pct}
+                    type="button"
+                    className="btn small"
+                    onClick={() => setForm(f => ({ ...f, monthlyRent: Math.round(tenant.monthlyRent * (1 + pct / 100)) }))}
+                  >
+                    +{pct}%
+                  </button>
+                ))}
               </div>
             </label>
           </div>

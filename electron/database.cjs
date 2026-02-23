@@ -875,6 +875,8 @@ function rowToExpense(row) {
 function rowToPayment(row) {
   return {
     ...row,
+    tenantId: row.tenantId || undefined,
+    unitId: row.unitId || undefined,
     method: row.method || undefined,
     category: row.category || undefined,
     notes: row.notes || undefined,
@@ -1074,4 +1076,16 @@ function closeDatabase() {
   }
 }
 
-module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, getEncryptionKeyError };
+async function backupDatabase(targetPath) {
+  if (!db) return { success: false, error: 'Database not open' };
+  try {
+    await db.backup(targetPath);
+    log.info('Database backup successful:', targetPath);
+    return { success: true, path: targetPath };
+  } catch (err) {
+    log.error('Backup failed:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, getEncryptionKeyError };

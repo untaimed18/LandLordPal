@@ -58,6 +58,8 @@ export default function Properties() {
     deposit: 0,
     bedrooms: 0,
     bathrooms: 0,
+    downPayment: 0,
+    closingCosts: 0,
     mortgageBalance: 0,
     mortgageRate: 0,
     mortgageTermYears: 30,

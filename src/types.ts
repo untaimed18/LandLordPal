@@ -158,8 +158,8 @@ export type PaymentCategory = 'rent' | 'deposit' | 'last_month' | 'fee' | 'other
 
 export interface Payment {
   id: Id;
-  tenantId: Id;
-  unitId: Id;
+  tenantId?: Id;
+  unitId?: Id;
   propertyId: Id;
   amount: number;
   date: string;

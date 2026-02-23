@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { addActivityLog, deleteTenant, updateTenant, takeSnapshot, restoreSnapshot } from '../../store'
+import { addActivityLog, updateTenant, updateUnit, takeSnapshot, restoreSnapshot } from '../../store'
 import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { nowISO } from '../../lib/id'
@@ -22,9 +22,8 @@ export default function MoveOutForm({ tenant, onClose }: Props) {
   async function handleSubmit() {
     const ok = await confirm({
       title: 'Confirm move-out',
-      message: `This will permanently remove "${tenant.name}" and all their payment history from the system. This cannot be undone without a backup.`,
+      message: `Mark "${tenant.name}" as moved out? The unit will be available for a new tenant.`,
       confirmText: 'Complete move-out',
-      danger: true,
     })
     if (!ok) return
 
@@ -36,13 +35,13 @@ export default function MoveOutForm({ tenant, onClose }: Props) {
         depositReturned: depositReturned,
         depositDeductions: depositDeductions || undefined,
       })
+      await updateUnit(tenant.unitId, { available: true })
       await addActivityLog({
         entityType: 'unit',
         entityId: tenant.unitId,
         note: `Tenant "${tenant.name}" moved out. Deposit held: ${formatMoney(tenant.deposit ?? 0)}. Returned: ${formatMoney(depositReturned)}${depositDeductions ? `. Deductions: ${depositDeductions}` : ''}${moveOutNotes ? `. Notes: ${moveOutNotes}` : ''}`,
         date: moveOutDate,
       })
-      await deleteTenant(tenant.id)
       onClose()
       toast('Tenant moved out and unit marked available', {
         type: 'success',

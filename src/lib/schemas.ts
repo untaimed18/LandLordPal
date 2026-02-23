@@ -45,6 +45,8 @@ export const tenantSchema = z.object({
   gracePeriodDays: z.number().int().min(0).max(60).optional(),
   lateFeeAmount: z.number().min(0).optional(),
   notes: z.string().max(2000).optional(),
+  screeningStatus: z.enum(['applied', 'approved', 'rejected']).optional(),
+  screeningNotes: z.string().max(2000).optional(),
 }).refine(
   (data) => !data.leaseStart || !data.leaseEnd || data.leaseEnd >= data.leaseStart,
   { message: 'Lease end must be after lease start', path: ['leaseEnd'] }

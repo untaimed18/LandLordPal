@@ -107,7 +107,7 @@ export function exportTenantStatementPdf(opts: TenantStatementOptions) {
     margin: { left: 14, right: 14 },
   })
 
-  const finalY = (doc as unknown as Record<string, number>).lastAutoTable?.finalY ?? 200
+  const finalY = ((doc as unknown as Record<string, unknown>).lastAutoTable as Record<string, number> | undefined)?.finalY ?? 200
   doc.setFontSize(11)
   doc.setTextColor(30, 30, 30)
   doc.text(`Balance Due: ${formatMoneyForPdf(finalBalance)}`, 14, finalY + 10)

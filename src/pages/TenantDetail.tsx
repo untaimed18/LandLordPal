@@ -10,12 +10,11 @@ import LeaseRenewalModal from '../components/LeaseRenewalModal'
 import EmailTemplateModal from '../components/EmailTemplateModal'
 import InspectionChecklistModal from '../components/InspectionChecklistModal'
 import { loadSettings } from '../lib/settings'
-import { exportTenantStatementPdf, formatMoneyForPdf } from '../lib/pdfExport'
+import { exportTenantStatementPdf } from '../lib/pdfExport'
 import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send, FileText, ClipboardList, UserCheck, UserX, UserPlus, CircleDollarSign, Users } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
-import type { InspectionChecklist, InspectionItem } from '../types'
 
 export default function TenantDetail() {
   const { id } = useParams<{ id: string }>()
@@ -127,9 +126,11 @@ export default function TenantDetail() {
   const property = properties.find((p) => p.id === tenant.propertyId)
   const unit = units.find((u) => u.id === tenant.unitId)
   const tenantComms = communicationLogs.filter((c) => c.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date))
-  const leaseStatus = getLeaseStatus(tenant.leaseEnd)
+  const leaseStatus = tenant.moveOutDate ? 'moved_out' : getLeaseStatus(tenant.leaseEnd)
 
-  const statusBadge = leaseStatus === 'expired'
+  const statusBadge = leaseStatus === 'moved_out'
+    ? <span className="badge" style={{ background: '#6c757d', color: 'white' }}>Moved Out ({formatDate(tenant.moveOutDate!)})</span>
+    : leaseStatus === 'expired'
     ? <span className="badge expired">Lease expired</span>
     : leaseStatus === 'expiring'
       ? <span className="badge expiring">Expiring soon</span>
@@ -163,10 +164,10 @@ export default function TenantDetail() {
         </div>
         <div className="header-actions no-print">
           <button type="button" className="btn small" onClick={() => window.print()}><Printer size={14} /> Print summary</button>
-          <button type="button" className="btn small primary" onClick={() => setShowRenewal(true)}><RotateCw size={14} /> Renew Lease</button>
+          {!tenant.moveOutDate && <button type="button" className="btn small primary" onClick={() => setShowRenewal(true)}><RotateCw size={14} /> Renew Lease</button>}
           <button type="button" className="btn small" onClick={() => setShowEmail(true)} disabled={!tenant.email}><Send size={14} /> Send Email</button>
           <button type="button" className="btn small" onClick={() => setShowInspection('move_in')}><ClipboardList size={14} /> Move-In Inspect</button>
-          <button type="button" className="btn small" onClick={() => setShowInspection('move_out')}><ClipboardList size={14} /> Move-Out Inspect</button>
+          {!tenant.moveOutDate && <button type="button" className="btn small" onClick={() => setShowInspection('move_out')}><ClipboardList size={14} /> Move-Out Inspect</button>}
           {tenantPayments.length > 0 && (
             <button type="button" className="btn small" onClick={() => {
               downloadCSV(`${tenant.name.replace(/\s+/g, '-')}-payments-${nowISO()}.csv`, toCSV(

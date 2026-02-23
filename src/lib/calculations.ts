@@ -21,7 +21,7 @@ function parseLocalDate(dateStr: string): Date {
 }
 
 export function getExpectedMonthlyRent(tenants: Tenant[]): number {
-  return tenants.reduce((sum, t) => sum + t.monthlyRent, 0);
+  return tenants.filter(t => !t.moveOutDate).reduce((sum, t) => sum + t.monthlyRent, 0);
 }
 
 function isIncomePayment(p: Payment): boolean {
@@ -68,10 +68,11 @@ export function getPropertySummary(
   const y = now.getFullYear();
   const m = now.getMonth();
 
-  const totalMonthlyRent = propTenants.reduce((s, t) => s + t.monthlyRent, 0);
+  const activeTenants = propTenants.filter(t => !t.moveOutDate);
+  const totalMonthlyRent = activeTenants.reduce((s, t) => s + t.monthlyRent, 0);
   const collectedThisMonth = getCollectedThisMonth(propPayments, y, m);
   const expensesThisMonth = getExpensesThisMonth(propExpenses, y, m);
-  const occupiedCount = propTenants.length;
+  const occupiedCount = activeTenants.length;
   const unitCount = propUnits.length;
   const occupancyRate = unitCount > 0 ? (occupiedCount / unitCount) * 100 : 0;
 
@@ -102,7 +103,8 @@ export function getDashboardStats(
   const collectedThisMonth = getCollectedThisMonth(payments, y, m);
   const expensesThisMonth = getExpensesThisMonth(expenses, y, m);
   const totalUnits = units.length;
-  const occupiedUnits = tenants.length;
+  const occupiedUnitIds = new Set(tenants.filter(t => !t.moveOutDate).map(t => t.unitId));
+  const occupiedUnits = occupiedUnitIds.size;
   const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
   const ytdIncome = getYTDIncome(payments, y);
   const ytdExpenses = getYTDExpenses(expenses, y);
@@ -159,7 +161,14 @@ export function getRentRollForMonth(
   payments: Payment[]
 ): RentRollItem[] {
   const items: RentRollItem[] = []
+  const monthStartStr = `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const monthEndDate = new Date(year, month + 1, 0)
+  const monthEndStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(monthEndDate.getDate()).padStart(2, '0')}`
+
   for (const tenant of tenants) {
+    if (tenant.moveOutDate && tenant.moveOutDate < monthStartStr) continue
+    if (tenant.leaseStart > monthEndStr) continue
+
     const unit = units.find((u) => u.id === tenant.unitId)
     const property = unit ? properties.find((p) => p.id === unit.propertyId) : undefined
     if (!unit || !property) continue
@@ -276,7 +285,7 @@ export function getInvestmentMetrics(
   const relevantTenants = propertyId
     ? tenants.filter((t) => t.propertyId === propertyId)
     : tenants;
-  const occupiedUnitIds = new Set(relevantTenants.map((t) => t.unitId));
+  const occupiedUnitIds = new Set(relevantTenants.filter(t => !t.moveOutDate).map((t) => t.unitId));
   const monthlyVacancyLoss = relevantUnits
     .filter((u) => !occupiedUnitIds.has(u.id))
     .reduce((s, u) => s + u.monthlyRent, 0);
@@ -479,10 +488,10 @@ export function getPropertyComparison(
       property.id,
     );
     const propUnits = units.filter((u) => u.propertyId === property.id);
-    const propTenants = tenants.filter((t) => t.propertyId === property.id);
+    const propActiveTenants = tenants.filter((t) => t.propertyId === property.id && !t.moveOutDate);
     const occupancyRate =
-      propUnits.length > 0 ? (propTenants.length / propUnits.length) * 100 : 0;
-    const expectedAnnual = propTenants.reduce((s, t) => s + t.monthlyRent, 0) * 12;
+      propUnits.length > 0 ? (propActiveTenants.length / propUnits.length) * 100 : 0;
+    const expectedAnnual = propActiveTenants.reduce((s, t) => s + t.monthlyRent, 0) * 12;
     const collectionRate =
       expectedAnnual > 0 ? (metrics.annualIncome / expectedAnnual) * 100 : 0;
 
@@ -541,6 +550,7 @@ export function getForecast(
   cutoff90.setDate(cutoff90.getDate() + 90);
   const leaseExpirationRisk = tenants
     .filter((t) => {
+      if (t.moveOutDate) return false;
       const end = new Date(t.leaseEnd + 'T12:00:00');
       if (Number.isNaN(end.getTime())) return false;
       const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
@@ -589,6 +599,7 @@ export function getLeasesEndingSoon(
   cutoffStart.setDate(cutoffStart.getDate() + withinDays)
   return tenants
     .filter((t) => {
+      if (t.moveOutDate) return false
       const end = new Date(t.leaseEnd + 'T12:00:00')
       if (Number.isNaN(end.getTime())) return false
       const endStart = new Date(end.getFullYear(), end.getMonth(), end.getDate())
@@ -620,7 +631,7 @@ export function getVacancyAnalysis(
 ): { vacantUnits: VacancyInfo[]; avgDaysVacant: number; totalMonthlyLoss: number; occupancyRate: number } {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const occupiedUnitIds = new Set(tenants.map((t) => t.unitId))
+  const occupiedUnitIds = new Set(tenants.filter(t => !t.moveOutDate).map((t) => t.unitId))
   const vacantUnits: VacancyInfo[] = []
 
   for (const unit of units) {

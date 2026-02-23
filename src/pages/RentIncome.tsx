@@ -9,7 +9,7 @@ import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate, formatMonthYear } from '../lib/format'
 import { nowISO } from '../lib/id'
 import { toCSV, downloadCSV } from '../lib/csv'
-import { RefreshCw, DollarSign, Calendar, CreditCard, User, Home, Banknote, Percent, TrendingUp, TrendingDown, Users } from 'lucide-react'
+import { RefreshCw, DollarSign, Calendar, CreditCard, User, Home, Banknote, Percent, TrendingUp, Users } from 'lucide-react'
 
 function startOfMonth(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`

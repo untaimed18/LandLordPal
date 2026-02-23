@@ -5,7 +5,7 @@ import { formatDate, formatPhoneNumber, formatMoney } from '../../lib/format'
 import { useFormValidation } from '../../hooks/useFormValidation'
 import { tenantSchema } from '../../lib/schemas'
 import { loadSettings } from '../../lib/settings'
-import { RefreshCw, ShieldCheck, DollarSign, Users, Plus, Trash2 } from 'lucide-react'
+import { RefreshCw, ShieldCheck, DollarSign, Users, Plus, Trash2, UserCheck } from 'lucide-react'
 import type { Tenant, Occupant, OccupantRelationship } from '../../types'
 
 const RELATIONSHIP_OPTIONS: { value: OccupantRelationship; label: string }[] = [
@@ -34,6 +34,8 @@ interface TenantFormData {
   requireFirstMonth: boolean
   requireLastMonth: boolean
   occupants: Occupant[]
+  screeningStatus: 'applied' | 'approved' | 'rejected' | ''
+  screeningNotes: string
 }
 
 interface Props {
@@ -48,10 +50,25 @@ interface Props {
 export default function TenantForm({ propertyId, unitName, tenants, editingTenantId, initial, onClose }: Props) {
   const toast = useToast()
   const settings = loadSettings()
-  const [form, setForm] = useState<TenantFormData>({
-    ...initial,
-    requireFirstMonth: initial.requireFirstMonth ?? settings.requireFirstMonth,
-    requireLastMonth: initial.requireLastMonth ?? settings.requireLastMonth,
+  const [form, setForm] = useState<TenantFormData>(() => {
+    // Auto-calculate lease end if start is provided but end is not
+    const start = initial.leaseStart
+    let end = initial.leaseEnd
+    if (start && !end) {
+      const d = new Date(start + 'T12:00:00')
+      d.setFullYear(d.getFullYear() + 1)
+      d.setDate(d.getDate() - 1)
+      end = d.toISOString().slice(0, 10)
+    }
+
+    return {
+      ...initial,
+      leaseEnd: end,
+      requireFirstMonth: initial.requireFirstMonth ?? settings.requireFirstMonth,
+      requireLastMonth: initial.requireLastMonth ?? settings.requireLastMonth,
+      screeningStatus: initial.screeningStatus ?? '',
+      screeningNotes: initial.screeningNotes ?? '',
+    }
   })
   const { errors, validate, clearError } = useFormValidation(tenantSchema)
 
@@ -80,11 +97,13 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
       gracePeriodDays: form.gracePeriodDays || undefined,
       lateFeeAmount: form.lateFeeAmount || undefined,
       notes: form.notes || undefined,
+      screeningStatus: form.screeningStatus || undefined,
+      screeningNotes: form.screeningNotes || undefined,
     }
     if (!validate(payload)) return
 
     const overlapping = tenants.find(
-      (t) => t.unitId === form.unitId && t.id !== editingTenantId &&
+      (t) => t.unitId === form.unitId && t.id !== editingTenantId && !t.moveOutDate &&
         t.leaseStart <= form.leaseEnd && t.leaseEnd >= form.leaseStart
     )
     if (overlapping) {
@@ -108,6 +127,8 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
       requireFirstMonth: form.requireFirstMonth,
       requireLastMonth: form.requireLastMonth,
       occupants: validOccupants.length > 0 ? validOccupants : undefined,
+      screeningStatus: form.screeningStatus || undefined,
+      screeningNotes: form.screeningNotes || undefined,
     }
 
     try {
@@ -142,7 +163,21 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
         <label className={errors.name ? 'form-field-error' : ''}>Name * <input required value={form.name} onChange={(e) => { setForm((n) => ({ ...n, name: e.target.value })); clearError('name') }} />{errors.name && <span className="field-error" role="alert">{errors.name}</span>}</label>
         <label className={errors.email ? 'form-field-error' : ''}>Email <input type="email" value={form.email} onChange={(e) => { setForm((n) => ({ ...n, email: e.target.value })); clearError('email') }} />{errors.email && <span className="field-error" role="alert">{errors.email}</span>}</label>
         <label className={errors.phone ? 'form-field-error' : ''}>Phone <input type="tel" value={form.phone} onChange={(e) => { setForm((n) => ({ ...n, phone: formatPhoneNumber(e.target.value) })); clearError('phone') }} placeholder="(555) 123-4567" />{errors.phone && <span className="field-error" role="alert">{errors.phone}</span>}</label>
-        <label className={errors.leaseStart ? 'form-field-error' : ''}>Lease start * <input type="date" required value={form.leaseStart} onChange={(e) => { setForm((n) => ({ ...n, leaseStart: e.target.value })); clearError('leaseStart') }} />{errors.leaseStart && <span className="field-error" role="alert">{errors.leaseStart}</span>}</label>
+        <label className={errors.leaseStart ? 'form-field-error' : ''}>Lease start * <input type="date" required value={form.leaseStart} onChange={(e) => {
+          const newStart = e.target.value
+          setForm((n) => {
+            // Auto-update end date if it was default or empty
+            let newEnd = n.leaseEnd
+            if (newStart && (!n.leaseEnd || n.leaseEnd === initial.leaseEnd)) {
+              const d = new Date(newStart + 'T12:00:00')
+              d.setFullYear(d.getFullYear() + 1)
+              d.setDate(d.getDate() - 1)
+              newEnd = d.toISOString().slice(0, 10)
+            }
+            return { ...n, leaseStart: newStart, leaseEnd: newEnd }
+          })
+          clearError('leaseStart')
+        }} />{errors.leaseStart && <span className="field-error" role="alert">{errors.leaseStart}</span>}</label>
         <label className={errors.leaseEnd ? 'form-field-error' : ''}>Lease end * <input type="date" required value={form.leaseEnd} onChange={(e) => { setForm((n) => ({ ...n, leaseEnd: e.target.value })); clearError('leaseEnd') }} />{errors.leaseEnd && <span className="field-error" role="alert">{errors.leaseEnd}</span>}</label>
         <label className={errors.monthlyRent ? 'form-field-error' : ''}>Monthly rent * <input type="number" min={0} required value={form.monthlyRent || ''} onChange={(e) => { setForm((n) => ({ ...n, monthlyRent: +e.target.value })); clearError('monthlyRent') }} />{errors.monthlyRent && <span className="field-error" role="alert">{errors.monthlyRent}</span>}</label>
         <label>Grace period (days) <input type="number" min={0} value={form.gracePeriodDays || ''} onChange={(e) => setForm((n) => ({ ...n, gracePeriodDays: +e.target.value }))} /></label>
@@ -268,6 +303,23 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
         >
           <Plus size={14} /> Add occupant
         </button>
+      </fieldset>
+      <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
+        <legend><UserCheck size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />Screening & Application</legend>
+        <div className="form-grid">
+          <label>Application Status
+            <select
+              value={form.screeningStatus}
+              onChange={(e) => setForm((n) => ({ ...n, screeningStatus: e.target.value as any }))}
+            >
+              <option value="">Not set</option>
+              <option value="applied">Applied</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </label>
+        </div>
+        <label style={{ marginTop: '0.5rem' }}>Screening notes <textarea value={form.screeningNotes} onChange={(e) => setForm((n) => ({ ...n, screeningNotes: e.target.value }))} rows={2} placeholder="Credit score, employment verification, references..." /></label>
       </fieldset>
       <label className={`toggle-card${form.autopay ? ' active' : ''}`}>
         <input type="checkbox" checked={form.autopay} onChange={(e) => setForm((n) => ({ ...n, autopay: e.target.checked }))} />

@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbLoad: () => ipcRenderer.invoke('db:load'),
   dbSave: (state) => ipcRenderer.invoke('db:save', state),
   dbBatch: (operations) => ipcRenderer.invoke('db:batch', operations),
+  dbBackup: (path) => ipcRenderer.invoke('db:backup', path),
 
   // Document attachments
   docPickFile: () => ipcRenderer.invoke('doc:pick-file'),

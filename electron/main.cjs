@@ -1,7 +1,8 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
-const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, getEncryptionKeyError } = require('./database.cjs');
+const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, getEncryptionKeyError } = require('./database.cjs');
+const fs = require('fs');
 const { dialog, shell } = require('electron');
 const log = require('./logger.cjs');
 
@@ -176,6 +177,52 @@ async function setupDatabase() {
       return { success: true };
     } catch (err) {
       log.error('db:batch failed:', err.message);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('db:backup', async (_event, customPath) => {
+    try {
+      let targetPath = customPath;
+      let isAutoBackup = false;
+      let backupDir = null;
+
+      if (!targetPath) {
+        isAutoBackup = true;
+        const docsDir = app.getPath('documents');
+        backupDir = path.join(docsDir, 'LandLordPal', 'Backups');
+        if (!fs.existsSync(backupDir)) {
+          fs.mkdirSync(backupDir, { recursive: true });
+        }
+        const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+        targetPath = path.join(backupDir, `backup-${dateStr}.db`);
+      }
+      
+      const result = await backupDatabase(targetPath);
+
+      // Cleanup old backups if this was an auto-backup
+      if (result.success && isAutoBackup && backupDir) {
+        try {
+          const MAX_AUTO_BACKUPS = 30;
+          const files = fs.readdirSync(backupDir)
+            .filter((f) => f.startsWith('backup-') && f.endsWith('.db'))
+            .map((f) => ({ name: f, time: fs.statSync(path.join(backupDir, f)).mtimeMs }))
+            .sort((a, b) => b.time - a.time);
+
+          if (files.length > MAX_AUTO_BACKUPS) {
+            for (const file of files.slice(MAX_AUTO_BACKUPS)) {
+              fs.unlinkSync(path.join(backupDir, file.name));
+              log.info('Removed old auto-backup:', file.name);
+            }
+          }
+        } catch (cleanupErr) {
+          log.warn('Auto-backup cleanup failed:', cleanupErr.message);
+        }
+      }
+
+      return result;
+    } catch (err) {
+      log.error('db:backup IPC failed:', err.message);
       return { success: false, error: err.message };
     }
   });

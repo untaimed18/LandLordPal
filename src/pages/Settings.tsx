@@ -7,7 +7,7 @@ import { nowISO } from '../lib/id'
 import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../lib/settings'
 import { backupSchema } from '../lib/schemas'
 import { parseImportCSV, type ImportType } from '../lib/csvImport'
-import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download, RefreshCw, Upload, Mail, ShieldCheck } from 'lucide-react'
+import { Home, DoorOpen, User, DollarSign, Receipt, Wrench, Users, FileText, Sun, Moon, MessageSquare, Bell, Paperclip, Download, RefreshCw, Upload, Mail, ShieldCheck, CalendarDays, Shield, Clock, Banknote } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'
@@ -336,12 +336,16 @@ export default function Settings() {
       <section className="card section-card">
         <div className="section-card-header">
           <h2><Bell size={18} aria-hidden="true" /> Notification thresholds</h2>
+          <button type="button" className="btn small" onClick={handleResetSettings}>Reset to defaults</button>
         </div>
         <p className="section-desc">Configure when alerts and reminders appear on the dashboard.</p>
         <div className="settings-thresholds">
           <div className="threshold-item">
             <div className="threshold-header">
-              <span className="threshold-label">Lease expiration warning</span>
+              <span className="threshold-label">
+                <span className="threshold-icon"><CalendarDays size={15} /></span>
+                Lease expiration warning
+              </span>
               <div className="threshold-input-wrap">
                 <input
                   type="number"
@@ -355,12 +359,15 @@ export default function Settings() {
               </div>
             </div>
             <span className="threshold-desc">
-              Alert when a lease expires within this window (default: {DEFAULT_SETTINGS.leaseWarningDays})
+              Alert when a lease expires within this window
             </span>
           </div>
           <div className="threshold-item">
             <div className="threshold-header">
-              <span className="threshold-label">Insurance expiration warning</span>
+              <span className="threshold-label">
+                <span className="threshold-icon"><Shield size={15} /></span>
+                Insurance expiration
+              </span>
               <div className="threshold-input-wrap">
                 <input
                   type="number"
@@ -374,12 +381,15 @@ export default function Settings() {
               </div>
             </div>
             <span className="threshold-desc">
-              Alert when insurance expires within this window (default: {DEFAULT_SETTINGS.insuranceWarningDays})
+              Alert when insurance expires within this window
             </span>
           </div>
           <div className="threshold-item">
             <div className="threshold-header">
-              <span className="threshold-label">Maintenance lookahead</span>
+              <span className="threshold-label">
+                <span className="threshold-icon"><Wrench size={15} /></span>
+                Maintenance lookahead
+              </span>
               <div className="threshold-input-wrap">
                 <input
                   type="number"
@@ -393,12 +403,15 @@ export default function Settings() {
               </div>
             </div>
             <span className="threshold-desc">
-              Show upcoming scheduled maintenance within this window (default: {DEFAULT_SETTINGS.maintenanceLookaheadDays})
+              Show upcoming scheduled maintenance within this window
             </span>
           </div>
           <div className="threshold-item">
             <div className="threshold-header">
-              <span className="threshold-label">Default rent grace period</span>
+              <span className="threshold-label">
+                <span className="threshold-icon"><Clock size={15} /></span>
+                Rent grace period
+              </span>
               <div className="threshold-input-wrap">
                 <input
                   type="number"
@@ -412,12 +425,15 @@ export default function Settings() {
               </div>
             </div>
             <span className="threshold-desc">
-              Days after due date before rent is flagged late, when not set per-tenant (default: {DEFAULT_SETTINGS.defaultGracePeriodDays})
+              Days after due date before rent is flagged late
             </span>
           </div>
           <div className="threshold-item">
             <div className="threshold-header">
-              <span className="threshold-label">Rent reminder window</span>
+              <span className="threshold-label">
+                <span className="threshold-icon"><Banknote size={15} /></span>
+                Rent reminder
+              </span>
               <div className="threshold-input-wrap">
                 <input
                   type="number"
@@ -431,13 +447,10 @@ export default function Settings() {
               </div>
             </div>
             <span className="threshold-desc">
-              Show rent reminders on the dashboard this many days before the 1st (default: {DEFAULT_SETTINGS.rentReminderDays}). Set to 0 to disable.
+              Remind this many days before the 1st. Set to 0 to disable.
             </span>
           </div>
         </div>
-        <button type="button" className="btn small" onClick={handleResetSettings} style={{ marginTop: '0.5rem' }}>
-          Reset to defaults
-        </button>
       </section>
 
       <section className="card section-card">
@@ -445,21 +458,22 @@ export default function Settings() {
           <h2><ShieldCheck size={18} aria-hidden="true" /> Move-in requirements</h2>
         </div>
         <p className="section-desc">Default requirements for new tenants. These can be overridden per-tenant when adding them.</p>
-        <div className="settings-thresholds">
-          <div className="threshold-item">
-            <label className={`toggle-card${appSettings.requireSecurityDeposit ? ' active' : ''}`}>
-              <input type="checkbox" checked={appSettings.requireSecurityDeposit} onChange={(e) => handleSettingChange('requireSecurityDeposit', e.target.checked)} />
-              <span className="toggle-card-text">
-                <span className="toggle-card-label">Require security deposit</span>
-                <span className="toggle-card-desc">Collect a security deposit before move-in</span>
-              </span>
-              <span className="toggle-track"><span className="toggle-thumb" /></span>
-            </label>
-          </div>
+        <div className="movein-settings-grid">
+          <label className={`toggle-card${appSettings.requireSecurityDeposit ? ' active' : ''}`}>
+            <input type="checkbox" checked={appSettings.requireSecurityDeposit} onChange={(e) => handleSettingChange('requireSecurityDeposit', e.target.checked)} />
+            <span className="toggle-card-text">
+              <span className="toggle-card-label">Require security deposit</span>
+              <span className="toggle-card-desc">Collect a security deposit before move-in</span>
+            </span>
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
           {appSettings.requireSecurityDeposit && (
             <div className="threshold-item">
               <div className="threshold-header">
-                <span className="threshold-label">Default deposit amount</span>
+                <span className="threshold-label">
+                  <span className="threshold-icon"><DollarSign size={15} /></span>
+                  Default deposit amount
+                </span>
                 <div className="threshold-input-wrap">
                   <span className="threshold-unit">$</span>
                   <input
@@ -475,26 +489,22 @@ export default function Settings() {
               <span className="threshold-desc">Set to $0 to default to one month's rent for each unit.</span>
             </div>
           )}
-          <div className="threshold-item">
-            <label className={`toggle-card${appSettings.requireFirstMonth ? ' active' : ''}`}>
-              <input type="checkbox" checked={appSettings.requireFirstMonth} onChange={(e) => handleSettingChange('requireFirstMonth', e.target.checked)} />
-              <span className="toggle-card-text">
-                <span className="toggle-card-label">Require first month's rent</span>
-                <span className="toggle-card-desc">First month's rent due at move-in</span>
-              </span>
-              <span className="toggle-track"><span className="toggle-thumb" /></span>
-            </label>
-          </div>
-          <div className="threshold-item">
-            <label className={`toggle-card${appSettings.requireLastMonth ? ' active' : ''}`}>
-              <input type="checkbox" checked={appSettings.requireLastMonth} onChange={(e) => handleSettingChange('requireLastMonth', e.target.checked)} />
-              <span className="toggle-card-text">
-                <span className="toggle-card-label">Require last month's rent</span>
-                <span className="toggle-card-desc">Collect last month's rent upfront before move-in</span>
-              </span>
-              <span className="toggle-track"><span className="toggle-thumb" /></span>
-            </label>
-          </div>
+          <label className={`toggle-card${appSettings.requireFirstMonth ? ' active' : ''}`}>
+            <input type="checkbox" checked={appSettings.requireFirstMonth} onChange={(e) => handleSettingChange('requireFirstMonth', e.target.checked)} />
+            <span className="toggle-card-text">
+              <span className="toggle-card-label">Require first month's rent</span>
+              <span className="toggle-card-desc">First month's rent due at move-in</span>
+            </span>
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+          <label className={`toggle-card${appSettings.requireLastMonth ? ' active' : ''}`}>
+            <input type="checkbox" checked={appSettings.requireLastMonth} onChange={(e) => handleSettingChange('requireLastMonth', e.target.checked)} />
+            <span className="toggle-card-text">
+              <span className="toggle-card-label">Require last month's rent</span>
+              <span className="toggle-card-desc">Collect last month's rent upfront before move-in</span>
+            </span>
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
         </div>
       </section>
 
@@ -567,15 +577,40 @@ export default function Settings() {
       <section className="card section-card">
         <h2>Backup & restore</h2>
         <p className="section-desc">
-          Your data is stored locally on this device. Export a backup to keep your data safe, or restore from a previous backup.
+          Your data is stored locally on this device. Automated backups are saved to your Documents/LandLordPal/Backups folder.
         </p>
+
+        <div className="threshold-item" style={{ marginBottom: '1.5rem' }}>
+          <label className={`toggle-card${appSettings.autoBackup ? ' active' : ''}`}>
+            <input type="checkbox" checked={appSettings.autoBackup} onChange={(e) => handleSettingChange('autoBackup', e.target.checked)} />
+            <span className="toggle-card-text">
+              <span className="toggle-card-label">Auto-backup on launch</span>
+              <span className="toggle-card-desc">Automatically create a backup every time you open the app</span>
+            </span>
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+        </div>
+
         <div className="settings-actions">
-          <button type="button" className="btn primary" onClick={handleExport}>
-            Export backup (JSON)
+          <button type="button" className="btn primary" onClick={async () => {
+            if (!window.electronAPI?.dbBackup) return;
+            toast('Creating backup...', 'info');
+            try {
+              const res = await window.electronAPI.dbBackup();
+              if (res.success) toast(`Backup saved to ${res.path}`, 'info');
+              else toast(`Backup failed: ${res.error}`, 'error');
+            } catch {
+              toast('Backup failed', 'error');
+            }
+          }}>
+            Backup Now (SQLite)
+          </button>
+          <button type="button" className="btn" onClick={handleExport}>
+            Export JSON
           </button>
           <div>
             <label className="btn" style={{ cursor: 'pointer' }}>
-              Import backup
+              Import JSON
               <input
                 ref={fileInput}
                 type="file"

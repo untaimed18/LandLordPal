@@ -83,11 +83,11 @@ export default function PropertyDetail() {
   useEffect(() => {
     if (searchParams.get('addTenant') === '1' && id) {
       const propUnitsLocal = units.filter((u) => u.propertyId === id)
-      const firstAvailable = propUnitsLocal.find((u) => !tenants.some((t) => t.unitId === u.id))
+      const firstAvailable = propUnitsLocal.find((u) => !tenants.some((t) => t.unitId === u.id && !t.moveOutDate))
       if (firstAvailable) {
         setEditingTenantId(null)
         setTenantFormUnitId(firstAvailable.id)
-        setTenantFormData({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: settings.defaultGracePeriodDays, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: settings.requireFirstMonth, requireLastMonth: settings.requireLastMonth, occupants: [] })
+        setTenantFormData({ unitId: firstAvailable.id, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: firstAvailable.monthlyRent, deposit: firstAvailable.deposit ?? 0, gracePeriodDays: settings.defaultGracePeriodDays, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: settings.requireFirstMonth, requireLastMonth: settings.requireLastMonth, occupants: [], screeningStatus: '', screeningNotes: '' })
         setSearchParams({}, { replace: true })
       }
     }
@@ -105,6 +105,8 @@ export default function PropertyDetail() {
   const prop = property
   const propUnits = units.filter((u) => u.propertyId === prop.id)
   const propTenants = tenants.filter((t) => t.propertyId === prop.id)
+  const activeTenants = propTenants.filter((t) => !t.moveOutDate)
+  const pastTenants = propTenants.filter((t) => t.moveOutDate).sort((a, b) => (b.moveOutDate || '').localeCompare(a.moveOutDate || ''))
   const propExpenses = expenses.filter((e) => e.propertyId === prop.id)
   const propPayments = payments.filter((p) => p.propertyId === prop.id)
   const propMaintenance = maintenanceRequests.filter((m) => m.propertyId === prop.id && m.status !== 'completed')
@@ -120,13 +122,13 @@ export default function PropertyDetail() {
   function openAddTenant(unitId: string, rent: number, deposit: number) {
     setEditingTenantId(null)
     setTenantFormUnitId(unitId)
-    setTenantFormData({ unitId, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: rent, deposit, gracePeriodDays: settings.defaultGracePeriodDays, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: settings.requireFirstMonth, requireLastMonth: settings.requireLastMonth, occupants: [] })
+    setTenantFormData({ unitId, name: '', email: '', phone: '', leaseStart: '', leaseEnd: '', monthlyRent: rent, deposit, gracePeriodDays: settings.defaultGracePeriodDays, lateFeeAmount: 0, autopay: false, notes: '', requireFirstMonth: settings.requireFirstMonth, requireLastMonth: settings.requireLastMonth, occupants: [], screeningStatus: '', screeningNotes: '' })
   }
 
   function openEditTenant(t: typeof propTenants[0]) {
     setTenantFormUnitId(null)
     setEditingTenantId(t.id)
-    setTenantFormData({ unitId: t.unitId, name: t.name, email: t.email ?? '', phone: t.phone ?? '', leaseStart: t.leaseStart, leaseEnd: t.leaseEnd, monthlyRent: t.monthlyRent, deposit: t.deposit ?? 0, gracePeriodDays: t.gracePeriodDays ?? 5, lateFeeAmount: t.lateFeeAmount ?? 0, autopay: t.autopay ?? false, notes: t.notes ?? '', requireFirstMonth: t.requireFirstMonth ?? true, requireLastMonth: t.requireLastMonth ?? false, occupants: t.occupants ?? [] })
+    setTenantFormData({ unitId: t.unitId, name: t.name, email: t.email ?? '', phone: t.phone ?? '', leaseStart: t.leaseStart, leaseEnd: t.leaseEnd, monthlyRent: t.monthlyRent, deposit: t.deposit ?? 0, gracePeriodDays: t.gracePeriodDays ?? 5, lateFeeAmount: t.lateFeeAmount ?? 0, autopay: t.autopay ?? false, notes: t.notes ?? '', requireFirstMonth: t.requireFirstMonth ?? true, requireLastMonth: t.requireLastMonth ?? false, occupants: t.occupants ?? [], screeningStatus: t.screeningStatus ?? '', screeningNotes: t.screeningNotes ?? '' })
   }
 
   function openRecordPayment(tenantId: string, amount: number) {
@@ -149,7 +151,7 @@ export default function PropertyDetail() {
   }
 
   async function handleDeleteUnit(unitId: string, unitName: string) {
-    const tenant = propTenants.find((t) => t.unitId === unitId)
+    const tenant = activeTenants.find((t) => t.unitId === unitId)
     if (tenant) { await confirm({ title: 'Cannot delete unit', message: 'Remove the tenant first before deleting the unit.', confirmText: 'OK' }); return }
     const ok = await confirm({ title: 'Delete unit', message: `Delete unit "${unitName}"?`, confirmText: 'Delete', danger: true })
     if (ok) {
@@ -313,7 +315,7 @@ export default function PropertyDetail() {
             <p className="empty-state">{isSingleUnitProp(prop.propertyType) ? 'No unit found. This may have been created before the auto-unit feature.' : 'No units. Add one above.'}</p>
           ) : (
             propUnits.map((unit) => {
-              const tenant = propTenants.find((t) => t.unitId === unit.id)
+              const tenant = activeTenants.find((t) => t.unitId === unit.id)
               const isEditingUnit = editingUnitId === unit.id
               return (
                 <div key={unit.id} className="unit-row">
@@ -460,6 +462,34 @@ export default function PropertyDetail() {
           )}
         </div>
       </section>
+
+      {pastTenants.length > 0 && (
+        <section className="card section-card">
+          <h2>Past Tenants</h2>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead><tr><th>Name</th><th>Unit</th><th>Move Out</th><th>Phone</th><th>Email</th><th>Actions</th></tr></thead>
+              <tbody>
+                {pastTenants.map((t) => (
+                  <tr key={t.id}>
+                    <td><Link to={`/tenants/${t.id}`} className="tenant-link"><strong>{t.name}</strong></Link></td>
+                    <td>{units.find(u => u.id === t.unitId)?.name ?? '—'}</td>
+                    <td>{formatDate(t.moveOutDate!)}</td>
+                    <td>{t.phone ?? '—'}</td>
+                    <td>{t.email ?? '—'}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <Link to={`/tenants/${t.id}`} className="btn small">View</Link>
+                        <button type="button" className="btn small danger" onClick={() => handleDeleteTenant(t.id, t.name)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {noteEntity && (
         <div className="card form-card" style={{ marginTop: '1rem' }}>
