@@ -116,36 +116,61 @@ function parseStateData(data: Record<string, unknown>): AppState {
   };
 }
 
+// ─── Save queue to serialize db writes ───────────────────────────────────────
+
+let saveQueueTail: Promise<unknown> = Promise.resolve();
+
+function enqueueSave<T>(fn: () => Promise<T>): Promise<T> {
+  const task = saveQueueTail.then(fn, fn);
+  saveQueueTail = task.catch(() => {});
+  return task;
+}
+
 // ─── Incremental persistence via db:batch ────────────────────────────────────
 
 async function persistBatch(ops: DbOperation[]): Promise<boolean> {
-  try {
-    const result = await requireElectronAPI().dbBatch(ops);
-    if (!result.success) {
-      emitSaveError(new Error(result.error || 'db:batch returned false'));
-      return false;
+  return enqueueSave(async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await requireElectronAPI().dbBatch(ops);
+        if (result.success) {
+          emitSaveSuccess();
+          return true;
+        }
+        if (attempt === 0) {
+          logger.warn('db:batch failed, retrying...', result.error);
+          continue;
+        }
+        emitSaveError(new Error(result.error || 'db:batch returned false'));
+        return false;
+      } catch (err) {
+        if (attempt === 0) {
+          logger.warn('db:batch threw, retrying...', err instanceof Error ? err.message : String(err));
+          continue;
+        }
+        emitSaveError(err);
+        return false;
+      }
     }
-    emitSaveSuccess();
-    return true;
-  } catch (err) {
-    emitSaveError(err);
     return false;
-  }
+  });
 }
 
 async function persistFullReplace(s: AppState): Promise<boolean> {
-  try {
-    const ok = await requireElectronAPI().dbSave(s);
-    if (!ok) {
-      emitSaveError(new Error('db:save returned false'));
+  return enqueueSave(async () => {
+    try {
+      const ok = await requireElectronAPI().dbSave(s);
+      if (!ok) {
+        emitSaveError(new Error('db:save returned false'));
+        return false;
+      }
+      emitSaveSuccess();
+      return true;
+    } catch (err) {
+      emitSaveError(err);
       return false;
     }
-    emitSaveSuccess();
-    return true;
-  } catch (err) {
-    emitSaveError(err);
-    return false;
-  }
+  });
 }
 
 // ─── In-memory state + pub/sub ───────────────────────────────────────────────

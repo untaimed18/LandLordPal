@@ -14,11 +14,64 @@ const CURRENT_SCHEMA_VERSION = 10;
 
 const ENC_ALGORITHM = 'aes-256-gcm';
 const ENC_KEY_FILE = '.landlordpal-key';
+const KEYTAR_SERVICE = 'LandLordPal';
+const KEYTAR_ACCOUNT = 'encryption-key';
 let encryptionKey = null;
 let encryptionKeyError = null;
 
-function loadEncryptionKey() {
+let keytar = null;
+try { keytar = require('keytar'); } catch { /* keytar not available */ }
+
+async function loadEncryptionKey() {
   const keyPath = path.join(userDataDir, ENC_KEY_FILE);
+
+  // Try keytar (OS credential store) first
+  if (keytar) {
+    try {
+      const stored = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT);
+      if (stored) {
+        encryptionKey = Buffer.from(stored, 'hex');
+        if (encryptionKey.length === 32) {
+          // Migrate: remove old file-based key if it exists
+          if (fs.existsSync(keyPath)) {
+            try { fs.unlinkSync(keyPath); log.info('Migrated encryption key to OS credential store, removed old file.'); } catch { /* best-effort */ }
+          }
+          return;
+        }
+        log.warn('Invalid key length in credential store, will regenerate.');
+      }
+    } catch (err) {
+      log.warn('Keytar read failed, falling back to file:', err.message);
+    }
+
+    // Migrate from file to keytar if file exists
+    try {
+      if (fs.existsSync(keyPath)) {
+        const buf = fs.readFileSync(keyPath);
+        if (buf.length === 32) {
+          encryptionKey = buf;
+          await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, buf.toString('hex'));
+          fs.unlinkSync(keyPath);
+          log.info('Migrated encryption key from file to OS credential store.');
+          return;
+        }
+      }
+    } catch (err) {
+      log.warn('File-to-keytar migration failed:', err.message);
+    }
+
+    // Generate new key and store in keytar
+    try {
+      encryptionKey = crypto.randomBytes(32);
+      await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT, encryptionKey.toString('hex'));
+      log.info('Generated new encryption key (stored in OS credential store).');
+      return;
+    } catch (err) {
+      log.warn('Keytar store failed, falling back to file:', err.message);
+    }
+  }
+
+  // Fallback: file-based key storage
   try {
     if (fs.existsSync(keyPath)) {
       const buf = fs.readFileSync(keyPath);
@@ -32,7 +85,7 @@ function loadEncryptionKey() {
     } else {
       encryptionKey = crypto.randomBytes(32);
       fs.writeFileSync(keyPath, encryptionKey, { mode: 0o600 });
-      log.info('Generated new encryption key');
+      log.info('Generated new encryption key (file-based fallback)');
     }
   } catch (err) {
     log.error('CRITICAL: Failed to manage encryption key:', err.message);
@@ -258,7 +311,7 @@ async function initDatabase(userDataPath) {
   db = new Database(dbFilePath);
   db.pragma('journal_mode = WAL');
 
-  loadEncryptionKey();
+  await loadEncryptionKey();
 
   // Check if it's a fresh DB (no tables) before creating them
   let isFresh = false;

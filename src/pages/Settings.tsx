@@ -591,6 +591,17 @@ export default function Settings() {
           </label>
         </div>
 
+        <div className="threshold-item" style={{ marginBottom: '1.5rem' }}>
+          <label className={`toggle-card${appSettings.errorReporting ? ' active' : ''}`}>
+            <input type="checkbox" checked={appSettings.errorReporting} onChange={(e) => handleSettingChange('errorReporting', e.target.checked)} />
+            <span className="toggle-card-text">
+              <span className="toggle-card-label">Anonymous error reporting</span>
+              <span className="toggle-card-desc">Help improve LandLord Pal by automatically sending crash reports. No personal data is shared. Takes effect on next launch.</span>
+            </span>
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+        </div>
+
         <div className="settings-actions">
           <button type="button" className="btn primary" onClick={async () => {
             if (!window.electronAPI?.dbBackup) return;

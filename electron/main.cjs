@@ -1,12 +1,41 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
+
+const SENTRY_DSN = process.env.SENTRY_DSN || 'https://9fb73591a8037b188820282a38bb6a74@o4510936485593088.ingest.us.sentry.io/4510936499290113';
+try {
+  const Sentry = require('@sentry/electron/main');
+  Sentry.init({ dsn: SENTRY_DSN });
+} catch { /* sentry optional */ }
 const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, copyFileToPhotos, deletePhotoFile, getPhotoPath, getEncryptionKeyError } = require('./database.cjs');
 const fs = require('fs');
 const { dialog, shell } = require('electron');
 const log = require('./logger.cjs');
 
+const isDev = !!process.env.VITE_DEV_SERVER_URL;
+
 let mainWindow = null;
+let dbClosed = false;
+
+// ─── Process-level error handlers ────────────────────────────────────────────
+
+process.on('uncaughtException', (error) => {
+  log.error('Uncaught Exception:', error.message, error.stack);
+  try {
+    if (!dbClosed) { closeDatabase(); dbClosed = true; }
+  } catch { /* best-effort */ }
+  if (app.isReady()) {
+    dialog.showErrorBox(
+      'LandLord Pal — Unexpected Error',
+      `The application encountered an unexpected error and needs to close.\n\nYour data has been saved.\n\nError: ${error.message}`
+    );
+  }
+  app.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  log.error('Unhandled Promise Rejection:', reason instanceof Error ? reason.message : String(reason));
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -29,7 +58,7 @@ function createWindow() {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'",
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; font-src 'self'",
         ],
       },
     });
@@ -46,11 +75,16 @@ function createWindow() {
   // Block new-window requests
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
-  if (process.env.VITE_DEV_SERVER_URL) {
+  if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    mainWindow.webContents.on('before-input-event', (_event, input) => {
+      if (input.key === 'F12' || (input.control && input.shift && input.key === 'I')) {
+        _event.preventDefault();
+      }
+    });
   }
 
   mainWindow.on('closed', () => {
@@ -117,7 +151,7 @@ function setupAutoUpdater() {
   });
 
   ipcMain.handle('quit-and-install', () => {
-    closeDatabase();
+    if (!dbClosed) { closeDatabase(); dbClosed = true; }
     autoUpdater.quitAndInstall(false, true);
   });
 
@@ -304,8 +338,19 @@ app.whenReady().then(async () => {
   setupAutoUpdater();
 });
 
+app.on('before-quit', () => {
+  if (!dbClosed) {
+    try {
+      closeDatabase();
+      dbClosed = true;
+      log.info('Database closed cleanly on quit.');
+    } catch (err) {
+      log.error('Error closing database on quit:', err.message);
+    }
+  }
+});
+
 app.on('window-all-closed', () => {
-  closeDatabase();
   app.quit();
 });
 

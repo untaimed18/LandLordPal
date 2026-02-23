@@ -1,10 +1,22 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
+import * as Sentry from '@sentry/electron/renderer'
 import App from './App'
 import { initStore } from './store'
 import logger from './lib/logger'
 import './index.css'
+
+const SENTRY_DSN = 'https://9fb73591a8037b188820282a38bb6a74@o4510936485593088.ingest.us.sentry.io/4510936499290113'
+try {
+  const settingsRaw = localStorage.getItem('landlordpal-settings')
+  const errorReporting = settingsRaw ? JSON.parse(settingsRaw).errorReporting !== false : true
+  if (errorReporting) {
+    Sentry.init({ dsn: SENTRY_DSN })
+  }
+} catch {
+  // non-critical
+}
 
 const savedTheme = localStorage.getItem('landlordpal-theme') || 'light'
 document.documentElement.setAttribute('data-theme', savedTheme)
