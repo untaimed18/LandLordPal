@@ -47,6 +47,8 @@ export default function PropertyEditForm({ property, onClose }: Props) {
     notes: property.notes ?? '',
     purchasePrice: property.purchasePrice ?? 0,
     purchaseDate: property.purchaseDate ?? '',
+    downPayment: property.downPayment ?? 0,
+    closingCosts: property.closingCosts ?? 0,
     mortgageBalance: property.mortgageBalance ?? 0,
     mortgageRate: property.mortgageRate ?? 0,
     mortgageTermYears: property.mortgageTermYears ?? 30,
@@ -70,6 +72,8 @@ export default function PropertyEditForm({ property, onClose }: Props) {
       amenities: form.amenities.length > 0 ? form.amenities : undefined,
       purchasePrice: form.purchasePrice || undefined,
       purchaseDate: form.purchaseDate || undefined,
+      downPayment: form.downPayment || undefined,
+      closingCosts: form.closingCosts || undefined,
       mortgageBalance: form.mortgageBalance || undefined,
       mortgageRate: form.mortgageRate || undefined,
       mortgageTermYears: form.mortgageTermYears || undefined,
@@ -119,11 +123,13 @@ export default function PropertyEditForm({ property, onClose }: Props) {
       </div>
       <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
         <legend>Acquisition &amp; Financing</legend>
-        <div className="form-grid">
-          <label>Purchase price <input type="text" inputMode="numeric" value={form.purchasePrice ? formatNumberWithCommas(String(form.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} /></label>
-          <label>Purchase date <input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
-          <label>Loan balance <input type="number" min={0} step={1} value={form.mortgageBalance || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageBalance: +e.target.value || 0 }))} /></label>
-          <label>Annual rate (%) <input type="number" min={0} max={20} step={0.125} value={form.mortgageRate || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageRate: +e.target.value || 0 }))} /></label>
+            <div className="form-grid">
+              <label>Purchase price <input type="text" inputMode="numeric" value={form.purchasePrice ? formatNumberWithCommas(String(form.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} /></label>
+              <label>Purchase date <input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
+              <label>Down payment <input type="text" inputMode="numeric" value={form.downPayment ? formatNumberWithCommas(String(form.downPayment)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, downPayment: raw ? Number(raw) : 0 })) }} /></label>
+              <label>Closing costs <input type="text" inputMode="numeric" value={form.closingCosts ? formatNumberWithCommas(String(form.closingCosts)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, closingCosts: raw ? Number(raw) : 0 })) }} /></label>
+              <label>Loan balance <input type="number" min={0} step={1} value={form.mortgageBalance || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageBalance: +e.target.value || 0 }))} /></label>
+              <label>Annual rate (%) <input type="number" min={0} max={20} step={0.125} value={form.mortgageRate || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageRate: +e.target.value || 0 }))} /></label>
           <label>Term (years) <input type="number" min={1} max={50} value={form.mortgageTermYears || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageTermYears: +e.target.value || 0 }))} /></label>
           <label>Monthly payment <input type="number" min={0} step={0.01} value={form.mortgageMonthlyPayment || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageMonthlyPayment: +e.target.value || 0 }))} /></label>
           <label>Mortgage start date <input type="date" value={form.mortgageStartDate} onChange={(e) => setForm((f) => ({ ...f, mortgageStartDate: e.target.value }))} /></label>

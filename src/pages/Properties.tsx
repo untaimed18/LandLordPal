@@ -92,6 +92,8 @@ export default function Properties() {
       deposit: propUnit?.deposit ?? 0,
       bedrooms: propUnit?.bedrooms ?? 0,
       bathrooms: propUnit?.bathrooms ?? 0,
+      downPayment: property.downPayment ?? 0,
+      closingCosts: property.closingCosts ?? 0,
       mortgageBalance: property.mortgageBalance ?? 0,
       mortgageRate: property.mortgageRate ?? 0,
       mortgageTermYears: property.mortgageTermYears ?? 30,
@@ -105,7 +107,7 @@ export default function Properties() {
     setShowForm(true)
   }
 
-  const emptyForm = { name: '', address: '', city: '', state: '', zip: '', propertyType: '', sqft: 0, amenities: [] as string[], purchasePrice: 0, purchaseDate: '', monthlyRent: 0, deposit: 0, bedrooms: 0, bathrooms: 0, mortgageBalance: 0, mortgageRate: 0, mortgageTermYears: 30, mortgageMonthlyPayment: 0, mortgageStartDate: '', insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '', notes: '' }
+  const emptyForm = { name: '', address: '', city: '', state: '', zip: '', propertyType: '', sqft: 0, amenities: [] as string[], purchasePrice: 0, purchaseDate: '', downPayment: 0, closingCosts: 0, monthlyRent: 0, deposit: 0, bedrooms: 0, bathrooms: 0, mortgageBalance: 0, mortgageRate: 0, mortgageTermYears: 30, mortgageMonthlyPayment: 0, mortgageStartDate: '', insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '', notes: '' }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

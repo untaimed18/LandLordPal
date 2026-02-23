@@ -229,6 +229,20 @@ export function getInvestmentMetrics(
     (s, p) => s + (p.purchasePrice ?? 0),
     0,
   );
+  const totalCashInvested = relevantProperties.reduce(
+    (s, p) => {
+      // If downPayment is set, use it + closingCosts.
+      // Otherwise, if mortgageBalance is set, assume Purchase - Mortgage = Down Payment?
+      // No, mortgageBalance changes. We can only rely on downPayment if set.
+      // Fallback: if no downPayment, assume all cash (Purchase Price).
+      if (p.downPayment != null) {
+        return s + p.downPayment + (p.closingCosts ?? 0);
+      }
+      return s + (p.purchasePrice ?? 0);
+    },
+    0
+  );
+
   const allHavePrice =
     relevantProperties.length > 0 &&
     relevantProperties.every((p) => p.purchasePrice && p.purchasePrice > 0);
@@ -249,8 +263,8 @@ export function getInvestmentMetrics(
 
   const capRate = allHavePrice && totalPurchasePrice > 0 ? (noi / totalPurchasePrice) * 100 : null;
   const cashOnCash =
-    allHavePrice && totalPurchasePrice > 0
-      ? ((noi - annualMortgage) / totalPurchasePrice) * 100
+    allHavePrice && totalCashInvested > 0
+      ? ((noi - annualMortgage) / totalCashInvested) * 100
       : null;
   const expenseRatio = annualIncome > 0 ? (annualExpenses / annualIncome) * 100 : null;
   const grm =

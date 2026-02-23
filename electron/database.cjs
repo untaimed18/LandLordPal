@@ -8,7 +8,7 @@ let db = null;
 let dbFilePath = null;
 let userDataDir = null;
 
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 
 // ─── Encryption ──────────────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ const TABLE_NAME_MAP = {
 };
 
 const TABLE_COLUMNS = {
-  properties: ['id', 'name', 'address', 'city', 'state', 'zip', 'propertyType', 'sqft', 'amenities', 'purchasePrice', 'purchaseDate', 'mortgageBalance', 'mortgageRate', 'mortgageTermYears', 'mortgageMonthlyPayment', 'mortgageStartDate', 'insuranceProvider', 'insurancePolicyNumber', 'insuranceExpiry', 'notes', 'createdAt', 'updatedAt'],
+  properties: ['id', 'name', 'address', 'city', 'state', 'zip', 'propertyType', 'sqft', 'amenities', 'purchasePrice', 'purchaseDate', 'downPayment', 'closingCosts', 'mortgageBalance', 'mortgageRate', 'mortgageTermYears', 'mortgageMonthlyPayment', 'mortgageStartDate', 'insuranceProvider', 'insurancePolicyNumber', 'insuranceExpiry', 'notes', 'createdAt', 'updatedAt'],
   units: ['id', 'propertyId', 'name', 'bedrooms', 'bathrooms', 'sqft', 'monthlyRent', 'deposit', 'available', 'notes', 'createdAt', 'updatedAt'],
   tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositStatus', 'depositPaidDate', 'depositPaidAmount', 'depositReturned', 'depositDeductions', 'requireFirstMonth', 'requireLastMonth', 'lastMonthPaid', 'moveInCostNotes', 'gracePeriodDays', 'lateFeeAmount', 'autopay', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'occupants', 'screeningStatus', 'screeningNotes', 'inspections', 'rentHistory', 'leaseHistory', 'createdAt', 'updatedAt'],
   expenses: ['id', 'propertyId', 'unitId', 'category', 'amount', 'date', 'description', 'recurring', 'vendorId', 'createdAt', 'updatedAt'],
@@ -115,6 +115,7 @@ const serializers = {
     propertyType: p.propertyType ?? null, sqft: p.sqft ?? null,
     amenities: p.amenities ? JSON.stringify(p.amenities) : null,
     purchasePrice: p.purchasePrice ?? null, purchaseDate: p.purchaseDate ?? null,
+    downPayment: p.downPayment ?? null, closingCosts: p.closingCosts ?? null,
     mortgageBalance: p.mortgageBalance ?? null, mortgageRate: p.mortgageRate ?? null,
     mortgageTermYears: p.mortgageTermYears ?? null, mortgageMonthlyPayment: p.mortgageMonthlyPayment ?? null,
     mortgageStartDate: p.mortgageStartDate ?? null,
@@ -351,6 +352,7 @@ async function migrateIfNeeded(userDataPath) {
       if (currentVersion < 6) runMigrationV6();
       if (currentVersion < 7) runMigrationV7();
       if (currentVersion < 8) runMigrationV8();
+      if (currentVersion < 9) runMigrationV9();
       setSchemaVersion(CURRENT_SCHEMA_VERSION);
     });
     migrate();
@@ -631,6 +633,15 @@ function runMigrationV8() {
   db.pragma('foreign_keys = ON');
 }
 
+function runMigrationV9() {
+  log.info('  Running migration v9: add downPayment and closingCosts to properties');
+  const addCol = (table, col, type) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch { /* already exists */ }
+  };
+  addCol('properties', 'downPayment', 'REAL');
+  addCol('properties', 'closingCosts', 'REAL');
+}
+
 // ─── File management for document attachments ─────────────────────────────────
 
 function getDocumentsDir() {
@@ -695,6 +706,7 @@ function createTables() {
       name TEXT NOT NULL, address TEXT NOT NULL, city TEXT NOT NULL, state TEXT NOT NULL, zip TEXT NOT NULL,
       propertyType TEXT, sqft INTEGER, amenities TEXT,
       purchasePrice REAL, purchaseDate TEXT,
+      downPayment REAL, closingCosts REAL,
       mortgageBalance REAL, mortgageRate REAL, mortgageTermYears INTEGER,
       mortgageMonthlyPayment REAL, mortgageStartDate TEXT,
       insuranceProvider TEXT, insurancePolicyNumber TEXT, insuranceExpiry TEXT,
@@ -810,6 +822,10 @@ function rowToProperty(row) {
     amenities: safeJsonParse(row.amenities, undefined),
     propertyType: row.propertyType || undefined,
     sqft: row.sqft != null ? row.sqft : undefined,
+    purchasePrice: row.purchasePrice != null ? row.purchasePrice : undefined,
+    purchaseDate: row.purchaseDate || undefined,
+    downPayment: row.downPayment != null ? row.downPayment : undefined,
+    closingCosts: row.closingCosts != null ? row.closingCosts : undefined,
     mortgageBalance: row.mortgageBalance != null ? row.mortgageBalance : undefined,
     mortgageRate: row.mortgageRate != null ? row.mortgageRate : undefined,
     mortgageTermYears: row.mortgageTermYears != null ? row.mortgageTermYears : undefined,

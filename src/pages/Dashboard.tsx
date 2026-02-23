@@ -347,7 +347,7 @@ export default function Dashboard() {
                     label="Cash-on-Cash"
                     value={`${investmentMetrics.cashOnCash.toFixed(1)}%`}
                     positive={investmentMetrics.cashOnCash > 0}
-                    tooltip="(NOI − Mortgage) / Purchase Price. Factors in debt service."
+                    tooltip="(NOI − Mortgage) / Total Cash Invested. Measures return on actual cash deployed."
                     id="coc"
                     tooltipId={tooltipId}
                     setTooltipId={setTooltipId}

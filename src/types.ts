@@ -21,6 +21,8 @@ export interface Property {
   amenities?: string[];
   purchasePrice?: number;
   purchaseDate?: string;
+  downPayment?: number;
+  closingCosts?: number;
   mortgageBalance?: number;
   mortgageRate?: number;
   mortgageTermYears?: number;
