@@ -502,7 +502,12 @@ export async function deleteUnit(id: string): Promise<void> {
   const units = state.units.filter((u) => u.id !== id);
   const deletedTenantIds = new Set(state.tenants.filter((t) => t.unitId === id).map((t) => t.id));
   const tenants = state.tenants.filter((t) => t.unitId !== id);
-  const payments = state.payments.filter((p) => p.unitId !== id);
+  
+  // Preserve payments by unlinking them from the deleted unit
+  const payments = state.payments.map((p) => 
+    p.unitId === id ? { ...p, unitId: undefined, updatedAt: nowISO() } : p
+  );
+
   const maintenanceRequests = state.maintenanceRequests.filter((m) => m.unitId !== id);
   const expenses = state.expenses.map((e) =>
     e.unitId === id ? { ...e, unitId: undefined, updatedAt: nowISO() } : e
@@ -537,7 +542,7 @@ export async function deleteUnit(id: string): Promise<void> {
 
   const ops: DbOperation[] = [
     { type: 'delete', table: 'units', ids: [id] },
-    // FK CASCADE handles: tenants, payments; FK SET NULL handles: expenses.unitId, maintenance_requests.unitId
+    // FK CASCADE handles: tenants; FK SET NULL handles: payments, expenses.unitId, maintenance_requests.unitId
   ];
   if (orphanedLogIds.length > 0) {
     ops.push({ type: 'delete', table: 'activityLogs', ids: orphanedLogIds });
@@ -587,11 +592,17 @@ export async function updateTenant(id: string, input: Partial<Omit<Tenant, 'id'>
 export async function deleteTenant(id: string): Promise<void> {
   const tenant = state.tenants.find((t) => t.id === id);
   const tenants = state.tenants.filter((t) => t.id !== id);
-  const payments = state.payments.filter((p) => p.tenantId !== id);
+  
+  // Preserve payments by unlinking them from the deleted tenant
+  const payments = state.payments.map((p) => 
+    p.tenantId === id ? { ...p, tenantId: undefined, updatedAt: nowISO() } : p
+  );
+  
   let units = state.units;
   const ops: DbOperation[] = [
     { type: 'delete', table: 'tenants', ids: [id] },
-    // FK CASCADE handles: payments, communication_logs; FK SET NULL handles: maintenance_requests.tenantId
+    // FK SET NULL handles: payments, maintenance_requests.tenantId
+    // FK CASCADE handles: communication_logs
   ];
   if (tenant) {
     units = state.units.map((u) =>

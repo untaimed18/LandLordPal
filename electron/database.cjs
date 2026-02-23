@@ -8,7 +8,7 @@ let db = null;
 let dbFilePath = null;
 let userDataDir = null;
 
-const CURRENT_SCHEMA_VERSION = 7;
+const CURRENT_SCHEMA_VERSION = 8;
 
 // ─── Encryption ──────────────────────────────────────────────────────────────
 
@@ -350,6 +350,7 @@ async function migrateIfNeeded(userDataPath) {
       if (currentVersion < 5) runMigrationV5();
       if (currentVersion < 6) runMigrationV6();
       if (currentVersion < 7) runMigrationV7();
+      if (currentVersion < 8) runMigrationV8();
       setSchemaVersion(CURRENT_SCHEMA_VERSION);
     });
     migrate();
@@ -607,6 +608,29 @@ function runMigrationV7() {
   addCol('tenants', 'occupants', 'TEXT');
 }
 
+function runMigrationV8() {
+  log.info('  Running migration v8: protect payments from cascade delete');
+  
+  // Recreate payments table with ON DELETE SET NULL for tenantId and unitId
+  db.pragma('foreign_keys = OFF');
+  db.exec(`
+    CREATE TABLE payments_new (
+      id TEXT PRIMARY KEY,
+      tenantId TEXT REFERENCES tenants(id) ON DELETE SET NULL,
+      unitId TEXT REFERENCES units(id) ON DELETE SET NULL,
+      propertyId TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+      amount REAL NOT NULL DEFAULT 0, date TEXT NOT NULL,
+      periodStart TEXT NOT NULL, periodEnd TEXT NOT NULL,
+      method TEXT, category TEXT, notes TEXT, lateFee REAL,
+      createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
+    );
+    INSERT INTO payments_new SELECT * FROM payments;
+    DROP TABLE payments;
+    ALTER TABLE payments_new RENAME TO payments;
+  `);
+  db.pragma('foreign_keys = ON');
+}
+
 // ─── File management for document attachments ─────────────────────────────────
 
 function getDocumentsDir() {
@@ -715,8 +739,8 @@ function createTables() {
     );
     CREATE TABLE IF NOT EXISTS payments (
       id TEXT PRIMARY KEY,
-      tenantId TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-      unitId TEXT NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+      tenantId TEXT REFERENCES tenants(id) ON DELETE SET NULL,
+      unitId TEXT REFERENCES units(id) ON DELETE SET NULL,
       propertyId TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
       amount REAL NOT NULL DEFAULT 0, date TEXT NOT NULL,
       periodStart TEXT NOT NULL, periodEnd TEXT NOT NULL,
