@@ -148,6 +148,11 @@ async function setupDatabase() {
       const data = loadAll();
       const counts = Object.entries(data).map(([k, v]) => `${k}: ${v.length}`).join(', ');
       log.info('Database loaded —', counts);
+      
+      // DEBUG: Log IDs to debug FK issues
+      if (data.properties.length > 0) log.info('Loaded Property IDs:', data.properties.map(p => p.id).join(', '));
+      if (data.units.length > 0) log.info('Loaded Unit IDs:', data.units.map(u => `${u.id} (prop: ${u.propertyId})`).join(', '));
+      
       return data;
     } catch (err) {
       log.error('db:load failed:', err.message);
@@ -172,6 +177,8 @@ async function setupDatabase() {
 
   ipcMain.handle('db:batch', (_event, operations) => {
     try {
+      // DEBUG: Log operations to debug FK issues
+      log.info('db:batch operations:', JSON.stringify(operations, null, 2));
       executeBatch(operations);
       return { success: true };
     } catch (err) {

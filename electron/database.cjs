@@ -210,9 +210,18 @@ function prepareStatements() {
   for (const [sqlTable, columns] of Object.entries(TABLE_COLUMNS)) {
     const cols = columns.join(', ');
     const params = columns.map((c) => `@${c}`).join(', ');
+    
+    // Use ON CONFLICT DO UPDATE to avoid DELETE CASCADE side effects
+    const updateSet = columns
+      .filter(c => c !== 'id') // Don't update ID
+      .map(c => `${c}=excluded.${c}`)
+      .join(', ');
+
     _stmts[`upsert_${sqlTable}`] = db.prepare(
-      `INSERT OR REPLACE INTO ${sqlTable} (${cols}) VALUES (${params})`
+      `INSERT INTO ${sqlTable} (${cols}) VALUES (${params}) 
+       ON CONFLICT(id) DO UPDATE SET ${updateSet}`
     );
+
     _stmts[`delete_${sqlTable}`] = db.prepare(
       `DELETE FROM ${sqlTable} WHERE id = @id`
     );
