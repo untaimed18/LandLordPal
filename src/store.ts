@@ -87,10 +87,13 @@ function requireElectronAPI(): ElectronAPI {
       docPickFile: async () => null,
       docDeleteFile: async () => true,
       docOpenFile: async () => true,
+      photoPick: async () => null,
+      photoDelete: async () => true,
+      photoGetPath: async () => null,
       onUpdateStatus: () => {},
       checkForUpdates: async () => {},
       startDownload: async () => {},
-      quitAndInstall: async () => {},
+      installUpdate: async () => {},
       getEncryptionKeyError: async () => null,
     } as unknown as ElectronAPI;
   }

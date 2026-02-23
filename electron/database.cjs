@@ -8,7 +8,7 @@ let db = null;
 let dbFilePath = null;
 let userDataDir = null;
 
-const CURRENT_SCHEMA_VERSION = 9;
+const CURRENT_SCHEMA_VERSION = 10;
 
 // ─── Encryption ──────────────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ const TABLE_COLUMNS = {
   tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositStatus', 'depositPaidDate', 'depositPaidAmount', 'depositReturned', 'depositDeductions', 'requireFirstMonth', 'requireLastMonth', 'lastMonthPaid', 'moveInCostNotes', 'gracePeriodDays', 'lateFeeAmount', 'autopay', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'occupants', 'screeningStatus', 'screeningNotes', 'inspections', 'rentHistory', 'leaseHistory', 'createdAt', 'updatedAt'],
   expenses: ['id', 'propertyId', 'unitId', 'category', 'amount', 'date', 'description', 'recurring', 'vendorId', 'createdAt', 'updatedAt'],
   payments: ['id', 'tenantId', 'unitId', 'propertyId', 'amount', 'date', 'periodStart', 'periodEnd', 'method', 'category', 'notes', 'lateFee', 'createdAt', 'updatedAt'],
-  maintenance_requests: ['id', 'propertyId', 'unitId', 'tenantId', 'title', 'description', 'priority', 'status', 'category', 'vendorId', 'cost', 'scheduledDate', 'recurrence', 'resolvedAt', 'notes', 'createdAt', 'updatedAt'],
+  maintenance_requests: ['id', 'propertyId', 'unitId', 'tenantId', 'title', 'description', 'priority', 'status', 'category', 'vendorId', 'cost', 'actualCost', 'scheduledDate', 'recurrence', 'resolvedAt', 'assignedAt', 'statusHistory', 'photos', 'notes', 'createdAt', 'updatedAt'],
   activity_logs: ['id', 'entityType', 'entityId', 'note', 'date', 'createdAt'],
   vendors: ['id', 'name', 'phone', 'email', 'specialty', 'notes', 'createdAt', 'updatedAt'],
   communication_logs: ['id', 'tenantId', 'propertyId', 'type', 'date', 'subject', 'notes', 'createdAt'],
@@ -172,9 +172,12 @@ const serializers = {
     id: m.id, propertyId: m.propertyId, unitId: m.unitId ?? null,
     tenantId: m.tenantId ?? null, title: m.title, description: m.description,
     priority: m.priority, status: m.status, category: m.category,
-    vendorId: m.vendorId ?? null, cost: m.cost ?? null,
+    vendorId: m.vendorId ?? null, cost: m.cost ?? null, actualCost: m.actualCost ?? null,
     scheduledDate: m.scheduledDate ?? null, recurrence: m.recurrence ?? null,
-    resolvedAt: m.resolvedAt ?? null, notes: m.notes ?? null,
+    resolvedAt: m.resolvedAt ?? null, assignedAt: m.assignedAt ?? null,
+    statusHistory: m.statusHistory ? JSON.stringify(m.statusHistory) : null,
+    photos: m.photos ? JSON.stringify(m.photos) : null,
+    notes: m.notes ?? null,
     createdAt: m.createdAt, updatedAt: m.updatedAt,
   }),
   activity_logs: (a) => ({
@@ -353,6 +356,7 @@ async function migrateIfNeeded(userDataPath) {
       if (currentVersion < 7) runMigrationV7();
       if (currentVersion < 8) runMigrationV8();
       if (currentVersion < 9) runMigrationV9();
+      if (currentVersion < 10) runMigrationV10();
       setSchemaVersion(CURRENT_SCHEMA_VERSION);
     });
     migrate();
@@ -642,6 +646,17 @@ function runMigrationV9() {
   addCol('properties', 'closingCosts', 'REAL');
 }
 
+function runMigrationV10() {
+  log.info('  Running migration v10: maintenance timeline, photos, actualCost, assignedAt');
+  const addCol = (table, col, type) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch { /* already exists */ }
+  };
+  addCol('maintenance_requests', 'actualCost', 'REAL');
+  addCol('maintenance_requests', 'assignedAt', 'TEXT');
+  addCol('maintenance_requests', 'statusHistory', 'TEXT');
+  addCol('maintenance_requests', 'photos', 'TEXT');
+}
+
 // ─── File management for document attachments ─────────────────────────────────
 
 function getDocumentsDir() {
@@ -687,6 +702,46 @@ function deleteDocumentFile(filename) {
   } catch (err) {
     log.warn('Failed to delete document file:', err.message);
   }
+}
+
+// ─── Photo management for maintenance requests ────────────────────────────────
+
+function getPhotosDir() {
+  const dir = path.join(userDataDir, 'photos');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function copyFileToPhotos(sourcePath) {
+  const ext = path.extname(sourcePath);
+  const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
+  const destPath = path.join(getPhotosDir(), filename);
+  fs.copyFileSync(sourcePath, destPath);
+  const stats = fs.statSync(destPath);
+  return { filename, size: stats.size };
+}
+
+function deletePhotoFile(filename) {
+  if (!isSafeFilename(filename)) {
+    log.warn('Rejected unsafe photo filename:', filename);
+    return;
+  }
+  const photosDir = getPhotosDir();
+  const filePath = path.join(photosDir, filename);
+  if (!filePath.startsWith(photosDir)) {
+    log.warn('Path traversal detected in photo:', filename);
+    return;
+  }
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (err) {
+    log.warn('Failed to delete photo file:', err.message);
+  }
+}
+
+function getPhotoPath(filename) {
+  if (!isSafeFilename(filename)) return null;
+  return path.join(getPhotosDir(), filename);
 }
 
 function getDocumentPath(filename) {
@@ -768,7 +823,8 @@ function createTables() {
       priority TEXT NOT NULL DEFAULT 'medium', status TEXT NOT NULL DEFAULT 'open',
       category TEXT NOT NULL DEFAULT 'other',
       vendorId TEXT REFERENCES vendors(id) ON DELETE SET NULL,
-      cost REAL, scheduledDate TEXT, recurrence TEXT, resolvedAt TEXT, notes TEXT,
+      cost REAL, actualCost REAL, scheduledDate TEXT, recurrence TEXT,
+      resolvedAt TEXT, assignedAt TEXT, statusHistory TEXT, photos TEXT, notes TEXT,
       createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS activity_logs (
@@ -891,9 +947,13 @@ function rowToMaintenanceRequest(row) {
     tenantId: row.tenantId || undefined,
     vendorId: row.vendorId || undefined,
     cost: row.cost != null ? row.cost : undefined,
+    actualCost: row.actualCost != null ? row.actualCost : undefined,
     scheduledDate: row.scheduledDate || undefined,
     recurrence: row.recurrence || undefined,
     resolvedAt: row.resolvedAt || undefined,
+    assignedAt: row.assignedAt || undefined,
+    statusHistory: safeJsonParse(row.statusHistory, undefined),
+    photos: safeJsonParse(row.photos, undefined),
     notes: row.notes || undefined,
   };
 }
@@ -1088,4 +1148,4 @@ async function backupDatabase(targetPath) {
   }
 }
 
-module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, getEncryptionKeyError };
+module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, copyFileToPhotos, deletePhotoFile, getPhotoPath, getEncryptionKeyError };

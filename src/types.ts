@@ -180,6 +180,20 @@ export type MaintenanceCategory = 'plumbing' | 'electrical' | 'hvac' | 'applianc
 
 export type MaintenanceRecurrence = 'none' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
 
+export interface MaintenanceStatusChange {
+  status: MaintenanceStatus;
+  date: string;
+  note?: string;
+}
+
+export interface MaintenancePhoto {
+  id: string;
+  filename: string;
+  caption?: string;
+  date: string;
+  label?: 'before' | 'after';
+}
+
 export interface MaintenanceRequest {
   id: Id;
   propertyId: Id;
@@ -192,9 +206,13 @@ export interface MaintenanceRequest {
   category: MaintenanceCategory;
   vendorId?: Id;
   cost?: number;
+  actualCost?: number;
   scheduledDate?: string;
   recurrence?: MaintenanceRecurrence;
   resolvedAt?: string;
+  assignedAt?: string;
+  statusHistory?: MaintenanceStatusChange[];
+  photos?: MaintenancePhoto[];
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -241,7 +259,7 @@ export interface Vendor {
 // Document attachment
 export interface Document {
   id: Id;
-  entityType: 'property' | 'unit' | 'tenant' | 'expense' | 'vendor';
+  entityType: 'property' | 'unit' | 'tenant' | 'expense' | 'vendor' | 'maintenance';
   entityId: Id;
   filename: string;
   originalName: string;

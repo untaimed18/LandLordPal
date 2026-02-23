@@ -48,6 +48,10 @@ interface ElectronAPI {
   docPickFile: () => Promise<{ filename: string; originalName: string; size: number; mimeType: string } | null>;
   docDeleteFile: (filename: string) => Promise<boolean>;
   docOpenFile: (filename: string) => Promise<boolean>;
+  // Photos
+  photoPick: () => Promise<{ filename: string; size: number } | null>;
+  photoDelete: (filename: string) => Promise<boolean>;
+  photoGetPath: (filename: string) => Promise<string | null>;
   // Security
   getEncryptionKeyError: () => Promise<string | null>;
   // Auto-update

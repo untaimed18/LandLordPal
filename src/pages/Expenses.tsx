@@ -50,7 +50,7 @@ const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
 export default function Expenses() {
   const toast = useToast()
   const confirm = useConfirm()
-  const { properties, units, expenses } = useStore()
+  const { properties, units, expenses, vendors } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -316,6 +316,7 @@ export default function Expenses() {
                 <th className="sortable" onClick={() => toggleSort('property')}>Property{sortIndicator('property')}</th>
                 <th className="sortable" onClick={() => toggleSort('category')}>Category{sortIndicator('category')}</th>
                 <th className="sortable" onClick={() => toggleSort('description')}>Description{sortIndicator('description')}</th>
+                <th>Vendor</th>
                 <th className="sortable" onClick={() => toggleSort('amount')}>Amount{sortIndicator('amount')}</th>
                 <th></th>
               </tr>
@@ -330,6 +331,7 @@ export default function Expenses() {
                   </td>
                   <td>{CATEGORIES.find((c) => c.value === e.category)?.label ?? e.category}</td>
                   <td>{e.description}</td>
+                  <td>{e.vendorId ? (() => { const v = vendors.find((vn) => vn.id === e.vendorId); return v ? <Link to={`/vendors/${v.id}`} className="tenant-link">{v.name}</Link> : '—' })() : <span className="muted">—</span>}</td>
                   <td className="negative">{formatMoney(e.amount)}</td>
                   <td className="actions-cell">
                     <button type="button" className="btn small" onClick={() => openEdit(e)}>Edit</button>

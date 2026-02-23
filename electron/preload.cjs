@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   docDeleteFile: (filename) => ipcRenderer.invoke('doc:delete-file', filename),
   docOpenFile: (filename) => ipcRenderer.invoke('doc:open-file', filename),
 
+  // Photos
+  photoPick: () => ipcRenderer.invoke('photo:pick'),
+  photoDelete: (filename) => ipcRenderer.invoke('photo:delete', filename),
+  photoGetPath: (filename) => ipcRenderer.invoke('photo:get-path', filename),
+
   // Security
   getEncryptionKeyError: () => ipcRenderer.invoke('encryption-key-error'),
 

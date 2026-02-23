@@ -9,8 +9,10 @@ import PropertyDetail from './pages/PropertyDetail'
 import RentIncome from './pages/RentIncome'
 import Expenses from './pages/Expenses'
 import Maintenance from './pages/Maintenance'
+import MaintenanceDetail from './pages/MaintenanceDetail'
 import Reports from './pages/Reports'
 import Vendors from './pages/Vendors'
+import VendorDetail from './pages/VendorDetail'
 import Settings from './pages/Settings'
 import Calendar from './pages/Calendar'
 import TenantDetail from './pages/TenantDetail'
@@ -30,8 +32,10 @@ export default function App() {
             <Route path="/rent" element={<RentIncome />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/maintenance" element={<Maintenance />} />
+            <Route path="/maintenance/:id" element={<MaintenanceDetail />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/vendors" element={<Vendors />} />
+            <Route path="/vendors/:id" element={<VendorDetail />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="*" element={<NotFound />} />

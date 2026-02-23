@@ -119,8 +119,9 @@ export default function Dashboard() {
     return notPaidThisMonth.filter((r) => r.tenant.email)
   }, [notPaidThisMonth, now, settings.rentReminderDays])
 
+  const activeTenants = ft.filter((t) => !t.moveOutDate)
   const vacancyCost = fu
-    .filter((u) => !ft.some((t) => t.unitId === u.id))
+    .filter((u) => !activeTenants.some((t) => t.unitId === u.id))
     .reduce((sum, u) => sum + u.monthlyRent, 0)
 
   const collectionRate = stats.expectedMonthlyRent > 0
@@ -137,7 +138,7 @@ export default function Dashboard() {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(currentYear, currentMonth - i, 1)
       const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      const income = fPay.filter((p) => p.date.startsWith(prefix)).reduce((s, p) => s + p.amount, 0)
+      const income = fPay.filter((p) => p.date.startsWith(prefix) && (!p.category || p.category === 'rent' || p.category === 'fee')).reduce((s, p) => s + p.amount, 0)
       const exp = fe.filter((e) => e.date.startsWith(prefix)).reduce((s, e) => s + e.amount, 0)
       months.push({ label: monthNames[d.getMonth()], income, expenses: exp })
     }
@@ -416,7 +417,8 @@ export default function Dashboard() {
 
           {(forecast.projectedMonthlyIncome > 0 || forecast.projectedMonthlyExpenses > 0) && (
             <section className="card section-card dash-forecast-section" style={{ marginBottom: '1.5rem' }}>
-              <h2 style={{ marginBottom: '1rem' }}><Activity size={18} aria-hidden="true" style={{ marginRight: 6, verticalAlign: '-3px' }} />Forecast</h2>
+              <h2 style={{ marginBottom: '0.25rem' }}><Activity size={18} aria-hidden="true" style={{ marginRight: 6, verticalAlign: '-3px' }} />Forecast</h2>
+              <p className="muted" style={{ fontSize: '0.8rem', marginBottom: '1rem' }}>Based on your last 6 months of income and expenses</p>
               <div className="metrics-grid">
                 <div className="metric-card">
                   <span className="metric-label">Projected Income</span>
@@ -432,13 +434,19 @@ export default function Dashboard() {
                     {formatMoney(forecast.projectedMonthlyNOI)}<small>/mo</small>
                   </span>
                 </div>
+                <div className="metric-card">
+                  <span className="metric-label">Projected Annual NOI</span>
+                  <span className={`metric-value ${forecast.projectedAnnualNOI >= 0 ? 'positive' : 'negative'}`}>
+                    {formatMoney(forecast.projectedAnnualNOI)}<small>/yr</small>
+                  </span>
+                </div>
                 {forecast.actualVsProjectedIncome != null && (
                   <div className="metric-card">
-                    <span className="metric-label">Actual vs Projected</span>
+                    <span className="metric-label">{monthNames[now.getMonth()]} Collection Pace</span>
                     <span className={`metric-value ${forecast.actualVsProjectedIncome >= 0 ? 'positive' : 'negative'}`}>
                       {forecast.actualVsProjectedIncome >= 0 ? '+' : ''}{forecast.actualVsProjectedIncome.toFixed(1)}%
                     </span>
-                    <span className="metric-sub">Income this month</span>
+                    <span className="metric-sub">vs. 6-month average</span>
                   </div>
                 )}
               </div>
@@ -511,7 +519,7 @@ export default function Dashboard() {
               const prop = properties.find((p) => p.id === m.propertyId)
               const daysUntil = Math.ceil((new Date(m.scheduledDate! + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
               return (
-                <Link key={`sched-${m.id}`} to="/maintenance" className="dash-notif dash-notif-info">
+                <Link key={`sched-${m.id}`} to={`/maintenance/${m.id}`} className="dash-notif dash-notif-info">
                   <Clock size={16} className="dash-notif-icon" aria-hidden="true" />
                   <div className="dash-notif-body">
                     <strong>{m.title}</strong>
@@ -639,7 +647,7 @@ export default function Dashboard() {
             {openMaintenance.slice(0, 5).map((r) => {
               const prop = properties.find((p) => p.id === r.propertyId)
               return (
-                <Link key={r.id} to="/maintenance" className="dash-list-item">
+                <Link key={r.id} to={`/maintenance/${r.id}`} className="dash-list-item">
                   <span className={`badge priority-${r.priority}`}>{r.priority}</span>
                   <div className="dash-list-body">
                     <strong>{r.title}</strong>

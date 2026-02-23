@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
-const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, getEncryptionKeyError } = require('./database.cjs');
+const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, copyFileToPhotos, deletePhotoFile, getPhotoPath, getEncryptionKeyError } = require('./database.cjs');
 const fs = require('fs');
 const { dialog, shell } = require('electron');
 const log = require('./logger.cjs');
@@ -265,6 +265,34 @@ async function setupDatabase() {
     if (!filePath) return false;
     shell.openPath(filePath);
     return true;
+  });
+
+  // Photo attachments for maintenance
+  ipcMain.handle('photo:pick', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const sourcePath = result.filePaths[0];
+    try {
+      const { filename, size } = copyFileToPhotos(sourcePath);
+      return { filename, size };
+    } catch (err) {
+      log.error('photo:pick failed:', err.message);
+      return null;
+    }
+  });
+
+  ipcMain.handle('photo:delete', (_event, filename) => {
+    deletePhotoFile(filename);
+    return true;
+  });
+
+  ipcMain.handle('photo:get-path', (_event, filename) => {
+    return getPhotoPath(filename);
   });
 }
 

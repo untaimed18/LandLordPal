@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { addVendor, updateVendor, deleteVendor, takeSnapshot, restoreSnapshot } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatPhoneNumber, formatMoney } from '../lib/format'
+import { getVendorPerformance } from '../lib/calculations'
+import type { VendorGrade } from '../lib/calculations'
 import { vendorSchema, extractErrors } from '../lib/schemas'
 import type { ValidationErrors } from '../lib/schemas'
 import { Phone, Mail, Users } from 'lucide-react'
@@ -23,6 +26,14 @@ const SPECIALTIES = [
   'Locksmith',
   'Other',
 ]
+
+const GRADE_COLORS: Record<VendorGrade, string> = {
+  A: 'var(--positive)',
+  B: '#4CAF50',
+  C: '#FFC107',
+  D: '#FF9800',
+  F: 'var(--negative)',
+}
 
 const emptyForm = { name: '', phone: '', email: '', specialty: '', notes: '' }
 
@@ -131,26 +142,36 @@ export default function Vendors() {
       ) : (
         <div className="vendor-grid">
           {vendors.map((v) => {
-            const jobCount = maintenanceRequests.filter((r) => r.vendorId === v.id).length
-            const expenseTotal = expenses.filter((e) => e.vendorId === v.id).reduce((s, e) => s + e.amount, 0)
+            const perf = getVendorPerformance(v.id, maintenanceRequests, expenses)
             return (
               <div key={v.id} className="vendor-card card">
-                <div className="vendor-card-header">
-                  <h3>{v.name}</h3>
-                  {v.specialty && <span className="badge">{v.specialty}</span>}
-                </div>
-                <div className="vendor-contact">
-                  {v.phone && <span><Phone size={13} style={{ verticalAlign: 'text-bottom', marginRight: 3 }} />{v.phone}</span>}
-                  {v.email && <span><Mail size={13} style={{ verticalAlign: 'text-bottom', marginRight: 3 }} />{v.email}</span>}
-                </div>
-                {v.notes && <p className="muted vendor-notes">{v.notes}</p>}
-                <div className="vendor-stats muted">
-                  {jobCount > 0 && <span>{jobCount} maintenance job{jobCount !== 1 ? 's' : ''}</span>}
-                  {expenseTotal > 0 && <span>Total spent: {formatMoney(expenseTotal)}</span>}
-                </div>
+                <Link to={`/vendors/${v.id}`} className="vendor-card-link">
+                  <div className="vendor-card-header">
+                    <h3>{v.name}</h3>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {v.specialty && <span className="badge">{v.specialty}</span>}
+                      {perf.totalJobs > 0 && (
+                        <span className="reliability-badge" style={{ borderColor: GRADE_COLORS[perf.grade] }} title={`${perf.score}/100 — ${perf.label}`}>
+                          <span className="reliability-grade" style={{ color: GRADE_COLORS[perf.grade] }}>{perf.grade}</span>
+                          <span className="reliability-label">{perf.score}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="vendor-contact">
+                    {v.phone && <span><Phone size={13} style={{ verticalAlign: 'text-bottom', marginRight: 3 }} />{v.phone}</span>}
+                    {v.email && <span><Mail size={13} style={{ verticalAlign: 'text-bottom', marginRight: 3 }} />{v.email}</span>}
+                  </div>
+                  {v.notes && <p className="muted vendor-notes">{v.notes}</p>}
+                  <div className="vendor-stats muted">
+                    {perf.totalJobs > 0 && <span>{perf.totalJobs} job{perf.totalJobs !== 1 ? 's' : ''} ({perf.completedJobs} done)</span>}
+                    {perf.totalSpent > 0 && <span>Total spent: {formatMoney(perf.totalSpent)}</span>}
+                    {perf.avgCompletionDays != null && <span>Avg {perf.avgCompletionDays}d to complete</span>}
+                  </div>
+                </Link>
                 <div className="vendor-actions">
-                  <button type="button" className="btn small" onClick={() => openEdit(v)}>Edit</button>
-                  <button type="button" className="btn small danger" onClick={() => handleDelete(v.id, v.name)}>Delete</button>
+                  <button type="button" className="btn small" onClick={(e) => { e.preventDefault(); openEdit(v) }}>Edit</button>
+                  <button type="button" className="btn small danger" onClick={(e) => { e.preventDefault(); handleDelete(v.id, v.name) }}>Delete</button>
                 </div>
               </div>
             )

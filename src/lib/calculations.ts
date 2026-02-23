@@ -4,6 +4,7 @@ import type {
   Tenant,
   Expense,
   Payment,
+  MaintenanceRequest,
   DashboardStats,
   PropertySummary,
 } from '../types';
@@ -723,4 +724,84 @@ export function getMaintenanceCostTrends(
     trends.push({ period: prefix, total, byCategory })
   }
   return trends
+}
+
+// ─── Vendor Performance ──────────────────────────────────────────────────────
+
+export type VendorGrade = 'A' | 'B' | 'C' | 'D' | 'F';
+
+export interface VendorPerformance {
+  totalJobs: number;
+  completedJobs: number;
+  openJobs: number;
+  inProgressJobs: number;
+  completionRate: number;
+  avgResponseDays: number | null;
+  avgCompletionDays: number | null;
+  totalSpent: number;
+  avgCostPerJob: number | null;
+  score: number;
+  grade: VendorGrade;
+  label: string;
+}
+
+export function getVendorPerformance(
+  vendorId: string,
+  maintenanceRequests: MaintenanceRequest[],
+  expenses: Expense[],
+): VendorPerformance {
+  const jobs = maintenanceRequests.filter((r) => r.vendorId === vendorId)
+  const totalJobs = jobs.length
+  const completedJobs = jobs.filter((j) => j.status === 'completed').length
+  const openJobs = jobs.filter((j) => j.status === 'open').length
+  const inProgressJobs = jobs.filter((j) => j.status === 'in_progress').length
+  const completionRate = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0
+
+  const daysBetween = (a: string, b: string) => {
+    const d1 = new Date(a)
+    const d2 = new Date(b)
+    return Math.max(0, Math.ceil((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)))
+  }
+
+  const responseTimes = jobs
+    .filter((j) => j.assignedAt && j.createdAt)
+    .map((j) => daysBetween(j.createdAt, j.assignedAt!))
+  const avgResponseDays = responseTimes.length > 0
+    ? Math.round(responseTimes.reduce((s, d) => s + d, 0) / responseTimes.length)
+    : null
+
+  const completionTimes = jobs
+    .filter((j) => j.status === 'completed' && j.resolvedAt && (j.assignedAt || j.createdAt))
+    .map((j) => daysBetween(j.assignedAt || j.createdAt, j.resolvedAt!))
+  const avgCompletionDays = completionTimes.length > 0
+    ? Math.round(completionTimes.reduce((s, d) => s + d, 0) / completionTimes.length)
+    : null
+
+  const totalSpent = expenses
+    .filter((e) => e.vendorId === vendorId)
+    .reduce((s, e) => s + e.amount, 0)
+  const avgCostPerJob = completedJobs > 0 ? Math.round(totalSpent / completedJobs) : null
+
+  let score = 50
+  if (totalJobs > 0) {
+    score += (completionRate / 100) * 30
+    if (avgCompletionDays !== null) {
+      if (avgCompletionDays <= 3) score += 20
+      else if (avgCompletionDays <= 7) score += 15
+      else if (avgCompletionDays <= 14) score += 10
+      else if (avgCompletionDays <= 30) score += 5
+    }
+  }
+  score = Math.round(Math.min(100, Math.max(0, score)))
+
+  let grade: VendorGrade = 'F'
+  let label = 'No Data'
+  if (totalJobs === 0) { grade = 'C'; label = 'New'; score = 50 }
+  else if (score >= 90) { grade = 'A'; label = 'Excellent' }
+  else if (score >= 75) { grade = 'B'; label = 'Good' }
+  else if (score >= 60) { grade = 'C'; label = 'Average' }
+  else if (score >= 40) { grade = 'D'; label = 'Below Average' }
+  else { grade = 'F'; label = 'Poor' }
+
+  return { totalJobs, completedJobs, openJobs, inProgressJobs, completionRate, avgResponseDays, avgCompletionDays, totalSpent, avgCostPerJob, score, grade, label }
 }

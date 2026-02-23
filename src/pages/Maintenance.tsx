@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { addMaintenanceRequest, updateMaintenanceRequest, deleteMaintenanceRequest, takeSnapshot, restoreSnapshot } from '../store'
@@ -44,10 +44,21 @@ const RECURRENCES: { value: MaintenanceRecurrence; label: string }[] = [
   { value: 'annual', label: 'Annually' },
 ]
 
+const CATEGORY_SPECIALTY_MAP: Record<string, string[]> = {
+  plumbing: ['Plumbing'],
+  electrical: ['Electrical'],
+  hvac: ['HVAC'],
+  appliance: ['Appliance Repair', 'General Handyman'],
+  structural: ['General Handyman', 'Roofing'],
+  pest: ['Pest Control'],
+  other: ['General Handyman'],
+}
+
 const emptyForm = {
   propertyId: '',
   unitId: '',
   tenantId: '',
+  vendorId: '',
   title: '',
   description: '',
   priority: 'medium' as MaintenancePriority,
@@ -61,16 +72,19 @@ const emptyForm = {
 export default function Maintenance() {
   const toast = useToast()
   const confirm = useConfirm()
-  const { properties, units, tenants, maintenanceRequests } = useStore()
+  const { properties, units, tenants, maintenanceRequests, vendors } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('open,in_progress')
   const [filterProperty, setFilterProperty] = useState('')
+  const [filterVendor, setFilterVendor] = useState('')
   const [form, setForm] = useState(emptyForm)
 
   const filtered = maintenanceRequests.filter((r) => {
     if (filterStatus && !filterStatus.split(',').includes(r.status)) return false
     if (filterProperty && r.propertyId !== filterProperty) return false
+    if (filterVendor === '__unassigned__' && r.vendorId) return false
+    if (filterVendor && filterVendor !== '__unassigned__' && r.vendorId !== filterVendor) return false
     return true
   }).sort((a, b) => {
     const pOrder = { emergency: 0, high: 1, medium: 2, low: 3 }
@@ -86,7 +100,12 @@ export default function Maintenance() {
   const inProgressCount = maintenanceRequests.filter((r) => r.status === 'in_progress').length
 
   const propUnits = form.propertyId ? units.filter((u) => u.propertyId === form.propertyId) : []
-  const propTenants = form.propertyId ? tenants.filter((t) => t.propertyId === form.propertyId) : []
+  const propTenants = form.propertyId ? tenants.filter((t) => t.propertyId === form.propertyId && !t.moveOutDate) : []
+
+  const suggestedVendors = useMemo(() => {
+    const specialties = CATEGORY_SPECIALTY_MAP[form.category] ?? []
+    return vendors.filter((v) => v.specialty && specialties.includes(v.specialty))
+  }, [form.category, vendors])
 
   function openEdit(req: (typeof maintenanceRequests)[0]) {
     setEditingId(req.id)
@@ -94,6 +113,7 @@ export default function Maintenance() {
       propertyId: req.propertyId,
       unitId: req.unitId ?? '',
       tenantId: req.tenantId ?? '',
+      vendorId: req.vendorId ?? '',
       title: req.title,
       description: req.description,
       priority: req.priority,
@@ -111,19 +131,26 @@ export default function Maintenance() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.propertyId) return
+
+    const existing = editingId ? maintenanceRequests.find((r) => r.id === editingId) : null
+    const vendorChanged = existing && form.vendorId !== (existing.vendorId ?? '')
+
     const payload = {
       propertyId: form.propertyId,
       unitId: form.unitId || undefined,
       tenantId: form.tenantId || undefined,
+      vendorId: form.vendorId || undefined,
       title: form.title,
       description: form.description,
       priority: form.priority,
-      status: editingId ? (maintenanceRequests.find((r) => r.id === editingId)?.status ?? 'open') : 'open',
+      status: editingId ? (existing?.status ?? 'open') : 'open',
       category: form.category,
       cost: form.cost || undefined,
       scheduledDate: form.scheduledDate || undefined,
       recurrence: form.recurrence !== 'none' ? form.recurrence : undefined,
       notes: form.notes || undefined,
+      ...(vendorChanged && form.vendorId ? { assignedAt: nowISO() } : {}),
+      ...(!editingId && form.vendorId ? { assignedAt: nowISO() } : {}),
     }
     if (!validateMaintenance(payload)) return
     try {
@@ -132,7 +159,8 @@ export default function Maintenance() {
         setEditingId(null)
         toast('Request updated')
       } else {
-        await addMaintenanceRequest(payload)
+        const statusEntry = { status: 'open' as const, date: nowISO() }
+        await addMaintenanceRequest({ ...payload, statusHistory: [statusEntry] })
         toast('Request created')
       }
       setForm(emptyForm)
@@ -144,8 +172,12 @@ export default function Maintenance() {
 
   async function handleStatusChange(id: string, status: MaintenanceStatus) {
     const request = maintenanceRequests.find(r => r.id === id)
+    const history = [...(request?.statusHistory ?? [])]
+    history.push({ status, date: nowISO() })
+
     await updateMaintenanceRequest(id, {
       status,
+      statusHistory: history,
       resolvedAt: status === 'completed' ? nowISO() : undefined,
     })
     toast(`Marked as ${STATUSES.find((s) => s.value === status)?.label}`)
@@ -173,6 +205,7 @@ export default function Maintenance() {
         scheduledDate: nextDate,
         recurrence: request.recurrence,
         notes: request.notes,
+        statusHistory: [{ status: 'open', date: nowISO() }],
       })
       toast(`Next ${request.recurrence} occurrence scheduled for ${nextDate}`, 'info')
     }
@@ -236,6 +269,25 @@ export default function Maintenance() {
             <label>Category * <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as MaintenanceCategory }))}>
               {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select></label>
+            <label>
+              Assign vendor
+              {suggestedVendors.length > 0 && !form.vendorId && <span className="field-hint" style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}>suggested below</span>}
+              <select value={form.vendorId} onChange={(e) => setForm((f) => ({ ...f, vendorId: e.target.value }))}>
+                <option value="">Unassigned</option>
+                {suggestedVendors.length > 0 && (
+                  <optgroup label="Suggested">
+                    {suggestedVendors.map((v) => <option key={v.id} value={v.id}>{v.name} — {v.specialty}</option>)}
+                  </optgroup>
+                )}
+                {vendors.filter((v) => !suggestedVendors.some((s) => s.id === v.id)).length > 0 && (
+                  <optgroup label={suggestedVendors.length > 0 ? 'Other' : 'All vendors'}>
+                    {vendors.filter((v) => !suggestedVendors.some((s) => s.id === v.id)).map((v) => (
+                      <option key={v.id} value={v.id}>{v.name}{v.specialty ? ` — ${v.specialty}` : ''}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </label>
             <label>Est. cost <input type="number" min={0} step={0.01} value={form.cost || ''} onChange={(e) => setForm((f) => ({ ...f, cost: +e.target.value }))} /></label>
             <label>Scheduled date <input type="date" value={form.scheduledDate} onChange={(e) => setForm((f) => ({ ...f, scheduledDate: e.target.value }))} /></label>
             <label>Recurrence <select value={form.recurrence} onChange={(e) => setForm((f) => ({ ...f, recurrence: e.target.value as MaintenanceRecurrence }))}>
@@ -270,6 +322,14 @@ export default function Maintenance() {
               {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </label>
+          <label>
+            <span className="label-text">Vendor</span>
+            <select className="select-inline" value={filterVendor} onChange={(e) => setFilterVendor(e.target.value)}>
+              <option value="">All vendors</option>
+              <option value="__unassigned__">Unassigned</option>
+              {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          </label>
         </div>
       )}
 
@@ -277,8 +337,8 @@ export default function Maintenance() {
         <div className="empty-state-card card" style={{ maxWidth: 480, margin: '2rem auto' }}>
           <div className="empty-icon"><Wrench size={32} /></div>
           <p className="empty-state-title">No matching requests</p>
-          <p className="empty-state-text">Try adjusting your status or property filters to see more results.</p>
-          <button type="button" className="btn" onClick={() => { setFilterStatus(''); setFilterProperty('') }}>Clear all filters</button>
+          <p className="empty-state-text">Try adjusting your filters to see more results.</p>
+          <button type="button" className="btn" onClick={() => { setFilterStatus(''); setFilterProperty(''); setFilterVendor('') }}>Clear all filters</button>
         </div>
       )}
 
@@ -295,18 +355,20 @@ export default function Maintenance() {
         <div className="table-wrap">
           <table className="data-table">
             <thead>
-              <tr><th>Title</th><th>Property / Unit</th><th>Priority</th><th>Category</th><th>Status</th><th>Cost</th><th>Scheduled</th><th>Created</th><th></th></tr>
+              <tr><th>Title</th><th>Property / Unit</th><th>Priority</th><th>Category</th><th>Vendor</th><th>Status</th><th>Cost</th><th>Scheduled</th><th>Created</th><th></th></tr>
             </thead>
             <tbody>
               {pagination.paged.map((r) => {
                 const prop = properties.find((p) => p.id === r.propertyId)
                 const unit = r.unitId ? units.find((u) => u.id === r.unitId) : null
+                const vendor = r.vendorId ? vendors.find((v) => v.id === r.vendorId) : null
                 return (
                   <tr key={r.id}>
-                    <td><strong>{r.title}</strong>{r.description && <span className="muted block">{r.description.slice(0, 60)}{r.description.length > 60 ? '...' : ''}</span>}</td>
+                    <td><Link to={`/maintenance/${r.id}`} className="tenant-link"><strong>{r.title}</strong></Link>{r.description && <span className="muted block">{r.description.slice(0, 60)}{r.description.length > 60 ? '...' : ''}</span>}</td>
                     <td>{prop?.name ?? '—'}{unit && <span className="muted"> — {unit.name}</span>}</td>
                     <td><span className={`badge priority-${r.priority}`}>{PRIORITIES.find((p) => p.value === r.priority)?.label}</span></td>
                     <td>{CATEGORIES.find((c) => c.value === r.category)?.label}</td>
+                    <td>{vendor ? <Link to={`/vendors/${vendor.id}`} className="tenant-link">{vendor.name}</Link> : <span className="muted">—</span>}</td>
                     <td>
                       <select className="select-inline select-compact" value={r.status} onChange={(e) => handleStatusChange(r.id, e.target.value as MaintenanceStatus)}>
                         {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -316,6 +378,7 @@ export default function Maintenance() {
                     <td>{r.scheduledDate ? formatDate(r.scheduledDate) : '—'}{r.recurrence && r.recurrence !== 'none' && <span className="muted block">{RECURRENCES.find((x) => x.value === r.recurrence)?.label}</span>}</td>
                     <td>{formatDate(r.createdAt)}</td>
                     <td className="actions-cell">
+                      <Link to={`/maintenance/${r.id}`} className="btn small">View</Link>
                       <button type="button" className="btn small" onClick={() => openEdit(r)}>Edit</button>
                       <button type="button" className="btn small danger" onClick={async () => { if (await confirm({ title: 'Delete request', message: `Delete "${r.title}"?`, confirmText: 'Delete', danger: true })) { const snap = takeSnapshot(); try { await deleteMaintenanceRequest(r.id); toast('Request deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Request restored', 'info') } catch { toast('Undo failed', 'error') } } } }) } catch { toast('Failed to delete request', 'error') } } }}>Delete</button>
                     </td>
