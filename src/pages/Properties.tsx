@@ -58,6 +58,11 @@ export default function Properties() {
     deposit: 0,
     bedrooms: 0,
     bathrooms: 0,
+    mortgageBalance: 0,
+    mortgageRate: 0,
+    mortgageTermYears: 30,
+    mortgageMonthlyPayment: 0,
+    mortgageStartDate: '',
     insuranceProvider: '',
     insurancePolicyNumber: '',
     insuranceExpiry: '',
@@ -87,6 +92,11 @@ export default function Properties() {
       deposit: propUnit?.deposit ?? 0,
       bedrooms: propUnit?.bedrooms ?? 0,
       bathrooms: propUnit?.bathrooms ?? 0,
+      mortgageBalance: property.mortgageBalance ?? 0,
+      mortgageRate: property.mortgageRate ?? 0,
+      mortgageTermYears: property.mortgageTermYears ?? 30,
+      mortgageMonthlyPayment: property.mortgageMonthlyPayment ?? 0,
+      mortgageStartDate: property.mortgageStartDate ?? '',
       insuranceProvider: property.insuranceProvider ?? '',
       insurancePolicyNumber: property.insurancePolicyNumber ?? '',
       insuranceExpiry: property.insuranceExpiry ?? '',
@@ -95,7 +105,7 @@ export default function Properties() {
     setShowForm(true)
   }
 
-  const emptyForm = { name: '', address: '', city: '', state: '', zip: '', propertyType: '', sqft: 0, amenities: [] as string[], purchasePrice: 0, purchaseDate: '', monthlyRent: 0, deposit: 0, bedrooms: 0, bathrooms: 0, insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '', notes: '' }
+  const emptyForm = { name: '', address: '', city: '', state: '', zip: '', propertyType: '', sqft: 0, amenities: [] as string[], purchasePrice: 0, purchaseDate: '', monthlyRent: 0, deposit: 0, bedrooms: 0, bathrooms: 0, mortgageBalance: 0, mortgageRate: 0, mortgageTermYears: 30, mortgageMonthlyPayment: 0, mortgageStartDate: '', insuranceProvider: '', insurancePolicyNumber: '', insuranceExpiry: '', notes: '' }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -110,6 +120,11 @@ export default function Properties() {
       amenities: form.amenities.length > 0 ? form.amenities : undefined,
       purchasePrice: form.purchasePrice || undefined,
       purchaseDate: form.purchaseDate || undefined,
+      mortgageBalance: form.mortgageBalance || undefined,
+      mortgageRate: form.mortgageRate || undefined,
+      mortgageTermYears: form.mortgageTermYears || undefined,
+      mortgageMonthlyPayment: form.mortgageMonthlyPayment || undefined,
+      mortgageStartDate: form.mortgageStartDate || undefined,
       insuranceProvider: form.insuranceProvider || undefined,
       insurancePolicyNumber: form.insurancePolicyNumber || undefined,
       insuranceExpiry: form.insuranceExpiry || undefined,
@@ -216,8 +231,6 @@ export default function Properties() {
               {PROPERTY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select></label>
             <label>Total sq ft <input type="number" min={0} value={form.sqft || ''} onChange={(e) => setForm((f) => ({ ...f, sqft: +e.target.value || 0 }))} placeholder="e.g. 2400" /></label>
-            <label>Purchase price <input type="text" inputMode="numeric" value={form.purchasePrice ? formatNumberWithCommas(String(form.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} placeholder="350,000" /></label>
-            <label>Purchase date <input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
           </div>
 
           {isSingleUnitType(form.propertyType) && (
@@ -250,6 +263,18 @@ export default function Properties() {
               ))}
             </div>
           </div>
+          <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
+            <legend>Acquisition &amp; Financing</legend>
+            <div className="form-grid">
+              <label>Purchase price <input type="text" inputMode="numeric" value={form.purchasePrice ? formatNumberWithCommas(String(form.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} placeholder="350,000" /></label>
+              <label>Purchase date <input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
+              <label>Loan balance <input type="number" min={0} step={1} value={form.mortgageBalance || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageBalance: +e.target.value || 0 }))} placeholder="e.g. 385,000" /></label>
+              <label>Annual rate (%) <input type="number" min={0} max={20} step={0.125} value={form.mortgageRate || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageRate: +e.target.value || 0 }))} placeholder="5.875" /></label>
+              <label>Term (years) <input type="number" min={1} max={50} value={form.mortgageTermYears || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageTermYears: +e.target.value || 0 }))} placeholder="30" /></label>
+              <label>Monthly payment <input type="number" min={0} step={0.01} value={form.mortgageMonthlyPayment || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageMonthlyPayment: +e.target.value || 0 }))} placeholder="1,400" /></label>
+              <label>Mortgage start date <input type="date" value={form.mortgageStartDate} onChange={(e) => setForm((f) => ({ ...f, mortgageStartDate: e.target.value }))} /></label>
+            </div>
+          </fieldset>
           <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
             <legend>Insurance (optional)</legend>
             <div className="form-grid">

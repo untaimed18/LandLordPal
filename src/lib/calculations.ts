@@ -221,12 +221,6 @@ export function getInvestmentMetrics(
 
   const annualIncome = yearPayments.reduce((s, p) => s + p.amount, 0);
   const annualExpenses = yearExpenses.reduce((s, e) => s + e.amount, 0);
-  const annualMortgage = yearExpenses
-    .filter((e) => e.category === 'mortgage')
-    .reduce((s, e) => s + e.amount, 0);
-
-  const operatingExpenses = annualExpenses - annualMortgage;
-  const noi = annualIncome - operatingExpenses;
 
   const relevantProperties = propertyId
     ? properties.filter((p) => p.id === propertyId)
@@ -238,6 +232,20 @@ export function getInvestmentMetrics(
   const allHavePrice =
     relevantProperties.length > 0 &&
     relevantProperties.every((p) => p.purchasePrice && p.purchasePrice > 0);
+
+  const mortgageFromExpenses = yearExpenses
+    .filter((e) => e.category === 'mortgage')
+    .reduce((s, e) => s + e.amount, 0);
+  const mortgageFromProperties = relevantProperties.reduce(
+    (s, p) => s + ((p.mortgageMonthlyPayment ?? 0) * 12),
+    0,
+  );
+  const annualMortgage = mortgageFromExpenses > 0
+    ? mortgageFromExpenses
+    : mortgageFromProperties;
+
+  const operatingExpenses = annualExpenses - mortgageFromExpenses;
+  const noi = annualIncome - operatingExpenses;
 
   const capRate = allHavePrice && totalPurchasePrice > 0 ? (noi / totalPurchasePrice) * 100 : null;
   const cashOnCash =

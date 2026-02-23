@@ -11,7 +11,7 @@ import EmailTemplateModal from '../components/EmailTemplateModal'
 import InspectionChecklistModal from '../components/InspectionChecklistModal'
 import { loadSettings } from '../lib/settings'
 import { exportTenantStatementPdf, formatMoneyForPdf } from '../lib/pdfExport'
-import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send, FileText, ClipboardList, UserCheck, UserX, UserPlus, CircleDollarSign } from 'lucide-react'
+import { User, Phone, Mail, CalendarDays, DollarSign, ShieldCheck, Clock, TrendingUp, RefreshCw, Printer, RotateCw, Send, FileText, ClipboardList, UserCheck, UserX, UserPlus, CircleDollarSign, Users } from 'lucide-react'
 import { toCSV, downloadCSV } from '../lib/csv'
 import { nowISO } from '../lib/id'
 import { useToast } from '../context/ToastContext'
@@ -283,6 +283,34 @@ export default function TenantDetail() {
         </div>
         {tenant.notes && <p className="stc-notes">{tenant.notes}</p>}
       </section>
+
+      {tenant.occupants && tenant.occupants.length > 0 && (
+        <section className="card section-card" style={{ marginBottom: '1.5rem' }}>
+          <h2><Users size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Occupants ({tenant.occupants.length})</h2>
+          <div className="occupants-table-wrap">
+            <table className="mini-table occupants-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Relationship</th>
+                  <th>Date of Birth</th>
+                  <th>On Lease</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tenant.occupants.map((occ, i) => (
+                  <tr key={i}>
+                    <td><strong>{occ.name}</strong></td>
+                    <td><span className="badge">{occ.relationship.replace('_', ' ')}</span></td>
+                    <td>{occ.dateOfBirth ? formatDate(occ.dateOfBirth) : '—'}</td>
+                    <td>{occ.onLease ? <span className="badge paid">Yes</span> : <span className="muted">No</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {((tenant.deposit != null && tenant.deposit > 0) || tenant.requireFirstMonth || tenant.requireLastMonth) && (() => {
         const depositOwed = tenant.deposit ?? 0

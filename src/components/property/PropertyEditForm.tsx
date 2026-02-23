@@ -107,8 +107,6 @@ export default function PropertyEditForm({ property, onClose }: Props) {
           {PROPERTY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select></label>
         <label>Total sq ft <input type="number" min={0} value={form.sqft || ''} onChange={(e) => setForm((f) => ({ ...f, sqft: +e.target.value || 0 }))} /></label>
-        <label>Purchase price <input type="text" inputMode="numeric" value={form.purchasePrice ? formatNumberWithCommas(String(form.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} /></label>
-        <label>Purchase date <input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
       </div>
       <div style={{ marginTop: '0.75rem' }}>
         <label>Amenities</label>
@@ -120,13 +118,15 @@ export default function PropertyEditForm({ property, onClose }: Props) {
         </div>
       </div>
       <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
-        <legend>Mortgage</legend>
+        <legend>Acquisition &amp; Financing</legend>
         <div className="form-grid">
-          <label>Loan Balance <input type="number" min={0} step={1} value={form.mortgageBalance || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageBalance: +e.target.value || 0 }))} /></label>
-          <label>Annual Rate (%) <input type="number" min={0} max={20} step={0.125} value={form.mortgageRate || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageRate: +e.target.value || 0 }))} /></label>
+          <label>Purchase price <input type="text" inputMode="numeric" value={form.purchasePrice ? formatNumberWithCommas(String(form.purchasePrice)) : ''} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); setForm((f) => ({ ...f, purchasePrice: raw ? Number(raw) : 0 })) }} /></label>
+          <label>Purchase date <input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} /></label>
+          <label>Loan balance <input type="number" min={0} step={1} value={form.mortgageBalance || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageBalance: +e.target.value || 0 }))} /></label>
+          <label>Annual rate (%) <input type="number" min={0} max={20} step={0.125} value={form.mortgageRate || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageRate: +e.target.value || 0 }))} /></label>
           <label>Term (years) <input type="number" min={1} max={50} value={form.mortgageTermYears || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageTermYears: +e.target.value || 0 }))} /></label>
-          <label>Monthly Payment <input type="number" min={0} step={0.01} value={form.mortgageMonthlyPayment || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageMonthlyPayment: +e.target.value || 0 }))} /></label>
-          <label>Start Date <input type="date" value={form.mortgageStartDate} onChange={(e) => setForm((f) => ({ ...f, mortgageStartDate: e.target.value }))} /></label>
+          <label>Monthly payment <input type="number" min={0} step={0.01} value={form.mortgageMonthlyPayment || ''} onChange={(e) => setForm((f) => ({ ...f, mortgageMonthlyPayment: +e.target.value || 0 }))} /></label>
+          <label>Mortgage start date <input type="date" value={form.mortgageStartDate} onChange={(e) => setForm((f) => ({ ...f, mortgageStartDate: e.target.value }))} /></label>
         </div>
       </fieldset>
       <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>

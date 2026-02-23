@@ -8,7 +8,7 @@ let db = null;
 let dbFilePath = null;
 let userDataDir = null;
 
-const CURRENT_SCHEMA_VERSION = 6;
+const CURRENT_SCHEMA_VERSION = 7;
 
 // ─── Encryption ──────────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ const TABLE_NAME_MAP = {
 const TABLE_COLUMNS = {
   properties: ['id', 'name', 'address', 'city', 'state', 'zip', 'propertyType', 'sqft', 'amenities', 'purchasePrice', 'purchaseDate', 'mortgageBalance', 'mortgageRate', 'mortgageTermYears', 'mortgageMonthlyPayment', 'mortgageStartDate', 'insuranceProvider', 'insurancePolicyNumber', 'insuranceExpiry', 'notes', 'createdAt', 'updatedAt'],
   units: ['id', 'propertyId', 'name', 'bedrooms', 'bathrooms', 'sqft', 'monthlyRent', 'deposit', 'available', 'notes', 'createdAt', 'updatedAt'],
-  tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositStatus', 'depositPaidDate', 'depositPaidAmount', 'depositReturned', 'depositDeductions', 'requireFirstMonth', 'requireLastMonth', 'lastMonthPaid', 'moveInCostNotes', 'gracePeriodDays', 'lateFeeAmount', 'autopay', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'screeningStatus', 'screeningNotes', 'inspections', 'rentHistory', 'leaseHistory', 'createdAt', 'updatedAt'],
+  tenants: ['id', 'unitId', 'propertyId', 'name', 'email', 'phone', 'leaseStart', 'leaseEnd', 'monthlyRent', 'deposit', 'depositStatus', 'depositPaidDate', 'depositPaidAmount', 'depositReturned', 'depositDeductions', 'requireFirstMonth', 'requireLastMonth', 'lastMonthPaid', 'moveInCostNotes', 'gracePeriodDays', 'lateFeeAmount', 'autopay', 'moveInDate', 'moveOutDate', 'moveInNotes', 'moveOutNotes', 'notes', 'occupants', 'screeningStatus', 'screeningNotes', 'inspections', 'rentHistory', 'leaseHistory', 'createdAt', 'updatedAt'],
   expenses: ['id', 'propertyId', 'unitId', 'category', 'amount', 'date', 'description', 'recurring', 'vendorId', 'createdAt', 'updatedAt'],
   payments: ['id', 'tenantId', 'unitId', 'propertyId', 'amount', 'date', 'periodStart', 'periodEnd', 'method', 'category', 'notes', 'lateFee', 'createdAt', 'updatedAt'],
   maintenance_requests: ['id', 'propertyId', 'unitId', 'tenantId', 'title', 'description', 'priority', 'status', 'category', 'vendorId', 'cost', 'scheduledDate', 'recurrence', 'resolvedAt', 'notes', 'createdAt', 'updatedAt'],
@@ -147,6 +147,7 @@ const serializers = {
     moveInDate: t.moveInDate ?? null, moveOutDate: t.moveOutDate ?? null,
     moveInNotes: t.moveInNotes ?? null, moveOutNotes: t.moveOutNotes ?? null,
     notes: t.notes ?? null,
+    occupants: t.occupants ? JSON.stringify(t.occupants) : null,
     screeningStatus: t.screeningStatus ?? null, screeningNotes: t.screeningNotes ?? null,
     inspections: t.inspections ? JSON.stringify(t.inspections) : null,
     rentHistory: t.rentHistory ? JSON.stringify(t.rentHistory) : null,
@@ -310,6 +311,7 @@ async function migrateIfNeeded(userDataPath) {
       if (currentVersion < 4) runMigrationV4();
       if (currentVersion < 5) runMigrationV5();
       if (currentVersion < 6) runMigrationV6();
+      if (currentVersion < 7) runMigrationV7();
       setSchemaVersion(CURRENT_SCHEMA_VERSION);
     });
     migrate();
@@ -559,6 +561,14 @@ function runMigrationV6() {
   addCol('payments', 'category', 'TEXT');
 }
 
+function runMigrationV7() {
+  log.info('  Running migration v7: occupants');
+  const addCol = (table, col, type) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch { /* already exists */ }
+  };
+  addCol('tenants', 'occupants', 'TEXT');
+}
+
 // ─── File management for document attachments ─────────────────────────────────
 
 function getDocumentsDir() {
@@ -651,6 +661,7 @@ function createTables() {
       autopay INTEGER DEFAULT 0,
       moveInDate TEXT, moveOutDate TEXT, moveInNotes TEXT, moveOutNotes TEXT,
       notes TEXT,
+      occupants TEXT,
       screeningStatus TEXT, screeningNotes TEXT, inspections TEXT,
       rentHistory TEXT, leaseHistory TEXT,
       createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL
@@ -765,6 +776,7 @@ function rowToTenant(row) {
     lastMonthPaid: !!row.lastMonthPaid,
     moveInCostNotes: row.moveInCostNotes || undefined,
     autopay: !!row.autopay,
+    occupants: safeJsonParse(row.occupants, undefined),
     screeningStatus: row.screeningStatus || undefined,
     screeningNotes: row.screeningNotes || undefined,
     inspections: safeJsonParse(row.inspections, undefined),

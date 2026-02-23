@@ -64,6 +64,22 @@ export interface LeaseHistory {
 
 export type DepositStatus = 'pending' | 'paid' | 'partial';
 
+export type OccupantRelationship =
+  | 'leaseholder'
+  | 'spouse'
+  | 'partner'
+  | 'roommate'
+  | 'child'
+  | 'dependent'
+  | 'other';
+
+export interface Occupant {
+  name: string;
+  relationship: OccupantRelationship;
+  dateOfBirth?: string;
+  onLease: boolean;
+}
+
 export interface Tenant {
   id: Id;
   unitId: Id;
@@ -92,6 +108,7 @@ export interface Tenant {
   moveInNotes?: string;
   moveOutNotes?: string;
   notes?: string;
+  occupants?: Occupant[];
   screeningStatus?: 'applied' | 'approved' | 'rejected';
   screeningNotes?: string;
   inspections?: InspectionChecklist[];

@@ -5,8 +5,18 @@ import { formatDate, formatPhoneNumber, formatMoney } from '../../lib/format'
 import { useFormValidation } from '../../hooks/useFormValidation'
 import { tenantSchema } from '../../lib/schemas'
 import { loadSettings } from '../../lib/settings'
-import { RefreshCw, ShieldCheck, DollarSign } from 'lucide-react'
-import type { Tenant } from '../../types'
+import { RefreshCw, ShieldCheck, DollarSign, Users, Plus, Trash2 } from 'lucide-react'
+import type { Tenant, Occupant, OccupantRelationship } from '../../types'
+
+const RELATIONSHIP_OPTIONS: { value: OccupantRelationship; label: string }[] = [
+  { value: 'leaseholder', label: 'Leaseholder' },
+  { value: 'spouse', label: 'Spouse' },
+  { value: 'partner', label: 'Partner' },
+  { value: 'roommate', label: 'Roommate' },
+  { value: 'child', label: 'Child' },
+  { value: 'dependent', label: 'Dependent' },
+  { value: 'other', label: 'Other' },
+]
 
 interface TenantFormData {
   unitId: string
@@ -23,6 +33,7 @@ interface TenantFormData {
   notes: string
   requireFirstMonth: boolean
   requireLastMonth: boolean
+  occupants: Occupant[]
 }
 
 interface Props {
@@ -81,6 +92,7 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
       return
     }
 
+    const validOccupants = form.occupants.filter((o) => o.name.trim())
     const data = {
       name: form.name,
       email: form.email || undefined,
@@ -95,6 +107,7 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
       notes: form.notes || undefined,
       requireFirstMonth: form.requireFirstMonth,
       requireLastMonth: form.requireLastMonth,
+      occupants: validOccupants.length > 0 ? validOccupants : undefined,
     }
 
     try {
@@ -169,6 +182,93 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
             </span>
           </div>
         )}
+      </fieldset>
+      <fieldset className="form-fieldset" style={{ marginTop: '0.75rem' }}>
+        <legend><Users size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />Occupants</legend>
+        <p className="muted" style={{ margin: '0 0 0.5rem', fontSize: '0.82rem' }}>List everyone who will live in the unit, including the primary tenant.</p>
+        <div className="occupant-list">
+          {form.occupants.map((occ, i) => (
+            <div key={i} className="occupant-card">
+              <div className="occupant-card-header">
+                <span className="occupant-card-num">{i + 1}</span>
+                <button
+                  type="button"
+                  className="btn small danger"
+                  title="Remove occupant"
+                  onClick={() => {
+                    const updated = form.occupants.filter((_, j) => j !== i)
+                    setForm((n) => ({ ...n, occupants: updated }))
+                  }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+              <div className="occupant-card-fields">
+                <label className="occupant-field-full">
+                  Name *
+                  <input
+                    required
+                    value={occ.name}
+                    placeholder="Full name"
+                    onChange={(e) => {
+                      const updated = [...form.occupants]
+                      updated[i] = { ...occ, name: e.target.value }
+                      setForm((n) => ({ ...n, occupants: updated }))
+                    }}
+                  />
+                </label>
+                <label>
+                  Relationship
+                  <select
+                    value={occ.relationship}
+                    onChange={(e) => {
+                      const updated = [...form.occupants]
+                      updated[i] = { ...occ, relationship: e.target.value as OccupantRelationship }
+                      setForm((n) => ({ ...n, occupants: updated }))
+                    }}
+                  >
+                    {RELATIONSHIP_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                </label>
+                <label>
+                  Date of birth
+                  <input
+                    type="date"
+                    value={occ.dateOfBirth ?? ''}
+                    onChange={(e) => {
+                      const updated = [...form.occupants]
+                      updated[i] = { ...occ, dateOfBirth: e.target.value || undefined }
+                      setForm((n) => ({ ...n, occupants: updated }))
+                    }}
+                  />
+                </label>
+                <label className="occupant-onlease">
+                  <input
+                    type="checkbox"
+                    checked={occ.onLease}
+                    onChange={(e) => {
+                      const updated = [...form.occupants]
+                      updated[i] = { ...occ, onLease: e.target.checked }
+                      setForm((n) => ({ ...n, occupants: updated }))
+                    }}
+                  />
+                  On lease
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn small"
+          style={{ marginTop: '0.5rem' }}
+          onClick={() => setForm((n) => ({
+            ...n,
+            occupants: [...n.occupants, { name: '', relationship: 'leaseholder', onLease: true }],
+          }))}
+        >
+          <Plus size={14} /> Add occupant
+        </button>
       </fieldset>
       <label className={`toggle-card${form.autopay ? ' active' : ''}`}>
         <input type="checkbox" checked={form.autopay} onChange={(e) => setForm((n) => ({ ...n, autopay: e.target.checked }))} />
