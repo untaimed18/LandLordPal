@@ -53,4 +53,9 @@ export function loadSettings(): AppSettings {
 
 export function saveSettings(settings: AppSettings): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  if (typeof window !== 'undefined' && window.electronAPI?.settingsSave) {
+    window.electronAPI.settingsSave(settings as unknown as Record<string, unknown>).catch(() => {
+      // non-critical: renderer settings remain saved locally
+    });
+  }
 }

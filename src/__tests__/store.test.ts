@@ -3,9 +3,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const mockDbBatch = vi.fn().mockResolvedValue({ success: true })
 const mockDbSave = vi.fn().mockResolvedValue(true)
 const mockDbLoad = vi.fn().mockResolvedValue(null)
+const mockDbBackup = vi.fn().mockResolvedValue({ success: true })
 const mockDocDeleteFile = vi.fn().mockResolvedValue(true)
 const mockDocPickFile = vi.fn().mockResolvedValue(null)
 const mockDocOpenFile = vi.fn().mockResolvedValue(true)
+const mockPhotoDelete = vi.fn().mockResolvedValue(true)
+const mockBackupExportAssets = vi.fn().mockResolvedValue({ documents: [], photos: [] })
+const mockBackupReplaceAssets = vi.fn().mockResolvedValue({ success: true })
+const mockSettingsSave = vi.fn().mockResolvedValue(true)
 
 Object.defineProperty(window, 'electronAPI', {
   value: {
@@ -13,9 +18,16 @@ Object.defineProperty(window, 'electronAPI', {
     dbLoad: mockDbLoad,
     dbSave: mockDbSave,
     dbBatch: mockDbBatch,
+    dbBackup: mockDbBackup,
     docPickFile: mockDocPickFile,
     docDeleteFile: mockDocDeleteFile,
     docOpenFile: mockDocOpenFile,
+    photoPick: vi.fn(),
+    photoDelete: mockPhotoDelete,
+    photoGetPath: vi.fn(),
+    backupExportAssets: mockBackupExportAssets,
+    backupReplaceAssets: mockBackupReplaceAssets,
+    settingsSave: mockSettingsSave,
     onUpdateStatus: vi.fn(),
     startDownload: vi.fn(),
     installUpdate: vi.fn(),
@@ -32,7 +44,11 @@ describe('store', () => {
     mockDbBatch.mockClear()
     mockDbSave.mockClear()
     mockDbLoad.mockResolvedValue(null)
+    mockDbBackup.mockClear()
     mockDocDeleteFile.mockClear()
+    mockPhotoDelete.mockClear()
+    mockBackupExportAssets.mockClear()
+    mockBackupReplaceAssets.mockClear()
 
     store = await import('../store')
     await store.initStore()
@@ -129,6 +145,43 @@ describe('store', () => {
       await store.deletePayment(payment.id)
       expect(store.getState().payments).toHaveLength(0)
     })
+
+    it('deletePayment recalculates deposit status fields', async () => {
+      const prop = await store.addProperty({ name: 'P', address: '1', city: 'A', state: 'TX', zip: '78701' })
+      const unit = await store.addUnit({ propertyId: prop.id, name: 'U', bedrooms: 1, bathrooms: 1, monthlyRent: 1000, available: false })
+      const tenant = await store.addTenant({ propertyId: prop.id, unitId: unit.id, name: 'Alice', leaseStart: '2025-01-01', leaseEnd: '2026-01-01', monthlyRent: 1000, deposit: 500 })
+      const payment = await store.addPayment({ tenantId: tenant.id, unitId: unit.id, propertyId: prop.id, amount: 500, date: '2025-01-01', periodStart: '2025-01-01', periodEnd: '2025-01-31', category: 'deposit' })
+      await store.updateTenant(tenant.id, { depositPaidAmount: 500, depositPaidDate: '2025-01-01', depositStatus: 'paid' })
+
+      await store.deletePayment(payment.id)
+      const updatedTenant = store.getState().tenants.find((t) => t.id === tenant.id)
+      expect(updatedTenant?.depositPaidAmount).toBeUndefined()
+      expect(updatedTenant?.depositPaidDate).toBeUndefined()
+      expect(updatedTenant?.depositStatus).toBe('pending')
+    })
+  })
+
+  describe('maintenance', () => {
+    it('deleteMaintenanceRequest removes linked docs and photos', async () => {
+      const prop = await store.addProperty({ name: 'P', address: '1', city: 'A', state: 'TX', zip: '78701' })
+      const request = await store.addMaintenanceRequest({
+        propertyId: prop.id,
+        title: 'Leak',
+        description: 'Kitchen',
+        priority: 'medium',
+        status: 'open',
+        category: 'plumbing',
+        photos: [{ id: 'photo1', filename: 'photo1.jpg', date: '2025-01-01' }],
+      })
+      mockDocPickFile.mockResolvedValueOnce({ filename: 'doc1.pdf', originalName: 'doc1.pdf', size: 1, mimeType: 'application/pdf' })
+      await store.addDocument('maintenance', request.id)
+
+      await store.deleteMaintenanceRequest(request.id)
+      expect(store.getState().maintenanceRequests).toHaveLength(0)
+      expect(store.getState().documents).toHaveLength(0)
+      expect(mockDocDeleteFile).toHaveBeenCalledWith('doc1.pdf')
+      expect(mockPhotoDelete).toHaveBeenCalledWith('photo1.jpg')
+    })
   })
 
   describe('vendors', () => {
@@ -152,19 +205,19 @@ describe('store', () => {
       await store.updateProperty(prop.id, { name: 'After' })
       expect(store.getState().properties[0].name).toBe('After')
 
-      store.restoreSnapshot(snap)
+      await store.restoreSnapshot(snap)
       expect(store.getState().properties[0].name).toBe('Before')
     })
   })
 
   describe('importState', () => {
-    it('replaces all state with parsed data', () => {
-      store.importState({
+    it('replaces all state with parsed data', async () => {
+      await store.importState({
         properties: [{ id: 'new-1', name: 'New', address: '2', city: 'B', state: 'CA', zip: '90210', createdAt: '2025-01-01', updatedAt: '2025-01-01' }],
         units: [], tenants: [], expenses: [], payments: [],
         maintenanceRequests: [], activityLogs: [], vendors: [],
         communicationLogs: [], documents: [], emailTemplates: [],
-      })
+      }, { documents: [], photos: [] })
       expect(store.getState().properties).toHaveLength(1)
       expect(store.getState().properties[0].name).toBe('New')
     })

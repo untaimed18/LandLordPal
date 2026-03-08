@@ -118,6 +118,10 @@ export const activityLogSchema = z.object({
 
 const backupItemSchema = z.object({ id: z.string() }).passthrough()
 const backupArraySchema = z.array(backupItemSchema).default([])
+const backupAssetSchema = z.object({
+  filename: z.string().min(1),
+  contentBase64: z.string().min(1),
+})
 
 export const backupSchema = z.object({
   properties: backupArraySchema,
@@ -131,6 +135,10 @@ export const backupSchema = z.object({
   communicationLogs: backupArraySchema,
   documents: backupArraySchema,
   emailTemplates: backupArraySchema,
+  attachments: z.object({
+    documents: z.array(backupAssetSchema).default([]),
+    photos: z.array(backupAssetSchema).default([]),
+  }).optional(),
 })
 
 export type ValidationErrors = Record<string, string>

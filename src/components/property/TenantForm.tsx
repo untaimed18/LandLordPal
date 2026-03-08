@@ -5,6 +5,7 @@ import { formatDate, formatPhoneNumber, formatMoney } from '../../lib/format'
 import { useFormValidation } from '../../hooks/useFormValidation'
 import { tenantSchema } from '../../lib/schemas'
 import { loadSettings } from '../../lib/settings'
+import { isTenantActiveOn } from '../../lib/calculations'
 import { RefreshCw, ShieldCheck, DollarSign, Users, Plus, Trash2, UserCheck } from 'lucide-react'
 import type { Tenant, Occupant, OccupantRelationship } from '../../types'
 
@@ -103,7 +104,7 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
     if (!validate(payload)) return
 
     const overlapping = tenants.find(
-      (t) => t.unitId === form.unitId && t.id !== editingTenantId && !t.moveOutDate &&
+      (t) => t.unitId === form.unitId && t.id !== editingTenantId && isTenantActiveOn(t) &&
         t.leaseStart <= form.leaseEnd && t.leaseEnd >= form.leaseStart
     )
     if (overlapping) {
@@ -310,7 +311,7 @@ export default function TenantForm({ propertyId, unitName, tenants, editingTenan
           <label>Application Status
             <select
               value={form.screeningStatus}
-              onChange={(e) => setForm((n) => ({ ...n, screeningStatus: e.target.value as any }))}
+              onChange={(e) => setForm((n) => ({ ...n, screeningStatus: e.target.value as NonNullable<Tenant['screeningStatus']> | '' }))}
             >
               <option value="">Not set</option>
               <option value="applied">Applied</option>

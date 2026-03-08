@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
-import { updateMaintenanceRequest, deleteMaintenanceRequest, takeSnapshot, restoreSnapshot } from '../store'
+import { addMaintenanceRequest, updateMaintenanceRequest, deleteMaintenanceRequest, takeSnapshot, restoreSnapshot } from '../store'
 import { useToast } from '../context/ToastContext'
 import { useConfirm } from '../context/ConfirmContext'
 import { formatMoney, formatDate } from '../lib/format'
 import { nowISO } from '../lib/id'
+import { getNextRecurringDate } from '../lib/calculations'
 import { exportWorkOrderPdf } from '../lib/pdfExport'
 import Breadcrumbs from '../components/Breadcrumbs'
 import DocumentAttachments from '../components/DocumentAttachments'
@@ -74,6 +75,27 @@ export default function MaintenanceDetail() {
       resolvedAt: status === 'completed' ? nowISO() : undefined,
     })
     toast(`Marked as ${STATUS_LABELS[status]}`)
+
+    if (status === 'completed' && request!.recurrence && request!.recurrence !== 'none') {
+      const nextDate = getNextRecurringDate(request!.scheduledDate ?? nowISO(), request!.recurrence)
+      if (!nextDate) return
+      await addMaintenanceRequest({
+        propertyId: request!.propertyId,
+        unitId: request!.unitId,
+        tenantId: request!.tenantId,
+        title: request!.title,
+        description: request!.description,
+        priority: request!.priority,
+        status: 'open',
+        category: request!.category,
+        vendorId: request!.vendorId,
+        scheduledDate: nextDate,
+        recurrence: request!.recurrence,
+        notes: request!.notes,
+        statusHistory: [{ status: 'open', date: nowISO() }],
+      })
+      toast(`Next ${request!.recurrence} occurrence scheduled for ${nextDate}`, 'info')
+    }
   }
 
   async function handleSaveActualCost() {

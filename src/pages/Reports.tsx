@@ -29,7 +29,7 @@ export default function Reports() {
   const { properties, units, tenants, expenses, payments, maintenanceRequests } = useStore()
   const toast = useToast()
   const printRef = useRef<HTMLDivElement>(null)
-  const now = new Date()
+  const [now] = useState(() => new Date())
   const [year, setYear] = useState(now.getFullYear())
   const [propertyFilter, setPropertyFilter] = useState('')
   const [activeReport, setActiveReport] = useState<ReportType>('pnl')
@@ -49,7 +49,7 @@ export default function Reports() {
       }
     }
     return Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i)
-  }, [payments, expenses])
+  }, [payments, expenses, now])
 
   const filteredPayments = propertyFilter ? payments.filter((p) => p.propertyId === propertyFilter) : payments
   const filteredExpenses = propertyFilter ? expenses.filter((e) => e.propertyId === propertyFilter) : expenses
@@ -109,18 +109,18 @@ export default function Reports() {
   const yoyTrends = useMemo(() => getYoYTrends(filteredPayments, filteredExpenses), [filteredPayments, filteredExpenses])
 
   const propertyComparison = useMemo(
-    () => getPropertyComparison(properties, units, tenants, expenses, payments, year),
-    [properties, units, tenants, expenses, payments, year],
+    () => getPropertyComparison(propertyFilter ? properties.filter((p) => p.id === propertyFilter) : properties, propertyFilter ? units.filter((u) => u.propertyId === propertyFilter) : units, propertyFilter ? tenants.filter((t) => t.propertyId === propertyFilter) : tenants, filteredExpenses, filteredPayments, year),
+    [properties, units, tenants, filteredExpenses, filteredPayments, year, propertyFilter],
   )
 
   const vacancyData = useMemo(
-    () => getVacancyAnalysis(properties, units, tenants),
-    [properties, units, tenants],
+    () => getVacancyAnalysis(propertyFilter ? properties.filter((p) => p.id === propertyFilter) : properties, propertyFilter ? units.filter((u) => u.propertyId === propertyFilter) : units, propertyFilter ? tenants.filter((t) => t.propertyId === propertyFilter) : tenants),
+    [properties, units, tenants, propertyFilter],
   )
 
   const maintenanceTrends = useMemo(
-    () => getMaintenanceCostTrends(maintenanceRequests, 12),
-    [maintenanceRequests],
+    () => getMaintenanceCostTrends(propertyFilter ? maintenanceRequests.filter((m) => m.propertyId === propertyFilter) : maintenanceRequests, 12),
+    [maintenanceRequests, propertyFilter],
   )
 
   const totalIncome = monthly.reduce((s, m) => s + m.income, 0)

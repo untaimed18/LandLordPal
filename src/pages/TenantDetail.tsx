@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { updateTenant } from '../store'
-import { getLeaseStatus, getTenantReliability } from '../lib/calculations'
+import { getLeaseStatus, getTenantReliability, isMoveOutEffective } from '../lib/calculations'
 import { formatMoney, formatDate } from '../lib/format'
 import Breadcrumbs from '../components/Breadcrumbs'
 import DocumentAttachments from '../components/DocumentAttachments'
@@ -26,6 +26,7 @@ export default function TenantDetail() {
 
   const tenant = tenants.find((t) => t.id === id)
   const settings = loadSettings()
+  const movedOut = tenant ? isMoveOutEffective(tenant.moveOutDate) : false
 
   const tenantPayments = useMemo(
     () => (tenant ? payments.filter((p) => p.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date)) : []),
@@ -110,7 +111,7 @@ export default function TenantDetail() {
   }, [tenant, tenantPayments])
 
   const reliability = useMemo(
-    () => (tenant ? getTenantReliability(tenant, payments, settings.defaultGracePeriodDays) : null),
+    () => (tenant ? getTenantReliability(tenant, payments, tenant.gracePeriodDays ?? settings.defaultGracePeriodDays) : null),
     [tenant, payments, settings.defaultGracePeriodDays],
   )
 
@@ -126,7 +127,7 @@ export default function TenantDetail() {
   const property = properties.find((p) => p.id === tenant.propertyId)
   const unit = units.find((u) => u.id === tenant.unitId)
   const tenantComms = communicationLogs.filter((c) => c.tenantId === tenant.id).sort((a, b) => b.date.localeCompare(a.date))
-  const leaseStatus = tenant.moveOutDate ? 'moved_out' : getLeaseStatus(tenant.leaseEnd)
+  const leaseStatus = movedOut ? 'moved_out' : getLeaseStatus(tenant.leaseEnd)
 
   const statusBadge = leaseStatus === 'moved_out'
     ? <span className="badge" style={{ background: '#6c757d', color: 'white' }}>Moved Out ({formatDate(tenant.moveOutDate!)})</span>
@@ -164,10 +165,10 @@ export default function TenantDetail() {
         </div>
         <div className="header-actions no-print">
           <button type="button" className="btn small" onClick={() => window.print()}><Printer size={14} /> Print summary</button>
-          {!tenant.moveOutDate && <button type="button" className="btn small primary" onClick={() => setShowRenewal(true)}><RotateCw size={14} /> Renew Lease</button>}
+          {!movedOut && <button type="button" className="btn small primary" onClick={() => setShowRenewal(true)}><RotateCw size={14} /> Renew Lease</button>}
           <button type="button" className="btn small" onClick={() => setShowEmail(true)} disabled={!tenant.email}><Send size={14} /> Send Email</button>
           <button type="button" className="btn small" onClick={() => setShowInspection('move_in')}><ClipboardList size={14} /> Move-In Inspect</button>
-          {!tenant.moveOutDate && <button type="button" className="btn small" onClick={() => setShowInspection('move_out')}><ClipboardList size={14} /> Move-Out Inspect</button>}
+          {!movedOut && <button type="button" className="btn small" onClick={() => setShowInspection('move_out')}><ClipboardList size={14} /> Move-Out Inspect</button>}
           {tenantPayments.length > 0 && (
             <button type="button" className="btn small" onClick={() => {
               downloadCSV(`${tenant.name.replace(/\s+/g, '-')}-payments-${nowISO()}.csv`, toCSV(

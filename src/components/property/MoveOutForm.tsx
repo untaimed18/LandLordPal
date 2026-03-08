@@ -3,6 +3,7 @@ import { addActivityLog, updateTenant, updateUnit, takeSnapshot, restoreSnapshot
 import { useToast } from '../../context/ToastContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { nowISO } from '../../lib/id'
+import { isMoveOutEffective } from '../../lib/calculations'
 import { formatMoney } from '../../lib/format'
 import type { Tenant } from '../../types'
 
@@ -20,10 +21,14 @@ export default function MoveOutForm({ tenant, onClose }: Props) {
   const [depositDeductions, setDepositDeductions] = useState('')
 
   async function handleSubmit() {
+    const moveOutEffective = isMoveOutEffective(moveOutDate)
+    const confirmMessage = moveOutEffective
+      ? `Mark "${tenant.name}" as moved out? The unit will be available for a new tenant.`
+      : `Schedule "${tenant.name}" to move out on ${moveOutDate}? The unit will stay occupied until that date.`
     const ok = await confirm({
       title: 'Confirm move-out',
-      message: `Mark "${tenant.name}" as moved out? The unit will be available for a new tenant.`,
-      confirmText: 'Complete move-out',
+      message: confirmMessage,
+      confirmText: moveOutEffective ? 'Complete move-out' : 'Schedule move-out',
     })
     if (!ok) return
 
@@ -35,15 +40,17 @@ export default function MoveOutForm({ tenant, onClose }: Props) {
         depositReturned: depositReturned,
         depositDeductions: depositDeductions || undefined,
       })
-      await updateUnit(tenant.unitId, { available: true })
+      if (moveOutEffective) {
+        await updateUnit(tenant.unitId, { available: true })
+      }
       await addActivityLog({
         entityType: 'unit',
         entityId: tenant.unitId,
-        note: `Tenant "${tenant.name}" moved out. Deposit held: ${formatMoney(tenant.deposit ?? 0)}. Returned: ${formatMoney(depositReturned)}${depositDeductions ? `. Deductions: ${depositDeductions}` : ''}${moveOutNotes ? `. Notes: ${moveOutNotes}` : ''}`,
+        note: `Tenant "${tenant.name}" ${moveOutEffective ? 'moved out' : `is scheduled to move out on ${moveOutDate}`}. Deposit held: ${formatMoney(tenant.deposit ?? 0)}. Returned: ${formatMoney(depositReturned)}${depositDeductions ? `. Deductions: ${depositDeductions}` : ''}${moveOutNotes ? `. Notes: ${moveOutNotes}` : ''}`,
         date: moveOutDate,
       })
       onClose()
-      toast('Tenant moved out and unit marked available', {
+      toast(moveOutEffective ? 'Tenant moved out and unit marked available' : 'Move-out scheduled', {
         type: 'success',
         action: {
           label: 'Undo',

@@ -10,6 +10,7 @@ import {
   getInvestmentMetrics,
   getForecast,
   getYoYTrends,
+  isTenantActiveOn,
 } from '../lib/calculations'
 import type { Property, Unit, Tenant, Expense, Payment } from '../types'
 import { formatMoney, formatPct } from '../lib/format'
@@ -39,6 +40,8 @@ import {
   Mail,
 } from 'lucide-react'
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 export default function Dashboard() {
   const { properties, units, tenants, expenses, payments, maintenanceRequests } = useStore()
   const settings = loadSettings()
@@ -53,7 +56,7 @@ export default function Dashboard() {
   const summaries = fp.map((p) =>
     getPropertySummary(p, units, tenants, expenses, payments)
   )
-  const now = new Date()
+  const [now] = useState(() => new Date())
   const rentRoll = getRentRollForMonth(now.getFullYear(), now.getMonth(), fp, fu, ft, fPay)
   const notPaidThisMonth = rentRoll.filter((r) => !r.paid)
   const leasesEndingSoon = getLeasesEndingSoon(ft, settings.leaseWarningDays)
@@ -94,7 +97,7 @@ export default function Dashboard() {
 
   const investmentMetrics = useMemo(
     () => getInvestmentMetrics(fp, fu, ft, fe, fPay, now.getFullYear()),
-    [fp, fu, ft, fe, fPay],
+    [fp, fu, ft, fe, fPay, now],
   )
 
   const forecast = useMemo(
@@ -119,7 +122,7 @@ export default function Dashboard() {
     return notPaidThisMonth.filter((r) => r.tenant.email)
   }, [notPaidThisMonth, now, settings.rentReminderDays])
 
-  const activeTenants = ft.filter((t) => !t.moveOutDate)
+  const activeTenants = ft.filter((t) => isTenantActiveOn(t))
   const vacancyCost = fu
     .filter((u) => !activeTenants.some((t) => t.unitId === u.id))
     .reduce((sum, u) => sum + u.monthlyRent, 0)
@@ -127,8 +130,6 @@ export default function Dashboard() {
   const collectionRate = stats.expectedMonthlyRent > 0
     ? (stats.collectedThisMonth / stats.expectedMonthlyRent) * 100
     : 0
-
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth()
@@ -140,7 +141,7 @@ export default function Dashboard() {
       const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const income = fPay.filter((p) => p.date.startsWith(prefix) && (!p.category || p.category === 'rent' || p.category === 'fee')).reduce((s, p) => s + p.amount, 0)
       const exp = fe.filter((e) => e.date.startsWith(prefix)).reduce((s, e) => s + e.amount, 0)
-      months.push({ label: monthNames[d.getMonth()], income, expenses: exp })
+      months.push({ label: MONTH_NAMES[d.getMonth()], income, expenses: exp })
     }
     return months
   }, [fPay, fe, currentYear, currentMonth])
@@ -155,7 +156,7 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <p className="page-desc">
             {hasData
-              ? `${monthNames[now.getMonth()]} ${now.getFullYear()} — ${fp.length} propert${fp.length !== 1 ? 'ies' : 'y'}, ${ft.length} tenant${ft.length !== 1 ? 's' : ''}`
+              ? `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()} — ${fp.length} propert${fp.length !== 1 ? 'ies' : 'y'}, ${ft.length} tenant${ft.length !== 1 ? 's' : ''}`
               : 'Your portfolio at a glance.'}
           </p>
         </div>
@@ -442,7 +443,7 @@ export default function Dashboard() {
                 </div>
                 {forecast.actualVsProjectedIncome != null && (
                   <div className="metric-card">
-                    <span className="metric-label">{monthNames[now.getMonth()]} Collection Pace</span>
+                    <span className="metric-label">{MONTH_NAMES[now.getMonth()]} Collection Pace</span>
                     <span className={`metric-value ${forecast.actualVsProjectedIncome >= 0 ? 'positive' : 'negative'}`}>
                       {forecast.actualVsProjectedIncome >= 0 ? '+' : ''}{forecast.actualVsProjectedIncome.toFixed(1)}%
                     </span>

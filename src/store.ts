@@ -28,6 +28,16 @@ export interface AppState {
   emailTemplates: EmailTemplate[];
 }
 
+interface BackupAssetEntry {
+  filename: string;
+  contentBase64: string;
+}
+
+interface BackupAssets {
+  documents: BackupAssetEntry[];
+  photos: BackupAssetEntry[];
+}
+
 const defaultState: AppState = {
   properties: [],
   units: [],
@@ -90,6 +100,9 @@ function requireElectronAPI(): ElectronAPI {
       photoPick: async () => null,
       photoDelete: async () => true,
       photoGetPath: async () => null,
+      backupExportAssets: async () => ({ documents: [], photos: [] }),
+      backupReplaceAssets: async () => ({ success: true }),
+      settingsSave: async () => true,
       onUpdateStatus: () => {},
       checkForUpdates: async () => {},
       startDownload: async () => {},
@@ -114,6 +127,21 @@ function parseStateData(data: Record<string, unknown>): AppState {
     documents: isArray(data.documents) ? filterValidItems<Document>(data.documents) : [],
     emailTemplates: isArray(data.emailTemplates) ? filterValidItems<EmailTemplate>(data.emailTemplates) : [],
   };
+}
+
+function getMaintenancePhotoFilenames(requests: MaintenanceRequest[]): string[] {
+  return [...new Set(requests.flatMap((request) => request.photos?.map((photo) => photo.filename) ?? []))];
+}
+
+function getStateAssetFilenames(appState: AppState): { documents: string[]; photos: string[] } {
+  return {
+    documents: [...new Set(appState.documents.map((doc) => doc.filename))],
+    photos: getMaintenancePhotoFilenames(appState.maintenanceRequests),
+  };
+}
+
+function emptyBackupAssets(): BackupAssets {
+  return { documents: [], photos: [] };
 }
 
 // ─── Save queue to serialize db writes ───────────────────────────────────────
@@ -350,8 +378,13 @@ export function takeSnapshot(): AppState {
 }
 
 export async function restoreSnapshot(snapshot: AppState): Promise<void> {
+  const previous = state;
   state = snapshot;
-  await persistFullReplace(state);
+  const ok = await persistFullReplace(state);
+  if (!ok) {
+    state = previous;
+    throw new Error('Failed to restore snapshot');
+  }
   listeners.forEach((l) => l());
 }
 
@@ -365,15 +398,34 @@ function notify(): void {
 }
 
 // Full state replace (used for backup restore / data clear)
-export async function importState(data: Record<string, unknown>): Promise<void> {
+export async function importState(data: Record<string, unknown>, assets?: BackupAssets): Promise<void> {
   const api = requireElectronAPI();
-  for (const doc of state.documents) {
-    api.docDeleteFile(doc.filename).catch((err: unknown) => {
-      logger.warn('Failed to delete document file during import:', doc.filename, err);
-    });
+  const previous = state;
+  const previousAssets = await api.backupExportAssets(getStateAssetFilenames(previous));
+  const nextState = parseStateData(data);
+
+  state = nextState;
+  const ok = await persistFullReplace(state);
+  if (!ok) {
+    state = previous;
+    throw new Error('Failed to import data');
   }
-  state = parseStateData(data);
-  await persistFullReplace(state);
+
+  const nextAssetFilenames = getStateAssetFilenames(nextState);
+  const shouldReplaceAssets = Boolean(assets) || (nextAssetFilenames.documents.length === 0 && nextAssetFilenames.photos.length === 0);
+  if (shouldReplaceAssets) {
+    const replaceResult = await api.backupReplaceAssets(assets ?? emptyBackupAssets());
+    if (!replaceResult.success) {
+      state = previous;
+      const restored = await persistFullReplace(previous);
+      const rollbackAssets = await api.backupReplaceAssets(previousAssets);
+      if (!restored || !rollbackAssets.success) {
+        emitSaveError(new Error(replaceResult.error || 'Failed to restore backup assets'));
+      }
+      throw new Error(replaceResult.error || 'Failed to import backup assets');
+    }
+  }
+
   notify();
 }
 
@@ -496,6 +548,10 @@ export async function deleteProperty(id: string): Promise<void> {
     })
     .map((a) => a.id);
 
+  const deletedExpenseIds = new Set(state.expenses.filter((e) => e.propertyId === id).map((e) => e.id));
+  const deletedMaintenance = state.maintenanceRequests.filter((m) => m.propertyId === id);
+  const deletedMaintenanceIds = new Set(deletedMaintenance.map((m) => m.id));
+
   // Clean up documents for the property and all its children
   const deletedUnitIds = new Set(state.units.filter((u) => u.propertyId === id).map((u) => u.id));
   const deletedTenantIds2 = new Set(state.tenants.filter((t) => t.propertyId === id).map((t) => t.id));
@@ -503,11 +559,18 @@ export async function deleteProperty(id: string): Promise<void> {
     if (d.entityType === 'property' && d.entityId === id) return true;
     if (d.entityType === 'unit' && deletedUnitIds.has(d.entityId)) return true;
     if (d.entityType === 'tenant' && deletedTenantIds2.has(d.entityId)) return true;
+    if (d.entityType === 'expense' && deletedExpenseIds.has(d.entityId)) return true;
+    if (d.entityType === 'maintenance' && deletedMaintenanceIds.has(d.entityId)) return true;
     return false;
   });
   for (const doc of orphanedDocs) {
     requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
       logger.warn('Failed to delete document file:', doc.filename, err);
+    });
+  }
+  for (const filename of getMaintenancePhotoFilenames(deletedMaintenance)) {
+    requireElectronAPI().photoDelete(filename).catch((err: unknown) => {
+      logger.warn('Failed to delete maintenance photo file:', filename, err);
     });
   }
   const orphanedDocIds = orphanedDocs.map((d) => d.id);
@@ -549,7 +612,9 @@ export async function deleteUnit(id: string): Promise<void> {
     p.unitId === id ? { ...p, unitId: undefined, updatedAt: nowISO() } : p
   );
 
-  const maintenanceRequests = state.maintenanceRequests.filter((m) => m.unitId !== id);
+  const maintenanceRequests = state.maintenanceRequests.map((m) =>
+    m.unitId === id ? { ...m, unitId: undefined, updatedAt: nowISO() } : m
+  );
   const expenses = state.expenses.map((e) =>
     e.unitId === id ? { ...e, unitId: undefined, updatedAt: nowISO() } : e
   );
@@ -640,6 +705,9 @@ export async function deleteTenant(id: string): Promise<void> {
   );
   
   let units = state.units;
+  const maintenanceRequests = state.maintenanceRequests.map((m) =>
+    m.tenantId === id ? { ...m, tenantId: undefined, updatedAt: nowISO() } : m
+  );
   const ops: DbOperation[] = [
     { type: 'delete', table: 'tenants', ids: [id] },
     // FK SET NULL handles: payments, maintenance_requests.tenantId
@@ -678,7 +746,7 @@ export async function deleteTenant(id: string): Promise<void> {
 
   const ok = await persistBatch(ops);
   if (ok) {
-    state = { ...state, tenants, payments, units, activityLogs, communicationLogs, documents };
+    state = { ...state, tenants, payments, units, maintenanceRequests, activityLogs, communicationLogs, documents };
     notify();
   } else {
     throw new Error('Failed to delete tenant');
@@ -722,14 +790,95 @@ export async function deleteExpense(id: string): Promise<void> {
 const paymentCrud = createCrud<Payment>('payments', 'payments');
 export const addPayment = paymentCrud.add;
 export const updatePayment = paymentCrud.update;
-export const deletePayment = paymentCrud.remove;
+
+export async function deletePayment(id: string): Promise<void> {
+  const payment = state.payments.find((p) => p.id === id);
+  if (!payment) return;
+
+  let tenants = state.tenants;
+  const tenant = payment.tenantId ? state.tenants.find((t) => t.id === payment.tenantId) : undefined;
+  const ops: DbOperation[] = [{ type: 'delete', table: 'payments', ids: [id] }];
+
+  if (tenant && payment.category === 'deposit') {
+    const remainingDepositPayments = state.payments.filter((p) => p.id !== id && p.tenantId === tenant.id && p.category === 'deposit');
+    const totalPaid = remainingDepositPayments.reduce((sum, p) => sum + p.amount, 0);
+    const latestDepositDate = [...remainingDepositPayments].sort((a, b) => b.date.localeCompare(a.date))[0]?.date;
+    const depositOwed = tenant.deposit ?? 0;
+    const updatedTenant: Tenant = {
+      ...tenant,
+      depositPaidAmount: totalPaid > 0 ? totalPaid : undefined,
+      depositPaidDate: latestDepositDate,
+      depositStatus: totalPaid <= 0 ? (depositOwed > 0 ? 'pending' : undefined) : totalPaid >= depositOwed ? 'paid' : 'partial',
+      updatedAt: nowISO(),
+    };
+    tenants = state.tenants.map((t) => (t.id === tenant.id ? updatedTenant : t));
+    ops.push({ type: 'upsert', table: 'tenants', data: updatedTenant });
+  }
+
+  if (tenant && payment.category === 'last_month') {
+    const hasRemainingLastMonthPayment = state.payments.some((p) => p.id !== id && p.tenantId === tenant.id && p.category === 'last_month');
+    const updatedTenant: Tenant = {
+      ...tenant,
+      lastMonthPaid: hasRemainingLastMonthPayment || undefined,
+      updatedAt: nowISO(),
+    };
+    tenants = state.tenants.map((t) => (t.id === tenant.id ? updatedTenant : t));
+    ops.push({ type: 'upsert', table: 'tenants', data: updatedTenant });
+  }
+
+  const ok = await persistBatch(ops);
+  if (ok) {
+    state = {
+      ...state,
+      payments: state.payments.filter((p) => p.id !== id),
+      tenants,
+    };
+    notify();
+  } else {
+    throw new Error('Failed to delete payment');
+  }
+}
 
 // ─── Maintenance Requests ────────────────────────────────────────────────────
 
 const maintenanceCrud = createCrud<MaintenanceRequest>('maintenanceRequests', 'maintenanceRequests');
 export const addMaintenanceRequest = maintenanceCrud.add;
 export const updateMaintenanceRequest = maintenanceCrud.update;
-export const deleteMaintenanceRequest = maintenanceCrud.remove;
+
+export async function deleteMaintenanceRequest(id: string): Promise<void> {
+  const request = state.maintenanceRequests.find((item) => item.id === id);
+  if (!request) return;
+
+  const maintenanceDocs = state.documents.filter((d) => d.entityType === 'maintenance' && d.entityId === id);
+  for (const doc of maintenanceDocs) {
+    requireElectronAPI().docDeleteFile(doc.filename).catch((err: unknown) => {
+      logger.warn('Failed to delete maintenance document file:', doc.filename, err);
+    });
+  }
+  for (const photo of request.photos ?? []) {
+    requireElectronAPI().photoDelete(photo.filename).catch((err: unknown) => {
+      logger.warn('Failed to delete maintenance photo file:', photo.filename, err);
+    });
+  }
+
+  const maintenanceDocIds = maintenanceDocs.map((d) => d.id);
+  const ops: DbOperation[] = [{ type: 'delete', table: 'maintenanceRequests', ids: [id] }];
+  if (maintenanceDocIds.length > 0) {
+    ops.push({ type: 'delete', table: 'documents', ids: maintenanceDocIds });
+  }
+
+  const ok = await persistBatch(ops);
+  if (ok) {
+    state = {
+      ...state,
+      maintenanceRequests: state.maintenanceRequests.filter((item) => item.id !== id),
+      documents: state.documents.filter((d) => !maintenanceDocIds.includes(d.id)),
+    };
+    notify();
+  } else {
+    throw new Error('Failed to delete maintenance request');
+  }
+}
 
 // ─── Activity Logs ───────────────────────────────────────────────────────────
 
@@ -831,14 +980,23 @@ export async function deleteDocument(id: string): Promise<void> {
 export function openDocument(id: string): void {
   const doc = state.documents.find((d) => d.id === id);
   if (doc) {
-    requireElectronAPI().docOpenFile(doc.filename).catch((err: unknown) => {
-      logger.warn('Failed to open document file:', doc.filename, err);
-      window.dispatchEvent(
-        new CustomEvent('landlordpal:save-error', {
-          detail: { message: `Could not open file "${doc.originalName}". It may have been moved or deleted.` },
-        })
-      );
-    });
+    requireElectronAPI().docOpenFile(doc.filename)
+      .then((opened) => {
+        if (opened) return;
+        window.dispatchEvent(
+          new CustomEvent('landlordpal:save-error', {
+            detail: { message: `Could not open file "${doc.originalName}". It may have been moved or deleted.` },
+          })
+        );
+      })
+      .catch((err: unknown) => {
+        logger.warn('Failed to open document file:', doc.filename, err);
+        window.dispatchEvent(
+          new CustomEvent('landlordpal:save-error', {
+            detail: { message: `Could not open file "${doc.originalName}". It may have been moved or deleted.` },
+          })
+        );
+      });
   }
 }
 

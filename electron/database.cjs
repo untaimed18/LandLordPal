@@ -805,6 +805,68 @@ function getDocumentPath(filename) {
   return path.join(getDocumentsDir(), filename);
 }
 
+function exportBackupAssets(request = {}) {
+  const documentFilenames = Array.isArray(request.documents) ? [...new Set(request.documents)] : [];
+  const photoFilenames = Array.isArray(request.photos) ? [...new Set(request.photos)] : [];
+  const documents = [];
+  const photos = [];
+
+  for (const filename of documentFilenames) {
+    const filePath = getDocumentPath(filename);
+    if (!filePath || !fs.existsSync(filePath)) continue;
+    documents.push({
+      filename,
+      contentBase64: fs.readFileSync(filePath).toString('base64'),
+    });
+  }
+
+  for (const filename of photoFilenames) {
+    const filePath = getPhotoPath(filename);
+    if (!filePath || !fs.existsSync(filePath)) continue;
+    photos.push({
+      filename,
+      contentBase64: fs.readFileSync(filePath).toString('base64'),
+    });
+  }
+
+  return { documents, photos };
+}
+
+function clearDirectory(dir) {
+  if (!fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir)) {
+    fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+  }
+}
+
+function writeBackupAsset(dir, asset) {
+  if (!asset || !isSafeFilename(asset.filename)) {
+    throw new Error(`Invalid backup asset filename: ${asset?.filename ?? 'unknown'}`);
+  }
+  const filePath = path.join(dir, asset.filename);
+  fs.writeFileSync(filePath, Buffer.from(asset.contentBase64, 'base64'));
+}
+
+function replaceBackupAssets(assets = {}) {
+  try {
+    const documentsDir = getDocumentsDir();
+    const photosDir = getPhotosDir();
+    clearDirectory(documentsDir);
+    clearDirectory(photosDir);
+
+    for (const asset of Array.isArray(assets.documents) ? assets.documents : []) {
+      writeBackupAsset(documentsDir, asset);
+    }
+    for (const asset of Array.isArray(assets.photos) ? assets.photos : []) {
+      writeBackupAsset(photosDir, asset);
+    }
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
 // ─── Create tables (fresh DB only — IF NOT EXISTS) ───────────────────────────
 
 function createTables() {
@@ -1193,12 +1255,31 @@ async function backupDatabase(targetPath) {
   if (!db) return { success: false, error: 'Database not open' };
   try {
     await db.backup(targetPath);
+    const backupBase = path.basename(targetPath, path.extname(targetPath));
+    const attachmentsPath = path.join(path.dirname(targetPath), `${backupBase}-attachments`);
+    fs.rmSync(attachmentsPath, { recursive: true, force: true });
+
+    const sourceDocumentsDir = path.join(userDataDir, 'documents');
+    const sourcePhotosDir = path.join(userDataDir, 'photos');
+    let copiedAttachments = false;
+
+    if (fs.existsSync(sourceDocumentsDir)) {
+      fs.mkdirSync(attachmentsPath, { recursive: true });
+      fs.cpSync(sourceDocumentsDir, path.join(attachmentsPath, 'documents'), { recursive: true });
+      copiedAttachments = true;
+    }
+    if (fs.existsSync(sourcePhotosDir)) {
+      fs.mkdirSync(attachmentsPath, { recursive: true });
+      fs.cpSync(sourcePhotosDir, path.join(attachmentsPath, 'photos'), { recursive: true });
+      copiedAttachments = true;
+    }
+
     log.info('Database backup successful:', targetPath);
-    return { success: true, path: targetPath };
+    return { success: true, path: targetPath, attachmentsPath: copiedAttachments ? attachmentsPath : undefined };
   } catch (err) {
     log.error('Backup failed:', err.message);
     return { success: false, error: err.message };
   }
 }
 
-module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, copyFileToPhotos, deletePhotoFile, getPhotoPath, getEncryptionKeyError };
+module.exports = { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, copyFileToPhotos, deletePhotoFile, getPhotoPath, getEncryptionKeyError, exportBackupAssets, replaceBackupAssets };

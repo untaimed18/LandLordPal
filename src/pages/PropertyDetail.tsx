@@ -7,7 +7,7 @@ import {
   addActivityLog, takeSnapshot, restoreSnapshot,
 } from '../store'
 import DocumentAttachments from '../components/DocumentAttachments'
-import { getPropertySummary, getLeaseStatus, getTenantReliability } from '../lib/calculations'
+import { getPropertySummary, getLeaseStatus, getTenantReliability, isMoveOutEffective, isTenantActiveOn } from '../lib/calculations'
 import type { ReliabilityGrade } from '../lib/calculations'
 import { loadSettings } from '../lib/settings'
 import { nowISO } from '../lib/id'
@@ -50,6 +50,7 @@ export default function PropertyDetail() {
   const toast = useToast()
   const confirm = useConfirm()
   const { properties, units, tenants, expenses, payments, maintenanceRequests, activityLogs, communicationLogs } = useStore()
+  const settings = loadSettings()
 
   const [paymentHistoryTenant, setPaymentHistoryTenant] = useState<string | null>(null)
   const [unitForm, setUnitForm] = useState(false)
@@ -83,7 +84,7 @@ export default function PropertyDetail() {
   useEffect(() => {
     if (searchParams.get('addTenant') === '1' && id) {
       const propUnitsLocal = units.filter((u) => u.propertyId === id)
-      const firstAvailable = propUnitsLocal.find((u) => !tenants.some((t) => t.unitId === u.id && !t.moveOutDate))
+      const firstAvailable = propUnitsLocal.find((u) => !tenants.some((t) => t.unitId === u.id && isTenantActiveOn(t)))
       if (firstAvailable) {
         setEditingTenantId(null)
         setTenantFormUnitId(firstAvailable.id)
@@ -91,7 +92,7 @@ export default function PropertyDetail() {
         setSearchParams({}, { replace: true })
       }
     }
-  }, [searchParams, id, units, tenants, setSearchParams])
+  }, [searchParams, id, units, tenants, setSearchParams, settings.defaultGracePeriodDays, settings.requireFirstMonth, settings.requireLastMonth])
 
   if (!property) {
     return (
@@ -105,8 +106,8 @@ export default function PropertyDetail() {
   const prop = property
   const propUnits = units.filter((u) => u.propertyId === prop.id)
   const propTenants = tenants.filter((t) => t.propertyId === prop.id)
-  const activeTenants = propTenants.filter((t) => !t.moveOutDate)
-  const pastTenants = propTenants.filter((t) => t.moveOutDate).sort((a, b) => (b.moveOutDate || '').localeCompare(a.moveOutDate || ''))
+  const activeTenants = propTenants.filter((t) => isTenantActiveOn(t))
+  const pastTenants = propTenants.filter((t) => isMoveOutEffective(t.moveOutDate)).sort((a, b) => (b.moveOutDate || '').localeCompare(a.moveOutDate || ''))
   const propExpenses = expenses.filter((e) => e.propertyId === prop.id)
   const propPayments = payments.filter((p) => p.propertyId === prop.id)
   const propMaintenance = maintenanceRequests.filter((m) => m.propertyId === prop.id && m.status !== 'completed')
@@ -117,8 +118,6 @@ export default function PropertyDetail() {
     return false
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const summary = getPropertySummary(prop, units, tenants, expenses, payments)
-  const settings = loadSettings()
-
   function openAddTenant(unitId: string, rent: number, deposit: number) {
     setEditingTenantId(null)
     setTenantFormUnitId(unitId)
@@ -144,7 +143,7 @@ export default function PropertyDetail() {
         await deleteProperty(prop.id)
         navigate('/properties')
         toast('Property deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); navigate(`/properties/${prop.id}`); toast('Property restored', 'info') } catch { toast('Undo failed', 'error') } } } })
-      } catch (err) {
+      } catch {
         toast('Failed to delete property', 'error')
       }
     }
@@ -160,7 +159,7 @@ export default function PropertyDetail() {
         await deleteUnit(unitId)
         setEditingUnitId(null)
         toast('Unit deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Unit restored', 'info') } catch { toast('Undo failed', 'error') } } } })
-      } catch (err) {
+      } catch {
         toast('Failed to delete unit', 'error')
       }
     }
@@ -174,7 +173,7 @@ export default function PropertyDetail() {
         await deleteTenant(tenantId)
         setEditingTenantId(null)
         toast('Tenant removed', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Tenant restored', 'info') } catch { toast('Undo failed', 'error') } } } })
-      } catch (err) {
+      } catch {
         toast('Failed to remove tenant', 'error')
       }
     }
@@ -187,7 +186,7 @@ export default function PropertyDetail() {
       try {
         await deletePayment(paymentId)
         toast('Payment deleted', { action: { label: 'Undo', onClick: async () => { try { await restoreSnapshot(snap); toast('Payment restored', 'info') } catch { toast('Undo failed', 'error') } } } })
-      } catch (err) {
+      } catch {
         toast('Failed to delete payment', 'error')
       }
     }
@@ -200,7 +199,7 @@ export default function PropertyDetail() {
       setNewUnit({ name: '', bedrooms: 1, bathrooms: 1, monthlyRent: 0, sqft: 0, deposit: 0, notes: '', available: true })
       setUnitForm(false)
       toast('Unit added')
-    } catch (err) {
+    } catch {
       toast('Failed to add unit', 'error')
     }
   }
@@ -212,7 +211,7 @@ export default function PropertyDetail() {
       setNoteText('')
       setNoteEntity(null)
       toast('Note added')
-    } catch (err) {
+    } catch {
       toast('Failed to add note', 'error')
     }
   }
@@ -334,7 +333,7 @@ export default function PropertyDetail() {
                         await updateUnit(unit.id, { name, bedrooms, bathrooms, monthlyRent, sqft, deposit, notes })
                         setEditingUnitId(null)
                         toast('Unit updated')
-                      } catch (err) {
+                      } catch {
                         toast('Failed to update unit', 'error')
                       }
                     }}>
@@ -364,7 +363,7 @@ export default function PropertyDetail() {
                               </div>
                             </div>
                             {(() => { const s = getLeaseStatus(tenant.leaseEnd); if (s === 'expired') return <span className="badge expired">Lease expired</span>; if (s === 'expiring') return <span className="badge expiring">Expiring soon</span>; return <span className="badge active-lease">Active</span> })()}
-                            <ReliabilityBadge tenant={tenant} payments={propPayments} graceDays={settings.defaultGracePeriodDays} />
+                            <ReliabilityBadge tenant={tenant} payments={propPayments} graceDays={tenant.gracePeriodDays ?? settings.defaultGracePeriodDays} />
                           </div>
                           <div className="stc-details-grid">
                             <div className="stc-detail"><CalendarDays size={14} className="stc-detail-icon" /><div><span className="stc-detail-label">Lease period</span><span className="stc-detail-value">{formatDate(tenant.leaseStart)} — {formatDate(tenant.leaseEnd)}</span></div></div>
@@ -433,7 +432,7 @@ export default function PropertyDetail() {
                               <span className="muted block">Rent history: {tenant.rentHistory.map((r, i) => <span key={i}>{formatDate(r.date)}: {formatMoney(r.oldRent)} → {formatMoney(r.newRent)}{i < tenant.rentHistory!.length - 1 ? ', ' : ''}</span>)}</span>
                             )}
                             {(() => { const s = getLeaseStatus(tenant.leaseEnd); if (s === 'expired') return <span className="badge expired">Lease expired</span>; if (s === 'expiring') return <span className="badge expiring">Lease expiring</span>; return <span className="badge active-lease">Active</span> })()}
-                            <ReliabilityBadge tenant={tenant} payments={propPayments} graceDays={settings.defaultGracePeriodDays} />
+                            <ReliabilityBadge tenant={tenant} payments={propPayments} graceDays={tenant.gracePeriodDays ?? settings.defaultGracePeriodDays} />
                           </>
                         )}
                         {unit.available && !tenant && <span className="badge available">Available</span>}

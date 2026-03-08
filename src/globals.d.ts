@@ -37,13 +37,23 @@ interface DbOperation {
   where?: { column: string; value: string };
 }
 
+interface BackupAssetEntry {
+  filename: string;
+  contentBase64: string;
+}
+
+interface BackupAssets {
+  documents: BackupAssetEntry[];
+  photos: BackupAssetEntry[];
+}
+
 interface ElectronAPI {
   platform: string;
   // Database
   dbLoad: () => Promise<AppStateData | null>;
   dbSave: (state: AppStateData) => Promise<boolean>;
   dbBatch: (operations: DbOperation[]) => Promise<{ success: boolean; error?: string }>;
-  dbBackup: (path?: string) => Promise<{ success: boolean; error?: string; path?: string }>;
+  dbBackup: (path?: string) => Promise<{ success: boolean; error?: string; path?: string; attachmentsPath?: string }>;
   // Documents
   docPickFile: () => Promise<{ filename: string; originalName: string; size: number; mimeType: string } | null>;
   docDeleteFile: (filename: string) => Promise<boolean>;
@@ -52,6 +62,9 @@ interface ElectronAPI {
   photoPick: () => Promise<{ filename: string; size: number } | null>;
   photoDelete: (filename: string) => Promise<boolean>;
   photoGetPath: (filename: string) => Promise<string | null>;
+  backupExportAssets: (request: { documents: string[]; photos: string[] }) => Promise<BackupAssets>;
+  backupReplaceAssets: (assets: BackupAssets) => Promise<{ success: boolean; error?: string }>;
+  settingsSave: (settings: Record<string, unknown>) => Promise<boolean>;
   // Security
   getEncryptionKeyError: () => Promise<string | null>;
   // Auto-update

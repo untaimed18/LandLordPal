@@ -12,6 +12,7 @@ import Pagination from '../components/Pagination'
 import { Wrench } from 'lucide-react'
 import { useFormValidation } from '../hooks/useFormValidation'
 import { maintenanceSchema } from '../lib/schemas'
+import { getNextRecurringDate, isTenantActiveOn } from '../lib/calculations'
 
 const PRIORITIES: { value: MaintenancePriority; label: string }[] = [
   { value: 'low', label: 'Low' },
@@ -100,7 +101,7 @@ export default function Maintenance() {
   const inProgressCount = maintenanceRequests.filter((r) => r.status === 'in_progress').length
 
   const propUnits = form.propertyId ? units.filter((u) => u.propertyId === form.propertyId) : []
-  const propTenants = form.propertyId ? tenants.filter((t) => t.propertyId === form.propertyId && !t.moveOutDate) : []
+  const propTenants = form.propertyId ? tenants.filter((t) => t.propertyId === form.propertyId && isTenantActiveOn(t)) : []
 
   const suggestedVendors = useMemo(() => {
     const specialties = CATEGORY_SPECIALTY_MAP[form.category] ?? []
@@ -183,15 +184,8 @@ export default function Maintenance() {
     toast(`Marked as ${STATUSES.find((s) => s.value === status)?.label}`)
 
     if (status === 'completed' && request?.recurrence && request.recurrence !== 'none') {
-      const baseDate = request.scheduledDate ? new Date(request.scheduledDate + 'T12:00:00') : new Date()
-      const next = new Date(baseDate)
-      switch (request.recurrence) {
-        case 'monthly': next.setMonth(next.getMonth() + 1); break
-        case 'quarterly': next.setMonth(next.getMonth() + 3); break
-        case 'semi_annual': next.setMonth(next.getMonth() + 6); break
-        case 'annual': next.setFullYear(next.getFullYear() + 1); break
-      }
-      const nextDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+      const nextDate = getNextRecurringDate(request.scheduledDate ?? nowISO(), request.recurrence)
+      if (!nextDate) return
       await addMaintenanceRequest({
         propertyId: request.propertyId,
         unitId: request.unitId,

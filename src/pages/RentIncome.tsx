@@ -288,7 +288,7 @@ export default function RentIncome() {
                       </td>
                       <td>
                         {(() => {
-                          const rel = getTenantReliability(r.tenant, payments, settings.defaultGracePeriodDays)
+                          const rel = getTenantReliability(r.tenant, payments, r.tenant.gracePeriodDays ?? settings.defaultGracePeriodDays)
                           return (
                             <span className={`reliability-badge-inline grade-${rel.grade}`} title={`${rel.label} — ${rel.score}/100`}>
                               {rel.grade} · {rel.score}

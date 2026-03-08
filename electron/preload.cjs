@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   photoPick: () => ipcRenderer.invoke('photo:pick'),
   photoDelete: (filename) => ipcRenderer.invoke('photo:delete', filename),
   photoGetPath: (filename) => ipcRenderer.invoke('photo:get-path', filename),
+  backupExportAssets: (request) => ipcRenderer.invoke('backup:export-assets', request),
+  backupReplaceAssets: (assets) => ipcRenderer.invoke('backup:replace-assets', assets),
+  settingsSave: (settings) => ipcRenderer.invoke('settings:save', settings),
 
   // Security
   getEncryptionKeyError: () => ipcRenderer.invoke('encryption-key-error'),

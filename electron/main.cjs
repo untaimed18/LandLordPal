@@ -3,11 +3,7 @@ const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
 const SENTRY_DSN = process.env.SENTRY_DSN || 'https://9fb73591a8037b188820282a38bb6a74@o4510936485593088.ingest.us.sentry.io/4510936499290113';
-try {
-  const Sentry = require('@sentry/electron/main');
-  Sentry.init({ dsn: SENTRY_DSN });
-} catch { /* sentry optional */ }
-const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, copyFileToPhotos, deletePhotoFile, getPhotoPath, getEncryptionKeyError } = require('./database.cjs');
+const { initDatabase, loadAll, replaceAll, executeBatch, closeDatabase, backupDatabase, copyFileToDocuments, deleteDocumentFile, getDocumentPath, copyFileToPhotos, deletePhotoFile, getPhotoPath, getEncryptionKeyError, exportBackupAssets, replaceBackupAssets } = require('./database.cjs');
 const fs = require('fs');
 const { dialog, shell } = require('electron');
 const log = require('./logger.cjs');
@@ -16,6 +12,48 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
 let mainWindow = null;
 let dbClosed = false;
+let SentryMain = null;
+let sentryEnabled = false;
+
+function getSettingsPath() {
+  return path.join(app.getPath('userData'), 'settings.json');
+}
+
+function readSavedSettings() {
+  try {
+    const settingsPath = getSettingsPath();
+    if (!fs.existsSync(settingsPath)) return {};
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeSavedSettings(settings) {
+  const settingsPath = getSettingsPath();
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+function applyErrorReportingPreference(enabled) {
+  if (enabled) {
+    if (sentryEnabled) return;
+    try {
+      if (!SentryMain) SentryMain = require('@sentry/electron/main');
+      SentryMain.init({ dsn: SENTRY_DSN });
+      sentryEnabled = true;
+    } catch {
+      // sentry optional
+    }
+    return;
+  }
+
+  if (!sentryEnabled) return;
+  sentryEnabled = false;
+  if (SentryMain && typeof SentryMain.close === 'function') {
+    Promise.resolve(SentryMain.close()).catch(() => {});
+  }
+}
 
 // ─── Process-level error handlers ────────────────────────────────────────────
 
@@ -246,6 +284,8 @@ async function setupDatabase() {
           if (files.length > MAX_AUTO_BACKUPS) {
             for (const file of files.slice(MAX_AUTO_BACKUPS)) {
               fs.unlinkSync(path.join(backupDir, file.name));
+              const attachmentDir = path.join(backupDir, `${path.basename(file.name, path.extname(file.name))}-attachments`);
+              fs.rmSync(attachmentDir, { recursive: true, force: true });
               log.info('Removed old auto-backup:', file.name);
             }
           }
@@ -294,10 +334,14 @@ async function setupDatabase() {
     return true;
   });
 
-  ipcMain.handle('doc:open-file', (_event, filename) => {
+  ipcMain.handle('doc:open-file', async (_event, filename) => {
     const filePath = getDocumentPath(filename);
     if (!filePath) return false;
-    shell.openPath(filePath);
+    const result = await shell.openPath(filePath);
+    if (result) {
+      log.warn('doc:open-file failed:', result);
+      return false;
+    }
     return true;
   });
 
@@ -328,11 +372,39 @@ async function setupDatabase() {
   ipcMain.handle('photo:get-path', (_event, filename) => {
     return getPhotoPath(filename);
   });
+
+  ipcMain.handle('backup:export-assets', (_event, request) => {
+    try {
+      return exportBackupAssets(request);
+    } catch (err) {
+      log.error('backup:export-assets failed:', err.message);
+      return { documents: [], photos: [] };
+    }
+  });
+
+  ipcMain.handle('backup:replace-assets', (_event, assets) => {
+    return replaceBackupAssets(assets);
+  });
+
+  ipcMain.handle('settings:save', (_event, settings) => {
+    try {
+      writeSavedSettings(settings || {});
+      if (typeof settings?.errorReporting === 'boolean') {
+        applyErrorReportingPreference(settings.errorReporting);
+      }
+      return true;
+    } catch (err) {
+      log.error('settings:save failed:', err.message);
+      return false;
+    }
+  });
 }
 
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+  const savedSettings = readSavedSettings();
+  applyErrorReportingPreference(savedSettings.errorReporting !== false);
   await setupDatabase();
   createWindow();
   setupAutoUpdater();

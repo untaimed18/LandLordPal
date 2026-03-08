@@ -49,19 +49,28 @@ export default function Settings() {
     toast('Settings reset to defaults', 'info')
   }
 
-  function handleExport() {
-    const data = getState()
-    const json = JSON.stringify(data, null, 2)
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `landlordpal-backup-${nowISO()}.json`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toast('Backup exported', 'info')
+  async function handleExport() {
+    try {
+      const data = getState()
+      const documentFilenames = [...new Set(documents.map((doc) => doc.filename))]
+      const photoFilenames = [...new Set(maintenanceRequests.flatMap((request) => request.photos?.map((photo) => photo.filename) ?? []))]
+      const attachments = window.electronAPI?.backupExportAssets
+        ? await window.electronAPI.backupExportAssets({ documents: documentFilenames, photos: photoFilenames })
+        : { documents: [], photos: [] }
+      const json = JSON.stringify({ ...data, attachments }, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `landlordpal-backup-${nowISO()}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      toast('Backup exported', 'info')
+    } catch {
+      toast('Failed to export backup', 'error')
+    }
   }
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -77,7 +86,19 @@ export default function Settings() {
           toast(`Invalid backup file: ${issues}`, 'error')
           return
         }
-        const recordCount = Object.values(parsed.data).reduce((s, arr) => s + arr.length, 0)
+        const recordCount = [
+          parsed.data.properties,
+          parsed.data.units,
+          parsed.data.tenants,
+          parsed.data.expenses,
+          parsed.data.payments,
+          parsed.data.maintenanceRequests,
+          parsed.data.activityLogs,
+          parsed.data.vendors,
+          parsed.data.communicationLogs,
+          parsed.data.documents,
+          parsed.data.emailTemplates,
+        ].reduce((sum, items) => sum + items.length, 0)
         const ok = await confirm({
           title: 'Import backup',
           message: `Importing will replace ALL current data with ${recordCount} records from the backup. This cannot be undone.`,
@@ -85,7 +106,10 @@ export default function Settings() {
           danger: true,
         })
         if (!ok) return
-        await importState(parsed.data as Record<string, unknown>)
+        await importState(parsed.data as Record<string, unknown>, parsed.data.attachments)
+        if (!parsed.data.attachments && parsed.data.documents.length > 0) {
+          toast('Backup restored, but attachment files were not included in this backup.', 'info')
+        }
         toast('Backup restored successfully')
       } catch {
         toast('Invalid backup file or failed to import. Please try again.', 'error')
@@ -197,7 +221,7 @@ export default function Settings() {
     })
     if (!ok2) return
     try {
-      await importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [], documents: [], emailTemplates: [] })
+      await importState({ properties: [], units: [], tenants: [], expenses: [], payments: [], maintenanceRequests: [], activityLogs: [], vendors: [], communicationLogs: [], documents: [], emailTemplates: [] }, { documents: [], photos: [] })
       toast('All data cleared')
     } catch {
       toast('Failed to clear data', 'error')
@@ -260,7 +284,7 @@ export default function Settings() {
         <p className="section-desc">Import data from CSV files. Please use the templates provided to ensure correct formatting.</p>
         
         <div className="import-controls" style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-          <select value={importType} onChange={(e) => setImportType(e.target.value as any)} className="select-inline">
+          <select value={importType} onChange={(e) => setImportType(e.target.value as ImportType)} className="select-inline">
             <option value="properties">Properties</option>
             <option value="units">Units</option>
             <option value="tenants">Tenants</option>
@@ -608,7 +632,7 @@ export default function Settings() {
             toast('Creating backup...', 'info');
             try {
               const res = await window.electronAPI.dbBackup();
-              if (res.success) toast(`Backup saved to ${res.path}`, 'info');
+              if (res.success) toast(res.attachmentsPath ? `Backup saved to ${res.path} with attachments in ${res.attachmentsPath}` : `Backup saved to ${res.path}`, 'info');
               else toast(`Backup failed: ${res.error}`, 'error');
             } catch {
               toast('Backup failed', 'error');

@@ -18,6 +18,7 @@ import {
   getVacancyAnalysis,
   getMortgageAmortization,
   getMaintenanceCostTrends,
+  getNextRecurringDate,
 } from '../lib/calculations'
 import type { Property, Unit, Tenant, Expense, Payment } from '../types'
 
@@ -47,6 +48,12 @@ describe('getExpectedMonthlyRent', () => {
   })
   it('returns 0 for empty list', () => {
     expect(getExpectedMonthlyRent([])).toBe(0)
+  })
+  it('keeps tenants with future move-out dates in current rent', () => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const futureMoveOut = tomorrow.toISOString().slice(0, 10)
+    expect(getExpectedMonthlyRent([makeTenant({ monthlyRent: 1000, moveOutDate: futureMoveOut })])).toBe(1000)
   })
 })
 
@@ -167,6 +174,19 @@ describe('getRentRollForMonth', () => {
     expect(roll).toHaveLength(1)
     expect(roll[0].paid).toBe(false)
     expect(roll[0].paidAmount).toBe(0)
+  })
+  it('does not count fee-only payments toward rent paid', () => {
+    const roll = getRentRollForMonth(
+      2025,
+      5,
+      [makeProperty()],
+      [makeUnit()],
+      [makeTenant()],
+      [makePayment({ id: 'fee1', date: '2025-06-15', amount: 50, category: 'fee', lateFee: 50 })],
+    )
+    expect(roll[0].paidAmount).toBe(0)
+    expect(roll[0].balance).toBe(1000)
+    expect(roll[0].lateFees).toBe(50)
   })
 })
 
@@ -454,6 +474,16 @@ describe('getVacancyAnalysis', () => {
     expect(result.occupancyRate).toBe(1)
   })
 
+  it('treats future move-outs as still occupied', () => {
+    const property = makeProperty()
+    const unit = makeUnit()
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tenant = makeTenant({ moveOutDate: tomorrow.toISOString().slice(0, 10) })
+    const result = getVacancyAnalysis([property], [unit], [tenant])
+    expect(result.vacantUnits).toHaveLength(0)
+  })
+
   it('handles no units', () => {
     const result = getVacancyAnalysis([], [], [])
     expect(result.vacantUnits).toHaveLength(0)
@@ -506,6 +536,12 @@ describe('getMaintenanceCostTrends', () => {
     const trends = getMaintenanceCostTrends([], 3)
     expect(trends.length).toBe(3)
     expect(trends.every((t) => t.total === 0)).toBe(true)
+  })
+})
+
+describe('getNextRecurringDate', () => {
+  it('clamps month-end recurrences to the last day of the next month', () => {
+    expect(getNextRecurringDate('2025-01-31', 'monthly')).toBe('2025-02-28')
   })
 })
 

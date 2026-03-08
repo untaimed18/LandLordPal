@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../hooks/useStore'
 import { formatMoney, formatDate } from '../lib/format'
+import { isMoveOutEffective } from '../lib/calculations'
 import { DollarSign, FileText, KeyRound, Wrench, Receipt, CalendarDays, Shield, Clock } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -29,7 +30,7 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function Calendar() {
   const { properties, units, tenants, expenses, maintenanceRequests } = useStore()
-  const now = new Date()
+  const [now] = useState(() => new Date())
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
 
@@ -43,11 +44,12 @@ export default function Calendar() {
       const leaseEnd = t.leaseEnd
       const mStart = leaseStart.slice(0, 7)
       const mEnd = leaseEnd.slice(0, 7)
-      if (monthStr >= mStart && monthStr <= mEnd) {
+      const rentDueDate = `${monthStr}-01`
+      if (monthStr >= mStart && monthStr <= mEnd && !isMoveOutEffective(t.moveOutDate, rentDueDate)) {
         const prop = properties.find((p) => p.id === t.propertyId)
         const unit = units.find((u) => u.id === t.unitId)
         result.push({
-          date: `${monthStr}-01`,
+          date: rentDueDate,
           type: 'rent_due',
           label: `${t.name} — ${formatMoney(t.monthlyRent)}`,
           sub: `${prop?.name ?? ''} / ${unit?.name ?? ''}`,
@@ -58,7 +60,7 @@ export default function Calendar() {
 
     // Lease endings this month
     for (const t of tenants) {
-      if (t.leaseEnd.startsWith(monthStr)) {
+      if (t.leaseEnd.startsWith(monthStr) && !isMoveOutEffective(t.moveOutDate, t.leaseEnd)) {
         const prop = properties.find((p) => p.id === t.propertyId)
         result.push({
           date: t.leaseEnd,
@@ -72,7 +74,7 @@ export default function Calendar() {
 
     // Lease starts this month
     for (const t of tenants) {
-      if (t.leaseStart.startsWith(monthStr)) {
+      if (t.leaseStart.startsWith(monthStr) && !isMoveOutEffective(t.moveOutDate, t.leaseStart)) {
         const prop = properties.find((p) => p.id === t.propertyId)
         result.push({
           date: t.leaseStart,
@@ -191,7 +193,7 @@ export default function Calendar() {
     const cutoffISO = cutoff.toISOString().slice(0, 10)
 
     for (const t of tenants) {
-      if (t.leaseEnd >= todayISO && t.leaseEnd <= cutoffISO) {
+      if (t.leaseEnd >= todayISO && t.leaseEnd <= cutoffISO && !isMoveOutEffective(t.moveOutDate, t.leaseEnd)) {
         const prop = properties.find((p) => p.id === t.propertyId)
         result.push({
           date: t.leaseEnd,
@@ -232,7 +234,7 @@ export default function Calendar() {
     }
 
     return result.sort((a, b) => a.date.localeCompare(b.date))
-  }, [tenants, properties, maintenanceRequests])
+  }, [tenants, properties, maintenanceRequests, now])
 
   return (
     <div className="page calendar-page">
